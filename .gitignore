@@ -13,11 +13,20 @@
 .phpunit.result.cache
 Homestead.json
 Homestead.yaml
+/auth.json
 npm-debug.log
 yarn-error.log
-/auth.json
+/.vagrant
 /.fleet
 /.idea
 /.nova
 /.vscode
 /.zed
+
+# Laravel 4 specific
+bootstrap/compiled.php
+app/storage/
+
+# Laravel 5 & Lumen specific with changed public path
+/public_html/storage
+/public_html/hot
