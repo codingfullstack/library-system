@@ -24,7 +24,7 @@ it('allows only superadmin to open the audit log page', function () {
     $this->actingAs($superAdmin)
         ->get(route('manage.audit-logs.index'))
         ->assertOk()
-        ->assertSee('Veiksmu istorija');
+        ->assertSee('Auditu zurnalas');
 
     $this->actingAs($admin)
         ->get(route('manage.audit-logs.index'))
@@ -53,7 +53,7 @@ it('records an audit log when a book is updated', function () {
         'category_ids' => [],
     ]);
 
-    $response->assertRedirect(route('manage.books.index'));
+    $response->assertRedirect(route('books.index'));
 
     $this->assertDatabaseHas('audit_logs', [
         'action' => 'book_updated',
@@ -244,7 +244,7 @@ it('allows superadmin to open a book page even when it has no copies yet', funct
         ->assertOk()
         ->assertSee('Katalogo knyga be egzemplioriu')
         ->assertSee('Kopiju nerasta')
-        ->assertSee('Prideti pirma egzemplioriu');
+        ->assertSee('Prideti egzemplioriu');
 });
 
 it('shows related audit logs on author edit page for superadmin', function () {

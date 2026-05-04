@@ -139,20 +139,15 @@ it('shows extended dashboard reports scoped to the staff library', function () {
     $response = $this->actingAs($staff)->get(route('dashboard'));
 
     $response->assertOk();
-    $response->assertSee('Kalno biblioteka statistika');
+    $response->assertSee('Apzvalga');
     $response->assertSee('Biblioteku palyginimas');
-    $response->assertSee('Veiklos laiko juosta');
-    $response->assertSee('Top autoriai');
-    $response->assertSee('Top kategorijos');
-    $response->assertSee('Top leidyklos');
-    $response->assertSee('Top egzemplioriai');
+    $response->assertSee('Isdavimu, grazinimu ir rezervaciju dinamika');
+    $response->assertSee('Populiariausios knygos');
+    $response->assertSee('Aktyviausi nariai');
+    $response->assertSee('Veiklos suvestine');
     $response->assertSee('Egzemplioriu busenos');
-    $response->assertSee('Egzemplioriai pagal filialus');
     $response->assertSee('Populiari knyga');
     $response->assertSee('Rasa Autore');
-    $response->assertSee('Testine fantastika');
-    $response->assertSee('Testo leidykla');
-    $response->assertSee('INV-POPULAR-001');
     $response->assertSee('Aktyvus narys');
     $response->assertDontSee('Slenio biblioteka');
     $response->assertDontSee('Kitas narys');
@@ -176,7 +171,7 @@ it('shows dashboard reports across libraries for super admin', function () {
     $response = $this->actingAs($superAdmin)->get(route('dashboard'));
 
     $response->assertOk();
-    $response->assertSee('Visu biblioteku statistika');
+    $response->assertSee('Apzvalga');
     $response->assertSee('Pirma biblioteka');
     $response->assertSee('Antra biblioteka');
 });

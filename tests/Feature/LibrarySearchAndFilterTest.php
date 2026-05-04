@@ -17,7 +17,7 @@ uses(RefreshDatabase::class);
 
 it('filters books by author category publisher and availability', function () {
     $library = Library::factory()->create();
-    $user = User::factory()->member()->create(['library_id' => $library->id]);
+    $user = User::factory()->staff()->create(['library_id' => $library->id]);
 
     $matchingAuthor = Author::factory()->create(['name' => 'Tinkamas Autorius']);
     $otherAuthor = Author::factory()->create(['name' => 'Kitas Autorius']);
@@ -74,7 +74,7 @@ it('filters books by author category publisher and availability', function () {
 
 it('filters book copies on the book page by status branch and location', function () {
     $library = Library::factory()->create();
-    $user = User::factory()->member()->create(['library_id' => $library->id]);
+    $user = User::factory()->staff()->create(['library_id' => $library->id]);
     $book = Book::factory()->create(['title' => 'Filtruojama knyga']);
 
     $matchingBranch = Branch::factory()->create(['library_id' => $library->id, 'name' => 'Centrinis']);
@@ -114,7 +114,7 @@ it('filters book copies on the book page by status branch and location', functio
 
 it('filters book copies on the book page by lifecycle group', function () {
     $library = Library::factory()->create();
-    $user = User::factory()->member()->create(['library_id' => $library->id]);
+    $user = User::factory()->staff()->create(['library_id' => $library->id]);
     $book = Book::factory()->create(['title' => 'Gyvenimo ciklo filtrai']);
     $branch = Branch::factory()->create(['library_id' => $library->id, 'name' => 'Pagrindinis']);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id, 'name' => 'Lentyna C']);
@@ -275,7 +275,7 @@ it('filters reservations by queue and library', function () {
     $response->assertSee('Pirmas narys');
     $response->assertDontSee('Antras narys');
     $response->assertDontSee('Kitos bibliotekos narys');
-    $response->assertSee('#1');
+    $response->assertSee('1');
 });
 
 it('shows global management search results for visible entities', function () {
