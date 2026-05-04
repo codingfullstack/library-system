@@ -1,212 +1,239 @@
-<x-layouts::app :title="__('Knygų sąrašas')">
-    <div class="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <div class="mb-6">
-            <h1 class="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">
-                Knygų sąrašas
-            </h1>
-            <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                Čia gali peržiūrėti bibliotekos knygas, ieškoti ir rūšiuoti įrašus.
-            </p>
-        </div>
+<x-layouts::app :title="__('Knygos')">
+    @php
+        $canManageBooks = in_array(auth()->user()?->role, ['super_admin', 'admin', 'staff'], true);
+        $canEditBooks = auth()->user()?->isSuperAdmin();
+    @endphp
 
-        <div
-            class="mb-6 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-            <form method="GET" action="{{ route('books.index') }}">
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-                    <div class="xl:col-span-2">
-                        <label for="search" class="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                            Paieška
-                        </label>
-                        <input id="search" type="text" name="search"
-                            placeholder="Ieškoti pagal pavadinimą, ISBN, autorių..." value="{{ request('search') }}"
-                            class="w-full rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white dark:placeholder:text-zinc-500">
+    <x-ui.page class="max-w-none px-4 py-0 sm:px-6 lg:px-8">
+        <div class="bg-[#f7f8fa] py-8 dark:bg-zinc-950">
+            <div class="mx-auto max-w-[1500px] space-y-6">
+                <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                    <div>
+                        <h1 class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">Knygos</h1>
+                        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                            Tvarkykite bibliotekos knygu kataloga
+                        </p>
                     </div>
 
-                    <div>
-                        <label for="sort" class="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                            Rūšiuoti pagal
-                        </label>
-                        <select id="sort" name="sort"
-                            class="w-full rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white">
-                            <option value="title" {{ request('sort', 'title') === 'title' ? 'selected' : '' }}>Pavadinimas
-                            </option>
-                            <option value="publication_year" {{ request('sort') === 'publication_year' ? 'selected' : '' }}>Leidimo metai</option>
-                            <option value="copies_count" {{ request('sort') === 'copies_count' ? 'selected' : '' }}>Kopijų
-                                kiekis</option>
-                            <option value="created_at" {{ request('sort') === 'created_at' ? 'selected' : '' }}>Sukūrimo
-                                data</option>
-                        </select>
-                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <a href="{{ route('exports.list', array_merge(request()->query(), ['resource' => 'books'])) }}" class="inline-flex h-11 items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                            <flux:icon.arrow-down-tray class="size-4" />
+                            Eksportuoti
+                        </a>
 
-                    <div>
-                        <label for="direction" class="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                            Kryptis
-                        </label>
-                        <select id="direction" name="direction"
-                            class="w-full rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white">
-                            <option value="asc" {{ request('direction', 'asc') === 'asc' ? 'selected' : '' }}>Didėjančiai
-                            </option>
-                            <option value="desc" {{ request('direction') === 'desc' ? 'selected' : '' }}>Mažėjančiai
-                            </option>
-                        </select>
-                    </div>
+                        @if($canManageBooks)
+                            <a href="{{ route('manage.imports.show', 'books') }}" class="inline-flex h-11 items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                                <flux:icon.arrow-up-tray class="size-4" />
+                                Importuoti
+                            </a>
 
-                    <div>
-                        <label for="per_page" class="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                            Rodyti po
-                        </label>
-                        <select id="per_page" name="per_page"
-                            class="w-full rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white">
-                            <option value="10" {{ request('per_page') == 10 ? 'selected' : '' }}>10</option>
-                            <option value="15" {{ request('per_page', 15) == 15 ? 'selected' : '' }}>15</option>
-                            <option value="25" {{ request('per_page') == 25 ? 'selected' : '' }}>25</option>
-                            <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
-                        </select>
+                            <a href="{{ route('manage.books.create') }}" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600">
+                                <flux:icon.plus class="size-4" />
+                                Prideti knyga
+                                <flux:icon.chevron-down class="size-4" />
+                            </a>
+                        @endif
                     </div>
                 </div>
 
-                <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <button type="submit"
-                        class="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium  shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
-                        Filtruoti
-                    </button>
+                @if(session('success'))
+                    <x-ui.alert type="success">
+                        {{ session('success') }}
+                    </x-ui.alert>
+                @endif
 
-                    <a href="{{ route('books.index') }}"
-                        class="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
-                        Išvalyti filtrus
-                    </a>
-                </div>
-            </form>
-        </div>
+                @if(session('error'))
+                    <x-ui.alert type="error">
+                        {{ session('error') }}
+                    </x-ui.alert>
+                @endif
 
-        @if($books->count() === 0)
-            <div
-                class="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-12 text-center shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
-                <h2 class="text-lg font-semibold text-zinc-900 dark:text-white">
-                    Knygų nerasta
-                </h2>
-                <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                    Pabandyk pakeisti paieškos frazę arba filtrus.
-                </p>
-            </div>
-        @else
-            <div
-                class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
-                        <thead class="bg-zinc-50 dark:bg-zinc-950/50">
-                            <tr>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                                    ID
-                                </th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                                    Pavadinimas
-                                </th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                                    ISBN
-                                </th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                                    Kategorija
-                                </th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                                    Leidykla
-                                </th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                                    Autoriai
-                                </th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                                    Metai
-                                </th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                                    Kopijos
-                                </th>
-                            </tr>
-                        </thead>
+                @include('manage.imports._result')
 
-                        <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
-                            @foreach($books as $book)
-                                <tr class="transition hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
-                                    <td class="whitespace-nowrap px-4 py-4 text-sm text-zinc-500 dark:text-zinc-400">
-                                        #{{ $book->id }}
-                                    </td>
+                <section class="overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                    <div class="px-5 py-4">
+                        <form method="GET" action="{{ route('books.index') }}" class="grid gap-3 xl:grid-cols-[minmax(320px,1.5fr)_180px_180px_160px_auto_auto] xl:items-center">
+                            <div class="relative xl:min-w-0">
+                                <input
+                                    id="search"
+                                    type="text"
+                                    name="search"
+                                    value="{{ request('search') }}"
+                                    placeholder="Ieskoti knygos pagal pavadinima, autoriu ar ISBN..."
+                                    class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 pl-11 shadow-none dark:border-zinc-700 dark:bg-zinc-950"
+                                >
+                                <div class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
+                                    <flux:icon.magnifying-glass class="size-4" />
+                                </div>
+                            </div>
 
-                                    <td class="px-4 py-4">
-                                        <div class="font-semibold text-zinc-900 dark:text-white">
-                                            <a href="{{ route('books.show', $book) }}"
-                                                class="font-semibold text-zinc-900 transition hover:text-indigo-600 dark:text-white dark:hover:text-indigo-400">
-                                                {{ $book->title }}
-                                            </a>
-                                        </div>
+                            <div class="xl:min-w-0">
+                                <select id="category_id" name="category_id" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
+                                    <option value="">Kategorija</option>
+                                    @foreach($categories as $category)
+                                        <option value="{{ $category->id }}" {{ (string) request('category_id') === (string) $category->id ? 'selected' : '' }}>
+                                            {{ $category->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
 
-                                        @if($book->subtitle)
-                                            <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                                                {{ $book->subtitle }}
-                                            </div>
-                                        @endif
-                                    </td>
+                            <div class="xl:min-w-0">
+                                <select id="availability" name="availability" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
+                                    <option value="">Busena</option>
+                                    <option value="available" {{ request('availability') === 'available' ? 'selected' : '' }}>Yra laisvu</option>
+                                    <option value="unavailable" {{ request('availability') === 'unavailable' ? 'selected' : '' }}>Laisvu nera</option>
+                                </select>
+                            </div>
 
-                                    <td class="whitespace-nowrap px-4 py-4 text-sm text-zinc-700 dark:text-zinc-300">
-                                        {{ $book->isbn ?: '—' }}
-                                    </td>
+                            @if(auth()->user()?->isSuperAdmin())
+                                <div class="xl:min-w-0">
+                                    <select id="library_id" name="library_id" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
+                                        <option value="">Filialas</option>
+                                        @foreach($libraries as $library)
+                                            <option value="{{ $library->id }}" {{ (string) request('library_id') === (string) $library->id ? 'selected' : '' }}>
+                                                {{ $library->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @else
+                                <input type="hidden" name="library_id" value="{{ request('library_id') }}">
+                            @endif
 
-                                    <td class="whitespace-nowrap px-4 py-4 text-sm text-zinc-700 dark:text-zinc-300">
-                                        <span
-                                            class="inline-flex rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                                            {{ $book->category?->name ?: '—' }}
-                                        </span>
-                                    </td>
+                            <button type="submit" class="app-button-secondary h-11 rounded-2xl px-4 xl:w-auto">
+                                <flux:icon.funnel class="mr-2 size-4" />
+                                Filtruoti
+                            </button>
 
-                                    <td class="whitespace-nowrap px-4 py-4 text-sm text-zinc-700 dark:text-zinc-300">
-                                        {{ $book->publisher?->name ?: '—' }}
-                                    </td>
+                            <a href="{{ route('books.index') }}" class="app-button-secondary h-11 rounded-2xl px-4 xl:w-auto">
+                                Isvalyti
+                            </a>
 
-                                    <td class="px-4 py-4 text-sm text-zinc-700 dark:text-zinc-300">
+                            <input type="hidden" name="sort" value="{{ request('sort', 'updated_at') }}">
+                            <input type="hidden" name="direction" value="{{ request('direction', 'desc') }}">
+                            <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
+                        </form>
+                    </div>
+                </section>
+
+                <section class="overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                    @if($books->count())
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
+                                <thead class="bg-zinc-50/80 dark:bg-zinc-950/50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left">
+                                            <input type="checkbox" class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500">
+                                        </th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Knyga</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Autorius</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Kategorija</th>
+                                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Egz.</th>
+                                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Laisvi</th>
+                                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Rezervacijos</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Busena</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Pask. atnaujinta</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Veiksmai</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
+                                    @foreach($books as $book)
                                         @php
-                                            $authors = $book->authors->pluck('name')->filter()->values();
+                                            $authorsList = $book->authors->pluck('name')->filter()->values();
+                                            $categoriesList = $book->categories->pluck('name')->filter()->values();
+                                            $statusMeta = $book->available_copies_count > 0
+                                                ? ['label' => 'Aktyvi', 'classes' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300']
+                                                : ($book->loaned_copies_count > 0
+                                                    ? ['label' => 'Isduota', 'classes' => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300']
+                                                    : ['label' => 'Neprieinama', 'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300']);
                                         @endphp
+                                        <tr class="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40">
+                                            <td class="px-4 py-4 align-middle">
+                                                <input type="checkbox" class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500">
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <div class="flex items-start gap-3">
+                                                    <div class="flex h-14 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-zinc-200 bg-zinc-100 text-[10px] font-semibold uppercase text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
+                                                        @if($book->cover_image)
+                                                            <img src="{{ $book->cover_image }}" alt="{{ $book->title }}" class="h-full w-full object-cover">
+                                                        @else
+                                                            {{ str($book->title)->words(1, '')->substr(0, 2)->upper() }}
+                                                        @endif
+                                                    </div>
+                                                    <div class="min-w-0">
+                                                        <a href="{{ route('books.show', $book) }}" class="font-semibold text-zinc-950 transition hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">
+                                                            {{ $book->title }}
+                                                        </a>
+                                                        <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{{ $book->isbn ?: '-' }}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">
+                                                {{ $authorsList->join(', ') ?: '-' }}
+                                            </td>
+                                            <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">
+                                                {{ $categoriesList->join(', ') ?: '-' }}
+                                            </td>
+                                            <td class="px-4 py-4 align-middle text-center text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                                                {{ $book->copies_count }}
+                                            </td>
+                                            <td class="px-4 py-4 align-middle text-center text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                                                {{ $book->available_copies_count }}
+                                            </td>
+                                            <td class="px-4 py-4 align-middle text-center text-sm text-zinc-700 dark:text-zinc-300">
+                                                {{ $book->active_reservations_count }}
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusMeta['classes'] }}">
+                                                    {{ $statusMeta['label'] }}
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle text-sm text-zinc-600 dark:text-zinc-400">
+                                                {{ $book->updated_at?->format('Y-m-d') ?: '-' }}
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
+                                                    <a href="{{ route('books.show', $book) }}" title="Perziureti knyga" aria-label="Perziureti knyga" class="transition hover:text-zinc-900 dark:hover:text-white">
+                                                        <flux:icon.eye class="size-4" />
+                                                    </a>
 
-                                        @if($authors->isNotEmpty())
-                                            <div class="flex flex-wrap gap-2">
-                                                @foreach($authors as $author)
-                                                    <span
-                                                        class="inline-flex rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
-                                                        {{ $author }}
-                                                    </span>
-                                                @endforeach
-                                            </div>
-                                        @else
-                                            <span class="text-zinc-400">—</span>
-                                        @endif
-                                    </td>
+                                                    @if($canEditBooks)
+                                                        <a href="{{ route('manage.books.edit', $book) }}" title="Redaguoti knyga" aria-label="Redaguoti knyga" class="transition hover:text-zinc-900 dark:hover:text-white">
+                                                            <flux:icon.pencil-square class="size-4" />
+                                                        </a>
 
-                                    <td class="whitespace-nowrap px-4 py-4 text-sm text-zinc-700 dark:text-zinc-300">
-                                        {{ $book->publication_year ?: '—' }}
-                                    </td>
+                                                        <form method="POST" action="{{ route('manage.books.destroy', $book) }}" onsubmit="return confirm('Ar tikrai nori istrinti sia knyga?')">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" class="transition hover:text-red-600 dark:hover:text-red-400" title="Istrinti knyga">
+                                                                <flux:icon.trash class="size-4" />
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
 
-                                    <td class="whitespace-nowrap px-4 py-4">
-                                        <span
-                                            class="inline-flex min-w-10 items-center justify-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                            {{ $book->copies_count }}
-                                        </span>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
+                        <div class="flex flex-col gap-4 border-t border-zinc-200 px-5 py-4 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-400 sm:flex-row sm:items-center sm:justify-between">
+                            <div>Rodoma {{ $books->firstItem() }}-{{ $books->lastItem() }} is {{ $books->total() }}</div>
+                            <div class="books-pagination">{{ $books->links() }}</div>
+                        </div>
+                    @else
+                        <div class="p-6">
+                            <x-ui.empty-state
+                                title="Knygu nerasta"
+                                description="Pabandyk pakeisti paieska arba filtrus."
+                            />
+                        </div>
+                    @endif
+                </section>
             </div>
-
-            <div class="mt-6">
-                {{ $books->links() }}
-            </div>
-        @endif
-    </div>
+        </div>
+    </x-ui.page>
 </x-layouts::app>

@@ -32,12 +32,15 @@ class AuthController extends Controller
             ], 403);
         }
 
+        $user->loadMissing('library:id,name');
         $token = $user->createToken('android-app')->plainTextToken;
 
         return response()->json([
-            'message' => 'Prisijungta sėkmingai.',
+            'message' => 'Prisijungta sekmingai.',
             'token' => $token,
-            'user' => $user,
+            'user' => array_merge($user->toArray(), [
+                'library_name' => $user->library?->name,
+            ]),
         ]);
     }
 
@@ -46,14 +49,18 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()?->delete();
 
         return response()->json([
-            'message' => 'Atsijungta sėkmingai.',
+            'message' => 'Atsijungta sekmingai.',
         ]);
     }
 
     public function me(Request $request): JsonResponse
     {
+        $user = $request->user()->loadMissing('library:id,name');
+
         return response()->json([
-            'user' => $request->user(),
+            'user' => array_merge($user->toArray(), [
+                'library_name' => $user->library?->name,
+            ]),
         ]);
     }
 }

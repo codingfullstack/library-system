@@ -24,4 +24,13 @@ class BookFactory extends Factory
             'cover_image' => null,
         ];
     }
+
+    public function configure(): static
+    {
+        return $this->afterCreating(function ($book) {
+            if ($book->category_id) {
+                $book->categories()->syncWithoutDetaching([$book->category_id]);
+            }
+        });
+    }
 }

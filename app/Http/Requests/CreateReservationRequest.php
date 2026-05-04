@@ -18,7 +18,7 @@ class CreateReservationRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:1000'],
         ];
 
-        if (in_array($this->user()?->role, ['admin', 'staff'], true)) {
+        if (in_array($this->user()?->role, ['super_admin', 'admin', 'staff'], true)) {
             $rules['user_id'] = ['required', 'integer', 'exists:users,id'];
             $rules['expires_at'] = ['nullable', 'date', 'after:now'];
         }

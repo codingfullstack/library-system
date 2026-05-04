@@ -23,10 +23,10 @@ return new class extends Migration
             $table->enum('status', [
                 'available',
                 'loaned',
-                'reserved',
                 'lost',
                 'damaged',
                 'maintenance',
+                'withdrawn',
             ])->default('available');
 
             $table->enum('condition_status', [

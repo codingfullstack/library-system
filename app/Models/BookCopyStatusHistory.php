@@ -1,0 +1,59 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class BookCopyStatusHistory extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'book_copy_id',
+        'changed_by',
+        'from_status',
+        'to_status',
+        'reason_code',
+        'reason_notes',
+        'changed_at',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'changed_at' => 'datetime',
+        ];
+    }
+
+    public function bookCopy(): BelongsTo
+    {
+        return $this->belongsTo(BookCopy::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'changed_by');
+    }
+
+    public static function reasonLabels(): array
+    {
+        return [
+            'created' => 'Sukurtas egzempliorius',
+            'issued' => 'Egzempliorius isduotas',
+            'returned' => 'Egzempliorius grazintas',
+            'marked_lost' => 'Pazymetas kaip prarastas',
+            'marked_damaged' => 'Pazymetas kaip sugadintas',
+            'sent_to_maintenance' => 'Issiustas tvarkymui',
+            'restored_to_active' => 'Grazintas i aktyvu fonda',
+            'withdrawn' => 'Nurasyta',
+            'status_adjusted' => 'Statusas pakoreguotas',
+        ];
+    }
+
+    public function reasonLabel(): string
+    {
+        return self::reasonLabels()[$this->reason_code] ?? (string) $this->reason_code;
+    }
+}

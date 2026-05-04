@@ -1,612 +1,458 @@
 <x-layouts::app :title="$book->title">
-    <div class="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <div class="mb-6">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                    <p class="text-sm font-medium text-indigo-600 dark:text-indigo-400">
-                        Knygos informacija
-                    </p>
-                    <h1 class="mt-1 text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">
-                        {{ $book->title }}
-                    </h1>
+    @php
+        $authUser = auth()->user();
+        $canEditBooks = $authUser?->isSuperAdmin();
 
-                    @if($book->subtitle)
-                        <p class="mt-2 text-base text-zinc-600 dark:text-zinc-400">
-                            {{ $book->subtitle }}
-                        </p>
-                    @endif
-                </div>
+        $preferredReservation = $book->reservations
+            ->filter(fn ($reservation) => $reservation->isPending())
+            ->sortBy('reserved_at')
+            ->first();
 
-                <div class="flex flex-wrap gap-2">
-                    <a href="{{ route('books.index') }}"
-                        class="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
-                        ← Atgal į sąrašą
-                    </a>
-                </div>
-            </div>
-        </div>
+        $visibleCopies = $book->bookCopies;
+        $availableCopies = $visibleCopies->where('status', 'available')->count();
+        $loanedCopies = $visibleCopies->where('status', 'loaned')->count();
+        $unavailableCopies = $visibleCopies->whereIn('status', ['lost', 'damaged', 'maintenance', 'withdrawn'])->count();
+        $activeReservationsCount = $book->reservations->filter(fn ($reservation) => $reservation->isPending())->count();
+        $hasOnlyUnavailableCopies = $visibleCopies->isNotEmpty() && $unavailableCopies === $visibleCopies->count();
 
-        @if (session('success'))
-            <div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-500/10 dark:text-emerald-300">
-                {{ session('success') }}
-            </div>
-        @endif
+        [$availabilityLabel, $availabilityClasses] = match (true) {
+            $availableCopies > 0 => ['Aktyvi', 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'],
+            $loanedCopies > 0 => ['Isduota', 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'],
+            $hasOnlyUnavailableCopies => ['Neprieinama', 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300'],
+            $preferredReservation => ['Rezervuojama', 'bg-violet-100 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300'],
+            default => ['Neprieinama', 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300'],
+        };
 
-        @if ($errors->any())
-            <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-500/10 dark:text-red-300">
-                <div class="font-semibold">Nepavyko išsaugoti:</div>
-                <ul class="mt-2 list-disc space-y-1 pl-5">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
+        $copyStatusLabels = \App\Models\BookCopy::statusLabels();
+        $copyLifecycleLabels = [
+            'active' => 'Aktyvus fondas',
+            'issues' => 'Probleminiai egzemplioriai',
+            'removed' => 'Nurasytas fondas',
+        ];
 
-        @php
-            $authUser = auth()->user();
+        $bookMeta = [
+            ['icon' => 'user', 'label' => 'Autorius', 'value' => $book->authors->pluck('name')->join(', ') ?: '-'],
+            ['icon' => 'building-library', 'label' => 'Leidykla', 'value' => $book->publisher?->name ?: '-'],
+            ['icon' => 'book-open-text', 'label' => 'ISBN', 'value' => $book->isbn ?: '-'],
+            ['icon' => 'calendar-days', 'label' => 'Metai', 'value' => $book->publication_year ?: '-'],
+            ['icon' => 'document-text', 'label' => 'Puslapiai', 'value' => $book->page_count ?: '-'],
+            ['icon' => 'language', 'label' => 'Kalba', 'value' => $book->language ?: '-'],
+            ['icon' => 'tag', 'label' => 'Kategorijos', 'value' => $book->categories->pluck('name')->join(', ') ?: '-'],
+            ['icon' => 'numbered-list', 'label' => 'Leidimas', 'value' => $book->edition ?: '-'],
+            ['icon' => 'clock', 'label' => 'Atnaujinta', 'value' => $book->updated_at?->format('Y-m-d H:i') ?: '-'],
+        ];
 
-            $activeReservations = $book->reservations
-                ->filter(fn ($reservation) => $reservation->isActive())
-                ->sortBy('reserved_at')
-                ->values();
+        $allowedTabs = $authUser?->isSuperAdmin()
+            ? ['copies', 'reservations', 'audit']
+            : ['copies', 'reservations'];
+        $initialTab = in_array((string) request('tab'), $allowedTabs, true) ? (string) request('tab') : 'copies';
+    @endphp
 
-            $firstActiveReservation = $activeReservations->first();
-        @endphp
-
-        <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
-            <div class="xl:col-span-2">
-                <div class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                    <div class="border-b border-zinc-200 px-6 py-5 dark:border-zinc-800">
-                        <h2 class="text-lg font-semibold text-zinc-900 dark:text-white">
-                            Bendra informacija
-                        </h2>
-                        <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                            Pagrindiniai knygos bibliografiniai duomenys.
-                        </p>
-                    </div>
-
-                    <div class="px-6 py-6">
-                        <dl class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                            <div class="rounded-xl bg-zinc-50 p-4 dark:bg-zinc-800/50">
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                    Autoriai
-                                </dt>
-                                <dd class="mt-2 text-sm font-medium text-zinc-900 dark:text-white">
-                                    {{ $book->authors->pluck('name')->join(', ') ?: '-' }}
-                                </dd>
-                            </div>
-
-                            <div class="rounded-xl bg-zinc-50 p-4 dark:bg-zinc-800/50">
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                    Kategorija
-                                </dt>
-                                <dd class="mt-2 text-sm font-medium text-zinc-900 dark:text-white">
-                                    {{ $book->category?->name ?: '-' }}
-                                </dd>
-                            </div>
-
-                            <div class="rounded-xl bg-zinc-50 p-4 dark:bg-zinc-800/50">
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                    Leidykla
-                                </dt>
-                                <dd class="mt-2 text-sm font-medium text-zinc-900 dark:text-white">
-                                    {{ $book->publisher?->name ?: '-' }}
-                                </dd>
-                            </div>
-
-                            <div class="rounded-xl bg-zinc-50 p-4 dark:bg-zinc-800/50">
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                    ISBN
-                                </dt>
-                                <dd class="mt-2 text-sm font-medium text-zinc-900 dark:text-white">
-                                    {{ $book->isbn ?: '-' }}
-                                </dd>
-                            </div>
-
-                            <div class="rounded-xl bg-zinc-50 p-4 dark:bg-zinc-800/50">
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                    Metai
-                                </dt>
-                                <dd class="mt-2 text-sm font-medium text-zinc-900 dark:text-white">
-                                    {{ $book->publication_year ?: '-' }}
-                                </dd>
-                            </div>
-
-                            <div class="rounded-xl bg-zinc-50 p-4 dark:bg-zinc-800/50">
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                    Kalba
-                                </dt>
-                                <dd class="mt-2 text-sm font-medium text-zinc-900 dark:text-white">
-                                    {{ $book->language ?: '-' }}
-                                </dd>
-                            </div>
-
-                            <div class="rounded-xl bg-zinc-50 p-4 dark:bg-zinc-800/50">
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                    Puslapiai
-                                </dt>
-                                <dd class="mt-2 text-sm font-medium text-zinc-900 dark:text-white">
-                                    {{ $book->page_count ?: '-' }}
-                                </dd>
-                            </div>
-
-                            <div class="rounded-xl bg-zinc-50 p-4 dark:bg-zinc-800/50">
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                    Leidimas
-                                </dt>
-                                <dd class="mt-2 text-sm font-medium text-zinc-900 dark:text-white">
-                                    {{ $book->edition ?? '-' }}
-                                </dd>
-                            </div>
-                        </dl>
-
-                        <div class="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-950/40">
-                            <h3 class="text-lg font-semibold text-zinc-900 dark:text-white">
-                                Aprašymas
-                            </h3>
-
-                            <div class="mt-3 text-sm leading-7 text-zinc-700 dark:text-zinc-300">
-                                {{ $book->description ?: 'Aprašymo nėra.' }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="xl:col-span-1 space-y-6">
-                <div class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                    <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                        Kopijos bibliotekoje
-                    </p>
-                    <div class="mt-3 flex items-end gap-3">
-                        <span class="text-4xl font-bold tracking-tight text-zinc-900 dark:text-white">
-                            {{ $book->copies_count }}
-                        </span>
-                        <span class="mb-1 text-sm text-zinc-500 dark:text-zinc-400">
-                            vnt.
-                        </span>
-                    </div>
-                </div>
-
-                <div class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                    <div class="flex items-center justify-between gap-3">
-                        <div>
-                            <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                                Aktyvios rezervacijos
-                            </p>
-                            <div class="mt-2 text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">
-                                {{ $activeReservations->count() }}
-                            </div>
+    <x-ui.page class="max-w-none px-4 py-0 sm:px-6 lg:px-8">
+        <div class="bg-[#f7f8fa] py-8 dark:bg-zinc-950">
+            <div class="mx-auto max-w-[1560px] space-y-6">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="space-y-3">
+                        <div class="flex flex-wrap items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+                            <span class="text-emerald-700 dark:text-emerald-300">Valdymas</span>
+                            <span>&gt;</span>
+                            <a href="{{ route('books.index') }}" class="hover:text-zinc-900 dark:hover:text-white">Knygos</a>
+                            <span>&gt;</span>
+                            <span class="text-zinc-900 dark:text-white">{{ $book->title }}</span>
                         </div>
 
-                        @if ($activeReservations->count() > 0)
-                            <span class="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
-                                Eilė aktyvi
+                        <div class="flex flex-wrap items-center gap-3">
+                            <h1 class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">{{ $book->title }}</h1>
+                            <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold {{ $availabilityClasses }}">
+                                {{ $availabilityLabel }}
                             </span>
-                        @else
-                            <span class="inline-flex rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                                Nėra eilės
-                            </span>
-                        @endif
-                    </div>
-
-                    @if ($firstActiveReservation)
-                        <div class="mt-5 rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/40 dark:bg-blue-500/10">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
-                                Pirmas eilėje
-                            </p>
-                            <p class="mt-2 text-base font-semibold text-zinc-900 dark:text-white">
-                                {{ $firstActiveReservation->user?->name ?: '—' }}
-                            </p>
-                            <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
-                                {{ $firstActiveReservation->user?->membership_number ?: ($firstActiveReservation->user?->email ?: '—') }}
-                            </p>
-                            <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
-                                Rezervuota: {{ $firstActiveReservation->reserved_at?->format('Y-m-d H:i') ?: '-' }}
-                            </p>
                         </div>
-                    @endif
-                </div>
-            </div>
-        </div>
 
-        <div class="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-3">
-            <div class="xl:col-span-1">
-                <div class="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                    <div class="border-b border-zinc-200 px-6 py-5 dark:border-zinc-800">
-                        <h2 class="text-lg font-semibold text-zinc-900 dark:text-white">
-                            Nauja rezervacija
-                        </h2>
-                        <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                            @if ($authUser?->role === 'member')
-                                Rezervuok šią knygą sau.
-                            @else
-                                Sukurk rezervaciją pasirinktam nariui.
-                            @endif
-                        </p>
-                    </div>
-
-                    <div class="px-6 py-6">
-                        @if ($authUser && $authUser->role === 'member')
-                            <form method="POST" action="{{ route('reservations.store') }}" class="space-y-5">
-                                @csrf
-
-                                <input type="hidden" name="book_id" value="{{ $book->id }}">
-
-                                <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-800/40">
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                        Rezervuos
-                                    </p>
-                                    <p class="mt-2 text-sm font-semibold text-zinc-900 dark:text-white">
-                                        {{ $authUser->name }}
-                                    </p>
-                                    <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                                        {{ $authUser->membership_number ?: $authUser->email }}
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <label for="member_notes" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                                        Pastabos
-                                    </label>
-                                    <textarea
-                                        name="notes"
-                                        id="member_notes"
-                                        rows="4"
-                                        class="mt-2 block w-full rounded-xl border-zinc-300 bg-white text-zinc-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
-                                        placeholder="Papildoma informacija..."
-                                    >{{ old('notes') }}</textarea>
-                                </div>
-
-                                <button
-                                    type="submit"
-                                    class="inline-flex w-full items-center justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                                >
-                                    Rezervuoti sau
-                                </button>
-                            </form>
-                        @elseif ($authUser && in_array($authUser->role, ['admin', 'staff'], true))
-                            <form method="POST" action="{{ route('reservations.store') }}" class="space-y-5">
-                                @csrf
-
-                                <input type="hidden" name="book_id" value="{{ $book->id }}">
-
-                                <div>
-                                    <label for="user_id" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                                        Nario ID
-                                    </label>
-                                    <input
-                                        type="number"
-                                        name="user_id"
-                                        id="user_id"
-                                        value="{{ old('user_id') }}"
-                                        class="mt-2 block w-full rounded-xl border-zinc-300 bg-white text-zinc-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
-                                        placeholder="Pvz. 12"
-                                        required
-                                    >
-                                    <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                                        Testavimui gali įrašyti nario ID. Vėliau galima bus pakeisti į paiešką.
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <label for="expires_at" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                                        Galioja iki
-                                    </label>
-                                    <input
-                                        type="datetime-local"
-                                        name="expires_at"
-                                        id="expires_at"
-                                        value="{{ old('expires_at') }}"
-                                        class="mt-2 block w-full rounded-xl border-zinc-300 bg-white text-zinc-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
-                                    >
-                                </div>
-
-                                <div>
-                                    <label for="staff_notes" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                                        Pastabos
-                                    </label>
-                                    <textarea
-                                        name="notes"
-                                        id="staff_notes"
-                                        rows="4"
-                                        class="mt-2 block w-full rounded-xl border-zinc-300 bg-white text-zinc-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
-                                        placeholder="Papildoma informacija..."
-                                    >{{ old('notes') }}</textarea>
-                                </div>
-
-                                <button
-                                    type="submit"
-                                    class="inline-flex w-full items-center justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                                >
-                                    Sukurti rezervaciją nariui
-                                </button>
-                            </form>
-                        @else
-                            <div class="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/40 dark:text-zinc-300">
-                                Norint rezervuoti knygą, reikia prisijungti.
-                            </div>
-                        @endif
-                    </div>
-                </div>
-            </div>
-
-            <div class="xl:col-span-2">
-                <div class="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                    <div class="border-b border-zinc-200 px-6 py-5 dark:border-zinc-800">
-                        <div class="flex items-center justify-between gap-4">
-                            <div>
-                                <h2 class="text-lg font-semibold text-zinc-900 dark:text-white">
-                                    Rezervacijų istorija
-                                </h2>
-                                <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                                    Visos šios knygos rezervacijos, naujausios viršuje.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="px-6 py-6">
-                        @if($book->reservations->isEmpty())
-                            <div class="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 px-6 py-10 text-center dark:border-zinc-700 dark:bg-zinc-800/40">
-                                <h3 class="text-lg font-semibold text-zinc-900 dark:text-white">
-                                    Rezervacijų nėra
-                                </h3>
-                                <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                                    Ši knyga dar nebuvo rezervuota.
-                                </p>
-                            </div>
-                        @else
-                            <div class="space-y-4">
-                                @foreach($book->reservations->sortByDesc('reserved_at') as $reservation)
-                                    @php
-                                        $isActive = $reservation->isActive();
-                                        $isFulfilled = $reservation->status === 'fulfilled' || ! is_null($reservation->fulfilled_at);
-                                        $isCancelled = $reservation->status === 'cancelled' || ! is_null($reservation->cancelled_at);
-
-                                        $statusClasses = match (true) {
-                                            $isActive => 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300',
-                                            $isFulfilled => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
-                                            $isCancelled => 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
-                                            default => 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
-                                        };
-
-                                        $statusLabel = match (true) {
-                                            $isActive => 'Aktyvi',
-                                            $isFulfilled => 'Įvykdyta',
-                                            $isCancelled => 'Atšaukta',
-                                            default => $reservation->status,
-                                        };
-                                    @endphp
-
-                                    <div class="rounded-2xl border border-zinc-200 p-5 dark:border-zinc-800">
-                                        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                                            <div>
-                                                <h3 class="text-base font-semibold text-zinc-900 dark:text-white">
-                                                    {{ $reservation->user?->name ?: 'Nežinomas narys' }}
-                                                </h3>
-                                                <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                                                    {{ $reservation->user?->membership_number ?: ($reservation->user?->email ?: '—') }}
-                                                </p>
-                                            </div>
-
-                                            <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold {{ $statusClasses }}">
-                                                {{ $statusLabel }}
-                                            </span>
-                                        </div>
-
-                                        <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                            <div class="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-800/50">
-                                                <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                                    Rezervuota
-                                                </p>
-                                                <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-white">
-                                                    {{ $reservation->reserved_at?->format('Y-m-d H:i') ?: '-' }}
-                                                </p>
-                                            </div>
-
-                                            <div class="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-800/50">
-                                                <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                                    Galioja iki
-                                                </p>
-                                                <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-white">
-                                                    {{ $reservation->expires_at?->format('Y-m-d H:i') ?: 'Be termino' }}
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        @if ($reservation->notes)
-                                            <div class="mt-4 rounded-xl bg-zinc-50 p-3 text-sm text-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300">
-                                                <span class="font-medium text-zinc-900 dark:text-white">Pastabos:</span>
-                                                {{ $reservation->notes }}
-                                            </div>
-                                        @endif
-
-                                        @if ($isActive && $authUser && in_array($authUser->role, ['admin', 'staff'], true))
-                                            <div class="mt-4 flex justify-end">
-                                                <form method="POST" action="{{ route('reservations.cancel', $reservation) }}">
-                                                    @csrf
-                                                    @method('PATCH')
-
-                                                    <button
-                                                        type="submit"
-                                                        class="inline-flex items-center justify-center rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
-                                                    >
-                                                        Atšaukti rezervaciją
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        @endif
-                                    </div>
+                        @if($book->categories->isNotEmpty())
+                            <div class="flex flex-wrap gap-2">
+                                @foreach($book->categories as $category)
+                                    <span class="inline-flex rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                                        {{ $category->name }}
+                                    </span>
                                 @endforeach
                             </div>
                         @endif
                     </div>
-                </div>
-            </div>
-        </div>
 
-        <div class="mt-8 rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-            <div class="border-b border-zinc-200 px-6 py-5 dark:border-zinc-800">
-                <div class="mb-4 flex items-center justify-between">
-                    <div>
-                        <h2 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
-                            Knygos kopijos
-                        </h2>
-                        <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                            Visos matomos jūsų bibliotekos kopijos ir jų būsena.
-                        </p>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <a href="{{ route('books.index') }}" class="inline-flex h-11 items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                            <flux:icon.arrow-left class="size-4" />
+                            Grizti i knygu sarasa
+                        </a>
+
+                        @if($canEditBooks)
+                            <a href="{{ route('manage.books.edit', $book) }}" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600">
+                                <flux:icon.pencil-square class="size-4" />
+                                Redaguoti knyga
+                            </a>
+
+                            <form method="POST" action="{{ route('manage.books.destroy', $book) }}" onsubmit="return confirm('Ar tikrai nori istrinti sia knyga?')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-red-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-red-500">
+                                    <flux:icon.trash class="size-4" />
+                                    Istrinti knyga
+                                </button>
+                            </form>
+                        @endif
                     </div>
                 </div>
-            </div>
 
-            <div class="px-6 py-6">
-                @if($book->bookCopies->isEmpty())
-                    <div class="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-12 text-center shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
-                        <h3 class="text-lg font-semibold text-zinc-900 dark:text-white">
-                            Kopijų nėra
-                        </h3>
-                        <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                            Šioje bibliotekoje šiuo metu nėra matomų šios knygos kopijų.
-                        </p>
-                    </div>
-                @else
-                    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-                        @foreach($book->bookCopies as $copy)
-                            @php
-                                $status = $copy->status ?: 'nežinoma';
+                @if (session('success'))
+                    <x-ui.alert>{{ session('success') }}</x-ui.alert>
+                @endif
 
-                                $statusClasses = match ($status) {
-                                    'available' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
-                                    'loaned' => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
-                                    'reserved' => 'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300',
-                                    'lost' => 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300',
-                                    'damaged' => 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300',
-                                    'maintenance' => 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300',
-                                    default => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
-                                };
+                @if ($errors->any())
+                    <x-ui.alert type="error">
+                        <div class="font-semibold">Nepavyko issaugoti:</div>
+                        <ul class="mt-2 list-disc space-y-1 pl-5">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </x-ui.alert>
+                @endif
 
-                                $firstReservationForBook = $activeReservations->first();
-                            @endphp
+                <div class="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1.85fr)_420px]">
+                    <section class="overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                        <div class="grid gap-6 p-6 xl:grid-cols-[140px_minmax(0,1fr)]">
+                            <div class="overflow-hidden rounded-[22px] border border-zinc-200 bg-zinc-100 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
+                                @if($book->cover_image)
+                                    <img src="{{ $book->cover_image }}" alt="{{ $book->title }}" class="h-full w-full object-cover">
+                                @else
+                                    <div class="flex aspect-[3/4] w-full items-center justify-center text-4xl font-bold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                                        {{ str($book->title)->substr(0, 2)->upper() }}
+                                    </div>
+                                @endif
+                            </div>
 
-                            <div class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900">
-                                <div class="border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
-                                    <div class="flex items-start justify-between gap-3">
-                                        <div>
-                                            <a href="{{ route('book-copies.show', $copy->id) }}">
-                                                <h3 class="text-lg font-semibold text-zinc-900 dark:text-white">
-                                                    Kopija #{{ $copy->id }}
-                                                </h3>
-                                            </a>
-                                            <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                                                Inventoriaus kodas: {{ $copy->inventory_code ?: '-' }}
-                                            </p>
+                            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                                @foreach($bookMeta as $item)
+                                    <div class="flex gap-3 rounded-2xl border border-zinc-200/80 bg-zinc-50/80 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/40">
+                                        <div class="mt-0.5 flex size-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                            <flux:icon :name="$item['icon']" class="size-4" />
                                         </div>
+                                        <div class="min-w-0">
+                                            <div class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ $item['label'] }}</div>
+                                            <div class="mt-1 break-words text-sm font-medium text-zinc-950 dark:text-white">{{ $item['value'] }}</div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </section>
 
-                                        <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $statusClasses }}">
-                                            {{ $status }}
-                                        </span>
+                    <div class="space-y-6">
+                        <section class="overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                            <div class="flex items-start justify-between gap-3 border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
+                                <div>
+                                    <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Kopijos bibliotekoje</div>
+                                    <div class="mt-2 flex items-end gap-2">
+                                        <span class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">{{ $book->copies_count }}</span>
+                                        <span class="mb-1 text-sm text-zinc-500 dark:text-zinc-400">vnt.</span>
                                     </div>
                                 </div>
 
-                                <div class="space-y-4 px-5 py-5">
-                                    <div class="grid grid-cols-1 gap-3">
-                                        <div class="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-800/50">
-                                            <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                                Būklė
-                                            </p>
-                                            <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-white">
-                                                {{ $copy->condition_status ?? '-' }}
-                                            </p>
-                                        </div>
+                                <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold {{ $availabilityClasses }}">
+                                    {{ $availabilityLabel }}
+                                </span>
+                            </div>
 
-                                        <div class="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-800/50">
-                                            <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                                Filialas
-                                            </p>
-                                            <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-white">
-                                                {{ $copy->branch?->name ?: '-' }}
-                                            </p>
-                                        </div>
-
-                                        <div class="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-800/50">
-                                            <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                                Vieta
-                                            </p>
-                                            <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-white">
-                                                @if($copy->location)
-                                                    {{ $copy->location->name ?: '-' }}
-                                                    /
-                                                    {{ $copy->location->room ?: '-' }}
-                                                    /
-                                                    {{ $copy->location->shelf ?: '-' }}
-                                                @else
-                                                    -
-                                                @endif
-                                            </p>
-                                        </div>
-
-                                        <div class="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-800/50">
-                                            <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                                Aktyvi paskola
-                                            </p>
-                                            <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-white">
-                                                {{ $copy->activeLoan ? 'taip' : 'ne' }}
-                                            </p>
-
-                                            @if($copy->activeLoan)
-                                                <div class="mt-3 space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
-                                                    <p>
-                                                        <span class="font-medium text-zinc-800 dark:text-zinc-200">Vartotojas:</span>
-                                                        {{ $copy->activeLoan->user?->name ?: '-' }}
-                                                    </p>
-                                                    <p>
-                                                        <span class="font-medium text-zinc-800 dark:text-zinc-200">El. paštas:</span>
-                                                        {{ $copy->activeLoan->user?->email ?: '-' }}
-                                                    </p>
-                                                    <p>
-                                                        <span class="font-medium text-zinc-800 dark:text-zinc-200">Grąžinti iki:</span>
-                                                        {{ $copy->activeLoan->due_at ? \Illuminate\Support\Carbon::parse($copy->activeLoan->due_at)->format('Y-m-d') : 'Be limito' }}
-                                                    </p>
-                                                    <p>
-                                                        <span class="font-medium text-zinc-800 dark:text-zinc-200">Vėluoja:</span>
-                                                        <span class="{{ $copy->activeLoan->is_overdue ? 'text-red-600 font-semibold' : 'text-zinc-700 dark:text-zinc-300' }}">
-                                                            {{ $copy->activeLoan->is_overdue ? 'Taip' : 'Ne' }}
-                                                        </span>
-                                                    </p>
-                                                </div>
-                                            @endif
-                                        </div>
-
-                                        @if ($firstReservationForBook)
-                                            <div class="rounded-xl border border-blue-200 bg-blue-50 p-3 dark:border-blue-900/40 dark:bg-blue-500/10">
-                                                <p class="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
-                                                    Pirmas rezervacijoje
-                                                </p>
-                                                <p class="mt-1 text-sm font-semibold text-zinc-900 dark:text-white">
-                                                    {{ $firstReservationForBook->user?->name ?: '-' }}
-                                                </p>
-                                                <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
-                                                    Staff gali išduoti ir kitam nariui, bet prioritetas priklauso šiam vartotojui.
-                                                </p>
-                                            </div>
-                                        @endif
-                                    </div>
-
-                                    <div class="pt-2">
-                                        <button type="button"
-                                            class="inline-flex w-full items-center justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50"
-                                            {{ $copy->activeLoan ? 'disabled' : '' }}>
-                                            {{ $copy->activeLoan ? 'Šiuo metu neišduodama' : 'Išduoti' }}
-                                        </button>
-                                    </div>
+                            <div class="grid grid-cols-3 gap-3 p-5">
+                                <div class="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                                    <div class="text-[11px] font-medium uppercase leading-tight tracking-wide text-emerald-700 dark:text-emerald-300">Laisvos</div>
+                                    <div class="mt-2 text-2xl font-bold text-zinc-950 dark:text-white">{{ $availableCopies }}</div>
+                                </div>
+                                <div class="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 dark:border-amber-900/50 dark:bg-amber-950/20">
+                                    <div class="text-[11px] font-medium uppercase leading-tight tracking-wide text-amber-700 dark:text-amber-300">Isduotos</div>
+                                    <div class="mt-2 text-2xl font-bold text-zinc-950 dark:text-white">{{ $loanedCopies }}</div>
+                                </div>
+                                <div class="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/40">
+                                    <div class="text-[11px] font-medium uppercase leading-tight tracking-wide text-zinc-500 dark:text-zinc-400">Neprieinamos</div>
+                                    <div class="mt-2 text-2xl font-bold text-zinc-950 dark:text-white">{{ $unavailableCopies }}</div>
                                 </div>
                             </div>
-                        @endforeach
+                        </section>
+
+                        <livewire:reservations.reservation-summary :book="$book" />
+
+                        <section class="overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                            <div class="flex items-center justify-between gap-3 border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
+                                <h2 class="text-sm font-semibold text-zinc-950 dark:text-white">Knygos pastabos</h2>
+                                @if($canEditBooks)
+                                    <a href="{{ route('manage.books.edit', $book) }}" title="Redaguoti knygos pastabas" aria-label="Redaguoti knygos pastabas" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-500 transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:text-white">
+                                        <flux:icon.pencil class="size-4" />
+                                    </a>
+                                @endif
+                            </div>
+                            <div class="px-5 py-4 text-sm leading-7 text-zinc-700 dark:text-zinc-300">
+                                {{ $book->description ?: 'Pastabu nera.' }}
+                            </div>
+                        </section>
                     </div>
-                @endif
+                </div>
+
+                <div
+                    x-data="{
+                        activeTab: '{{ $initialTab }}',
+                        setTab(tab) {
+                            this.activeTab = tab;
+                            const url = new URL(window.location.href);
+                            [
+                                'audit-page',
+                                'reservation-history-page',
+                                'copy-page',
+                                'page',
+                            ].forEach((param) => url.searchParams.delete(param));
+                            url.searchParams.set('tab', tab);
+                            window.history.replaceState({}, '', url);
+                        }
+                    }"
+                    x-init="activeTab = new URLSearchParams(window.location.search).get('tab') || '{{ $initialTab }}'"
+                    class="space-y-6"
+                >
+                    <div class="flex flex-wrap items-center gap-6 border-b border-zinc-200 px-1 dark:border-zinc-800">
+                        <button
+                            type="button"
+                            @click="setTab('copies')"
+                            :class="activeTab === 'copies'
+                                ? 'border-emerald-600 text-emerald-700 dark:text-emerald-300'
+                                : 'border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'"
+                            class="inline-flex h-12 items-center border-b-2 px-2 text-sm font-semibold transition"
+                        >
+                            Egzemplioriai
+                        </button>
+                        <button
+                            type="button"
+                            @click="setTab('reservations')"
+                            :class="activeTab === 'reservations'
+                                ? 'border-emerald-600 text-emerald-700 dark:text-emerald-300'
+                                : 'border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'"
+                            class="inline-flex h-12 items-center border-b-2 px-2 text-sm font-semibold transition"
+                        >
+                            Rezervacijos
+                        </button>
+                        @if($authUser?->isSuperAdmin())
+                            <button
+                                type="button"
+                                @click="setTab('audit')"
+                                :class="activeTab === 'audit'
+                                    ? 'border-emerald-600 text-emerald-700 dark:text-emerald-300'
+                                    : 'border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'"
+                                class="inline-flex h-12 items-center border-b-2 px-2 text-sm font-semibold transition"
+                            >
+                                Veiksmu istorija
+                            </button>
+                        @endif
+                    </div>
+
+                    <section id="egzemplioriai" x-show="activeTab === 'copies'" x-cloak class="overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                    <div class="border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
+                        <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                            <div>
+                                <h2 class="text-lg font-semibold text-zinc-950 dark:text-white">Knygos kopijos</h2>
+                                <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Filtruok sios knygos kopijas pagal gyvenimo cikla, statusa, filiala ir vieta.</p>
+                            </div>
+
+                            @if(in_array($authUser?->role, ['super_admin', 'admin', 'staff'], true))
+                                <a href="{{ route('manage.book-copies.create', ['book_id' => $book->id]) }}" class="inline-flex h-11 items-center justify-center rounded-2xl bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600">
+                                    Prideti egzemplioriu
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="space-y-4 px-5 py-4">
+                        <form method="GET" action="{{ route('books.show', $book) }}" class="grid gap-3 xl:grid-cols-[220px_220px_220px_220px_auto_auto] xl:items-end">
+                            <input type="hidden" name="tab" value="copies">
+                            <div>
+                                <label for="copy_lifecycle" class="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Gyvenimo ciklas</label>
+                                <select id="copy_lifecycle" name="copy_lifecycle" class="app-input h-11 rounded-2xl border-zinc-200 bg-white shadow-none dark:border-zinc-700 dark:bg-zinc-950">
+                                    <option value="">Visi etapai</option>
+                                    @foreach($copyLifecycleLabels as $lifecycleValue => $lifecycleLabel)
+                                        <option value="{{ $lifecycleValue }}" @selected(request('copy_lifecycle') === $lifecycleValue)>{{ $lifecycleLabel }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div>
+                                <label for="copy_status" class="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Statusas</label>
+                                <select id="copy_status" name="copy_status" class="app-input h-11 rounded-2xl border-zinc-200 bg-white shadow-none dark:border-zinc-700 dark:bg-zinc-950">
+                                    <option value="">Visi statusai</option>
+                                    @foreach($copyStatusLabels as $statusValue => $statusLabel)
+                                        <option value="{{ $statusValue }}" @selected(request('copy_status') === $statusValue)>{{ $statusLabel }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div>
+                                <label for="branch_id" class="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Filialas</label>
+                                <select id="branch_id" name="branch_id" class="app-input h-11 rounded-2xl border-zinc-200 bg-white shadow-none dark:border-zinc-700 dark:bg-zinc-950">
+                                    <option value="">Visi filialai</option>
+                                    @foreach($copyBranches as $branch)
+                                        <option value="{{ $branch->id }}" @selected((string) request('branch_id') === (string) $branch->id)>{{ $branch->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div>
+                                <label for="location_id" class="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Vieta</label>
+                                <select id="location_id" name="location_id" class="app-input h-11 rounded-2xl border-zinc-200 bg-white shadow-none dark:border-zinc-700 dark:bg-zinc-950">
+                                    <option value="">Visos vietos</option>
+                                    @foreach($copyLocations as $location)
+                                        <option value="{{ $location->id }}" @selected((string) request('location_id') === (string) $location->id)>
+                                            {{ collect([$location->name, $location->room, $location->shelf])->filter()->join(' / ') }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <button type="submit" class="inline-flex h-11 items-center justify-center rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                                <flux:icon.funnel class="mr-2 size-4" />
+                                Filtruoti
+                            </button>
+
+                            <a href="{{ route('books.show', ['book' => $book, 'tab' => 'copies']) }}" class="inline-flex h-11 items-center justify-center rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                                Isvalyti
+                            </a>
+                        </form>
+
+                        @if($bookCopies->total() === 0)
+                            <x-ui.empty-state title="Kopiju nerasta" description="Siai knygai dar neprideta nei viena kopija." />
+                        @else
+                            <div class="text-sm text-zinc-500 dark:text-zinc-400">
+                                Rodoma kopiju: {{ $bookCopies->firstItem() }}-{{ $bookCopies->lastItem() }} is {{ $bookCopies->total() }}
+                            </div>
+
+                            <div class="overflow-hidden rounded-[22px] border border-zinc-200/80 dark:border-zinc-800">
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
+                                        <thead class="bg-zinc-50/80 dark:bg-zinc-950/50">
+                                            <tr>
+                                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Inventorinis nr.</th>
+                                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Statusas</th>
+                                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Filialas</th>
+                                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Vieta</th>
+                                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Bukle</th>
+                                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Isigyta</th>
+                                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Veiksmai</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-zinc-200 bg-white dark:divide-zinc-800 dark:bg-zinc-900">
+                                            @foreach($bookCopies as $copy)
+                                                @php
+                                                    $status = $copy->status ?: 'unknown';
+                                                    $preferredReservationForCopy = $book->reservations
+                                                        ->filter(fn ($reservation) => $reservation->isPending())
+                                                        ->where('library_id', $copy->library_id)
+                                                        ->sortBy('reserved_at')
+                                                        ->first();
+                                                @endphp
+                                                <tr class="align-middle transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40">
+                                                    <td class="px-4 py-4 text-sm font-medium">
+                                                        <a
+                                                            href="{{ route('book-copies.show', $copy->id) }}"
+                                                            title="Perziureti kopija {{ $copy->inventory_code }}"
+                                                            aria-label="Perziureti kopija {{ $copy->inventory_code }}"
+                                                            class="text-zinc-950 transition hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300"
+                                                        >
+                                                            {{ $copy->inventory_code ?: '-' }}
+                                                        </a>
+                                                    </td>
+                                                    <td class="px-4 py-4">
+                                                        <div class="flex flex-col gap-2">
+                                                            <x-ui.status-badge :status="$status" :label="$copyStatusLabels[$status] ?? $status" />
+                                                            @if($preferredReservationForCopy)
+                                                                <span class="inline-flex w-fit rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">Yra rezervacija</span>
+                                                            @endif
+                                                        </div>
+                                                    </td>
+                                                    <td class="px-4 py-4 text-sm text-zinc-700 dark:text-zinc-300">{{ $copy->branch?->name ?: '-' }}</td>
+                                                    <td class="px-4 py-4 text-sm text-zinc-700 dark:text-zinc-300">
+                                                        @if($copy->location)
+                                                            {{ collect([$copy->location->name, $copy->location->room, $copy->location->shelf])->filter()->join(' / ') ?: '-' }}
+                                                        @else
+                                                            -
+                                                        @endif
+                                                    </td>
+                                                    <td class="px-4 py-4 text-sm text-zinc-700 dark:text-zinc-300">{{ ucfirst((string) $copy->condition_status) }}</td>
+                                                    <td class="px-4 py-4 text-sm text-zinc-700 dark:text-zinc-300">{{ $copy->acquired_at?->format('Y-m-d') ?: '-' }}</td>
+                                                    <td class="px-4 py-4">
+                                                        <div class="flex items-center gap-2">
+                                                            <a href="{{ route('book-copies.show', $copy->id) }}" title="Perziureti kopija" aria-label="Perziureti kopija" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-500 transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:text-white">
+                                                                <flux:icon.eye class="size-4" />
+                                                            </a>
+
+                                                            @if($copy->activeLoan)
+                                                                <livewire:loans.return-book-copy-form :book-copy="$copy" :key="'return-copy-'.$copy->id" />
+                                                            @endif
+
+                                                            <livewire:loans.borrow-book-copy-form :book-copy="$copy" :preferred-reservation-id="$preferredReservationForCopy?->id" :key="'borrow-copy-'.$copy->id" />
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            @if($bookCopies->hasPages())
+                                <div class="flex justify-end">
+                                    {{ $bookCopies->appends([
+                                        'tab' => 'copies',
+                                        'copy_lifecycle' => request('copy_lifecycle'),
+                                        'copy_status' => request('copy_status'),
+                                        'branch_id' => request('branch_id'),
+                                        'location_id' => request('location_id'),
+                                    ])->links() }}
+                                </div>
+                            @endif
+                        @endif
+                    </div>
+                    </section>
+
+                    <section id="rezervacijos" x-show="activeTab === 'reservations'" x-cloak class="grid grid-cols-1 gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
+                        <x-ui.panel title="Nauja rezervacija" :description="$authUser?->role === 'member' ? 'Rezervuok sia knyga sau.' : 'Sukurk rezervacija pasirinktam nariui.'">
+                            <livewire:reservations.create-reservation-form :book="$book" />
+                        </x-ui.panel>
+
+                        <div class="overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                            <div class="border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
+                                <h2 class="text-lg font-semibold text-zinc-950 dark:text-white">Rezervaciju istorija</h2>
+                                <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Visos sios knygos rezervacijos, naujausios virsuje.</p>
+                            </div>
+
+                            <div class="p-5">
+                                <livewire:reservations.reservation-history :book="$book" />
+                            </div>
+                        </div>
+                    </section>
+
+                    @if($authUser?->isSuperAdmin())
+                        <section id="veiksmu-istorija" x-show="activeTab === 'audit'" x-cloak class="overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                            <div class="border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
+                                <h2 class="text-lg font-semibold text-zinc-950 dark:text-white">Veiksmu istorija</h2>
+                                <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Vienoje vietoje matysi knygos, jos egzemplioriu, rezervaciju ir isdavimu veiksmu istorija.</p>
+                            </div>
+
+                            <div class="p-5">
+                                @include('manage.audit-logs._list', [
+                                    'auditLogs' => $auditLogs,
+                                    'tab' => 'audit',
+                                    'emptyTitle' => 'Veiksmu dar nera',
+                                    'emptyDescription' => 'Siai knygai audit irasu dar nesukaupta.',
+                                ])
+                            </div>
+                        </section>
+                    @endif
+                </div>
             </div>
         </div>
-    </div>
+    </x-ui.page>
 </x-layouts::app>

@@ -12,7 +12,8 @@ class SearchLibraryMembersQuery
         $query = trim($query);
 
         return User::query()
-            ->where('library_id', $authUser->library_id)
+            ->with('library:id,name')
+            ->when(! $authUser->isSuperAdmin(), fn ($builder) => $builder->where('library_id', $authUser->library_id))
             ->where('role', 'member')
             ->where('is_active', true)
             ->when($query !== '', function ($q) use ($query) {
@@ -27,6 +28,7 @@ class SearchLibraryMembersQuery
             ->limit(20)
             ->get([
                 'id',
+                'library_id',
                 'name',
                 'email',
                 'membership_number',

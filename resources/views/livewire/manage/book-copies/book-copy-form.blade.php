@@ -1,0 +1,139 @@
+<form wire:submit="save" class="space-y-6">
+    <div class="mb-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
+        <p class="text-sm font-semibold text-zinc-950 dark:text-white">{{ $selectedBook?->title ?: 'Knyga' }}</p>
+        <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
+            {{ $selectedBook?->authors?->pluck('name')->join(', ') ?: 'Autorius nenurodytas' }}
+        </p>
+        <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            ISBN: {{ $selectedBook?->isbn ?: '-' }}
+            @if($selectedBook?->publisher)
+                - Leidykla: {{ $selectedBook->publisher->name }}
+            @endif
+            @if($selectedBook?->categories?->isNotEmpty())
+                - Kategorijos: {{ $selectedBook->categories->pluck('name')->join(', ') }}
+            @endif
+        </p>
+    </div>
+
+    <div class="grid gap-4 lg:grid-cols-2">
+        @if(auth()->user()?->isSuperAdmin())
+            <div class="lg:col-span-2">
+                <label for="copy-library-id" class="app-label">Biblioteka</label>
+                <select id="copy-library-id" wire:model.live="selectedLibraryId" class="app-input" required>
+                    <option value="">Pasirinkti biblioteka</option>
+                    @foreach($libraries as $library)
+                        <option value="{{ $library->id }}">{{ $library->name }}</option>
+                    @endforeach
+                </select>
+                @error('selectedLibraryId') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+            </div>
+        @endif
+
+        <div>
+            <label for="branch_id" class="app-label">Filialas</label>
+            <select id="branch_id" wire:model.live="branchId" class="app-input" required>
+                <option value="">Pasirinkti filiala</option>
+                @foreach($branches as $branch)
+                    <option value="{{ $branch->id }}">
+                        {{ $branch->name }}{{ $branch->code ? ' ('.$branch->code.')' : '' }}
+                    </option>
+                @endforeach
+            </select>
+            @error('branchId') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+        </div>
+
+        <div>
+            <label for="location_id" class="app-label">Vieta</label>
+            <select id="location_id" wire:model.live="locationId" class="app-input">
+                <option value="">Pasirinkti vieta</option>
+                @foreach($locations as $location)
+                    <option value="{{ $location->id }}">
+                        {{ $location->branch?->name ? $location->branch->name.' / ' : '' }}{{ $location->name }}{{ $location->room ? ' / '.$location->room : '' }}{{ $location->shelf ? ' / '.$location->shelf : '' }}
+                    </option>
+                @endforeach
+            </select>
+            @error('locationId') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+        </div>
+
+        <div>
+            <label for="inventory_code" class="app-label">Kopija</label>
+            <input id="inventory_code" type="text" wire:model="inventoryCode" class="app-input" required>
+            @error('inventoryCode') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+        </div>
+
+        <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
+            <p class="text-xs font-medium uppercase text-zinc-500 dark:text-zinc-400">QR kodas</p>
+            <p class="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+                {{ $bookCopy?->qr_code ?: 'Bus sugeneruotas automatiskai.' }}
+            </p>
+        </div>
+
+        <div>
+            <label for="barcode" class="app-label">Bruksninis kodas</label>
+            <input id="barcode" type="text" wire:model="barcode" class="app-input">
+            @error('barcode') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+        </div>
+
+        <div>
+            <label for="acquired_at" class="app-label">Isigijimo data</label>
+            <input id="acquired_at" type="date" wire:model="acquiredAt" class="app-input">
+            @error('acquiredAt') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+        </div>
+
+        @if(! $isEditing)
+            <div>
+                <label for="status" class="app-label">Pradine busena</label>
+                <select id="status" wire:model="status" class="app-input" required>
+                    @foreach($creatableStatusOptions as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+                <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                    Velesni busenos pakeitimai valdomi per kopijos gyvenimo cikla.
+                </p>
+                @error('status') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+            </div>
+        @else
+            <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
+                <p class="text-xs font-medium uppercase text-zinc-500 dark:text-zinc-400">Dabartine busena</p>
+                <p class="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+                    {{ $statusOptions[$status] ?? $status }}
+                </p>
+                <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                    Busenos keitimus daryk per gyvenimo ciklo valdymo bloka kopijos perziuroje.
+                </p>
+            </div>
+        @endif
+
+        <div>
+            <label for="condition_status" class="app-label">Fizine bukle</label>
+            <select id="condition_status" wire:model="conditionStatus" class="app-input" required>
+                @foreach($conditionOptions as $value => $label)
+                    <option value="{{ $value }}">{{ $label }}</option>
+                @endforeach
+            </select>
+            @error('conditionStatus') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+        </div>
+
+        <div class="lg:col-span-2">
+            <label for="notes" class="app-label">Pastabos</label>
+            <textarea id="notes" wire:model="notes" rows="4" class="app-input"></textarea>
+            @error('notes') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+        </div>
+    </div>
+
+    @error('selectedBook')
+        <p class="text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+    @enderror
+
+    <div class="flex flex-col gap-3 sm:flex-row">
+        <button type="submit" class="app-button-primary" wire:loading.attr="disabled">
+            <span wire:loading.remove wire:target="save">{{ $isEditing ? 'Issaugoti pakeitimus' : 'Prideti egzemplioriu' }}</span>
+            <span wire:loading wire:target="save">{{ $isEditing ? 'Saugoma...' : 'Pridedama...' }}</span>
+        </button>
+
+        <a href="{{ $bookCopy ? route('book-copies.show', $bookCopy) : route('manage.book-copies.create', array_filter(['search' => request('search'), 'library_id' => $selectedLibraryId])) }}" class="app-button-secondary">
+            {{ $bookCopy ? 'Grizti' : 'Atsaukti pasirinkima' }}
+        </a>
+    </div>
+</form>

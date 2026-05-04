@@ -2,44 +2,53 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\BookCopy;
+use App\Http\Resources\BookCopyLookupResource;
+use App\Queries\BookCopies\FindBookCopyByQrQuery;
+use App\Queries\BookCopies\GetVisibleBookCopyQuery;
+use App\Queries\Management\AuditLogs\GetRecentAuditLogsForModelQuery;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class BookCopyController extends Controller
 {
-    public function showPage(string $id): View
+    public function showPage(
+        Request $request,
+        string $id,
+        GetVisibleBookCopyQuery $getVisibleBookCopyQuery,
+        GetRecentAuditLogsForModelQuery $getRecentAuditLogsForModelQuery
+    ): View
     {
-        $copy = BookCopy::query()
-            ->with(['book', 'branch'])
-            ->findOrFail($id);
+        $copy = $getVisibleBookCopyQuery->handle($request->user(), $id, ['book', 'branch', 'location', 'activeLoan.user']);
+        $actor = $request->user();
 
         return view('book-copies.show', [
             'copy' => $copy,
+            'auditLogs' => $actor?->isSuperAdmin()
+                ? $getRecentAuditLogsForModelQuery->handle($copy)
+                : collect(),
         ]);
     }
 
-    public function findByQr(string $qrCode)
+    public function findByQr(
+        Request $request,
+        string $qrCode,
+        FindBookCopyByQrQuery $findBookCopyByQrQuery
+    ): JsonResponse
     {
-        $copy = BookCopy::query()
-            ->with(['book', 'branch'])
-            ->where('qr_code', $qrCode)
-            ->first();
+        $copy = $findBookCopyByQrQuery->handle($request->user(), $qrCode, [
+            'book',
+            'branch',
+        ]);
 
-        if (!$copy) {
+        if (! $copy) {
             return response()->json([
-                'message' => 'Egzempliorius nerastas'
+                'message' => 'Egzempliorius nerastas',
             ], 404);
         }
 
-        return response()->json([
-            'id' => $copy->id,
-            'inventory_code' => $copy->inventory_code,
-            'qr_code' => $copy->qr_code,
-            'status' => $copy->status,
-            'book' => [
-                'title' => $copy->book->title ?? null,
-            ],
-            'branch' => $copy->branch?->name,
-        ]);
+        return response()->json(
+            (new BookCopyLookupResource($copy))->resolve()
+        );
     }
 }

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\BookCopy;
+use App\Queries\BookCopies\GetVisibleBookCopyQuery;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
@@ -11,12 +11,12 @@ use Illuminate\Http\Response;
 
 class BookCopyQrController extends Controller
 {
-    public function show(string $id): Response
+    public function show(string $id, GetVisibleBookCopyQuery $getVisibleBookCopyQuery): Response
     {
-        $copy = BookCopy::query()->findOrFail($id);
+        $copy = $getVisibleBookCopyQuery->handle(auth()->user(), $id);
 
         if (empty($copy->qr_code)) {
-            abort(404, 'QR code reikšmė nerasta');
+            abort(404, 'QR code reiksme nerasta');
         }
 
         $renderer = new ImageRenderer(

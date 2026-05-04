@@ -61,6 +61,112 @@ select:focus[data-flux-control] {
     @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
 }
 
+@layer components {
+    .app-page {
+        @apply mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8;
+    }
+
+    .app-panel {
+        @apply overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900;
+    }
+
+    .app-panel-header {
+        @apply border-b border-zinc-200 px-5 py-4 dark:border-zinc-800 sm:px-6;
+    }
+
+    .app-panel-body {
+        @apply px-5 py-5 sm:px-6;
+    }
+
+    .app-card {
+        @apply rounded-lg border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900;
+    }
+
+    .app-muted-card {
+        @apply rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-800/50;
+    }
+
+    .app-copy-card {
+        @apply rounded-lg border border-zinc-200 bg-white p-5 shadow-sm transition dark:border-zinc-800 dark:bg-zinc-900;
+    }
+
+    .app-copy-card-priority {
+        @apply border-sky-200 shadow-sky-100/60 dark:border-sky-900/50;
+    }
+
+    .app-priority-banner {
+        @apply rounded-lg border border-sky-200 bg-sky-50 p-4 dark:border-sky-900/40 dark:bg-sky-500/10;
+    }
+
+    .app-priority-pill {
+        @apply inline-flex items-center rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-800 dark:bg-sky-500/15 dark:text-sky-200;
+    }
+
+    .app-subtle-pill {
+        @apply inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200;
+    }
+
+    .app-selection-list {
+        @apply flex min-h-12 flex-wrap gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-950/40;
+    }
+
+    .app-selection-chip {
+        @apply inline-flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-medium text-teal-900 dark:border-teal-900/40 dark:bg-teal-500/10 dark:text-teal-100;
+    }
+
+    .app-selection-chip-remove {
+        @apply inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-teal-700 transition hover:bg-teal-100 dark:bg-zinc-900 dark:text-teal-200 dark:hover:bg-zinc-800;
+    }
+
+    .app-input {
+        @apply w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-600/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white dark:placeholder:text-zinc-500;
+    }
+
+    .app-label {
+        @apply mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300;
+    }
+
+    .app-button-primary {
+        @apply inline-flex items-center justify-center rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/30;
+    }
+
+    .app-button-secondary {
+        @apply inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800;
+    }
+
+    .app-button-danger {
+        @apply inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-600/30;
+    }
+
+    .app-table {
+        @apply min-w-full divide-y divide-zinc-200 dark:divide-zinc-800;
+    }
+
+    .app-table-head {
+        @apply bg-zinc-50 dark:bg-zinc-950/60;
+    }
+
+    .app-th {
+        @apply px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400;
+    }
+
+    .app-td {
+        @apply px-5 py-4 align-top text-sm text-zinc-700 dark:text-zinc-300;
+    }
+
+    .app-status {
+        @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold;
+    }
+
+    .dashboard-shell {
+        @apply bg-zinc-50 dark:bg-zinc-950;
+    }
+
+    .dashboard-surface {
+        @apply rounded-3xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900;
+    }
+}
+
 /* \[:where(&)\]:size-4 {
     @apply size-4;
 } */

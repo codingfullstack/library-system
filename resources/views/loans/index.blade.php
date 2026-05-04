@@ -1,157 +1,262 @@
-<x-layouts::app :title="__('Paskolos')">
-    <div class="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <div class="mb-6">
-            <h1 class="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">
-                Aktyvios paskolos
-            </h1>
-            <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                Čia gali matyti aktyvias ir vėluojančias bibliotekos paskolas.
-            </p>
-        </div>
-
-        @if(session('success'))
-            <div class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-500/10 dark:text-emerald-300">
-                {{ session('success') }}
-            </div>
-        @endif
-
-        <div class="mb-6 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-            <form method="GET" action="{{ route('loans.index') }}">
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+<x-layouts::app :title="__('Isduotos knygos')">
+    <x-ui.page class="max-w-none px-4 py-0 sm:px-6 lg:px-8">
+        <div class="bg-[#f7f8fa] py-8 dark:bg-zinc-950">
+            <div class="mx-auto max-w-[1500px] space-y-6">
+                <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div>
-                        <label for="search" class="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                            Paieška
-                        </label>
-                        <input
-                            id="search"
-                            type="text"
-                            name="search"
-                            value="{{ request('search') }}"
-                            placeholder="Narys, knyga, ISBN, inventoriaus kodas..."
-                            class="w-full rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
-                        >
+                        <h1 class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">Isduotos knygos</h1>
+                        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                            Perziurekite visas siuo metu isduotas knygas
+                        </p>
                     </div>
 
-                    <div>
-                        <label for="status" class="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                            Būsena
-                        </label>
-                        <select
-                            id="status"
-                            name="status"
-                            class="w-full rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
-                        >
-                            <option value="">Aktyvios + vėluojančios</option>
-                            <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Aktyvios</option>
-                            <option value="overdue" {{ request('status') === 'overdue' ? 'selected' : '' }}>Vėluojančios</option>
-                            <option value="returned" {{ request('status') === 'returned' ? 'selected' : '' }}>Grąžintos</option>
-                        </select>
-                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <a href="{{ route('exports.list', array_merge(request()->query(), ['resource' => 'loans'])) }}" class="inline-flex h-11 items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                            <flux:icon.arrow-down-tray class="size-4" />
+                            Eksportuoti
+                        </a>
 
-                    <div>
-                        <label for="per_page" class="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                            Rodyti po
-                        </label>
-                        <select
-                            id="per_page"
-                            name="per_page"
-                            class="w-full rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
-                        >
-                            <option value="10" {{ request('per_page') == 10 ? 'selected' : '' }}>10</option>
-                            <option value="15" {{ request('per_page', 15) == 15 ? 'selected' : '' }}>15</option>
-                            <option value="25" {{ request('per_page') == 25 ? 'selected' : '' }}>25</option>
-                            <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
-                        </select>
+                        <button type="button" class="inline-flex h-11 items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                            <flux:icon.funnel class="size-4" />
+                            Filtruoti
+                        </button>
                     </div>
                 </div>
 
-                <div class="mt-4 flex gap-3">
-                    <button
-                        type="submit"
-                        class="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium  shadow-sm transition hover:bg-indigo-500"
-                    >
-                        Filtruoti
-                    </button>
+                @if(session('success'))
+                    <x-ui.alert type="success">
+                        {{ session('success') }}
+                    </x-ui.alert>
+                @endif
 
-                    <a
-                        href="{{ route('loans.index') }}"
-                        class="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                    >
-                        Išvalyti
-                    </a>
+                <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <section class="rounded-[22px] border border-zinc-200/80 bg-white px-5 py-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                        <div class="flex items-start gap-3">
+                            <span class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                                <flux:icon.book-open-text class="size-5" />
+                            </span>
+                            <div>
+                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Isduota knygu</div>
+                                <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['active_loans_count'] }}</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Siuo metu</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="rounded-[22px] border border-zinc-200/80 bg-white px-5 py-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                        <div class="flex items-start gap-3">
+                            <span class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+                                <flux:icon.users class="size-5" />
+                            </span>
+                            <div>
+                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Vartotoju</div>
+                                <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['unique_members_count'] }}</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Unikaliu vartotoju</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="rounded-[22px] border border-zinc-200/80 bg-white px-5 py-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                        <div class="flex items-start gap-3">
+                            <span class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                                <flux:icon.calendar-days class="size-5" />
+                            </span>
+                            <div>
+                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Grazinimo siandien</div>
+                                <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['due_today_count'] }}</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Knygos</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="rounded-[22px] border border-zinc-200/80 bg-white px-5 py-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                        <div class="flex items-start gap-3">
+                            <span class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300">
+                                <flux:icon.clock class="size-5" />
+                            </span>
+                            <div>
+                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Veluojancios knygos</div>
+                                <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['overdue_loans_count'] }}</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Is viso</div>
+                            </div>
+                        </div>
+                    </section>
                 </div>
-            </form>
-        </div>
 
-        <div class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
-                    <thead class="bg-zinc-50 dark:bg-zinc-950/50">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Narys</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Knyga</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Kopija</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Būsena</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Grąžinti iki</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Veiksmai</th>
-                        </tr>
-                    </thead>
+                <section class="overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                    <div class="px-5 py-4">
+                        <form method="GET" action="{{ route('loans.index') }}" class="grid gap-3 xl:grid-cols-[minmax(320px,1.5fr)_180px_180px_210px_auto_auto] xl:items-center">
+                            <div class="relative xl:min-w-0">
+                                <input
+                                    id="search"
+                                    type="text"
+                                    name="search"
+                                    value="{{ request('search') }}"
+                                    placeholder="Ieskoti pagal knygos pavadinima, autoriu ar ISBN..."
+                                    class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 pl-11 shadow-none dark:border-zinc-700 dark:bg-zinc-950"
+                                >
+                                <div class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
+                                    <flux:icon.magnifying-glass class="size-4" />
+                                </div>
+                            </div>
 
-                    <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
-                        @forelse($loans as $loan)
-                            <tr class="transition hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
-                                <td class="px-4 py-4 text-sm text-zinc-900 dark:text-white">
-                                    <div class="font-semibold">{{ $loan->user?->name }}</div>
-                                    <div class="text-zinc-500 dark:text-zinc-400">{{ $loan->user?->membership_number }}</div>
-                                </td>
+                            <div class="xl:min-w-0">
+                                <select id="member_id" name="member_id" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
+                                    <option value="">Vartotojas</option>
+                                    @foreach($members as $member)
+                                        <option value="{{ $member->id }}" {{ (string) request('member_id') === (string) $member->id ? 'selected' : '' }}>
+                                            {{ $member->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
 
-                                <td class="px-4 py-4 text-sm text-zinc-900 dark:text-white">
-                                    <div class="font-semibold">{{ $loan->bookCopy?->book?->title }}</div>
-                                    <div class="text-zinc-500 dark:text-zinc-400">{{ $loan->bookCopy?->book?->isbn }}</div>
-                                </td>
+                            <div class="xl:min-w-0">
+                                <select id="status" name="status" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
+                                    <option value="">Busena</option>
+                                    <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Aktyvios</option>
+                                    <option value="overdue" {{ request('status') === 'overdue' ? 'selected' : '' }}>Veluojancios</option>
+                                    <option value="returned" {{ request('status') === 'returned' ? 'selected' : '' }}>Grazintos</option>
+                                </select>
+                            </div>
 
-                                <td class="px-4 py-4 text-sm text-zinc-700 dark:text-zinc-300">
-                                    {{ $loan->bookCopy?->inventory_code }}
-                                </td>
+                            <div class="xl:min-w-0">
+                                <input type="date" id="due_date" name="due_date" value="{{ request('due_date') }}" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
+                            </div>
 
-                                <td class="px-4 py-4">
-                                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $loan->status === 'overdue' ? 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300' : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' }}">
-                                        {{ $loan->status }}
-                                    </span>
-                                </td>
+                            <div class="flex items-center gap-3 xl:justify-start">
+                                <button type="submit" class="app-button-secondary h-11 rounded-2xl px-4">
+                                    <flux:icon.funnel class="mr-2 size-4" />
+                                    Filtruoti
+                                </button>
 
-                                <td class="px-4 py-4 text-sm text-zinc-700 dark:text-zinc-300">
-                                    {{ $loan->due_at ?: '-' }}
-                                </td>
+                                <a href="{{ route('loans.index') }}" class="app-button-secondary h-11 rounded-2xl px-4">
+                                    Isvalyti
+                                </a>
+                            </div>
 
-                                <td class="px-4 py-4">
-                                    @if(in_array($loan->status, ['active', 'overdue']))
-                                        <form method="POST" action="{{ route('loans.return', $loan->bookCopy) }}">
-                                            @csrf
-                                            <button
-                                                type="submit"
-                                                class="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium  transition hover:bg-indigo-500"
-                                            >
-                                                Grąžinti
-                                            </button>
-                                        </form>
-                                    @endif
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="px-4 py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">
-                                    Paskolų nerasta.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+                            @if(auth()->user()?->isSuperAdmin())
+                                <input type="hidden" name="library_id" value="{{ request('library_id') }}">
+                            @endif
+                            <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
+                        </form>
+                    </div>
+                </section>
+
+                <section class="overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                    @if($loans->count())
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
+                                <thead class="bg-zinc-50/80 dark:bg-zinc-950/50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left">
+                                            <input type="checkbox" class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500">
+                                        </th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Knyga</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Vartotojas</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Isdavimo data</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Grazinimo data</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Busena</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Kopija</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Veiksmai</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
+                                    @foreach($loans as $loan)
+                                        @php
+                                            $dueDate = $loan->due_at;
+                                            $daysUntilDue = $dueDate ? now()->startOfDay()->diffInDays($dueDate->copy()->startOfDay(), false) : null;
+                                            $statusMeta = $loan->is_overdue
+                                                ? ['label' => 'Veluoja', 'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300']
+                                                : (($daysUntilDue !== null && $daysUntilDue <= 2)
+                                                    ? ['label' => 'Grazinti netrukus', 'classes' => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300']
+                                                    : ['label' => 'Aktyvi', 'classes' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300']);
+                                        @endphp
+                                        <tr class="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40">
+                                            <td class="px-4 py-4 align-middle">
+                                                <input type="checkbox" class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500">
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <div class="flex items-start gap-3">
+                                                    <div class="flex h-14 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-zinc-200 bg-zinc-100 text-[10px] font-semibold uppercase text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
+                                                        @if($loan->bookCopy?->book?->cover_image)
+                                                            <img src="{{ $loan->bookCopy->book->cover_image }}" alt="{{ $loan->bookCopy->book->title }}" class="h-full w-full object-cover">
+                                                        @else
+                                                            {{ str($loan->bookCopy?->book?->title ?? 'BK')->words(1, '')->substr(0, 2)->upper() }}
+                                                        @endif
+                                                    </div>
+                                                    <div class="min-w-0">
+                                                        <a href="{{ route('books.show', $loan->bookCopy->book) }}" class="font-semibold text-zinc-950 transition hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">
+                                                            {{ $loan->bookCopy?->book?->title ?? '-' }}
+                                                        </a>
+                                                        <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{{ $loan->bookCopy?->book?->isbn ?? '-' }}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">
+                                                <div class="font-medium text-zinc-900 dark:text-zinc-100">{{ $loan->user?->name ?? '-' }}</div>
+                                                <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{{ $loan->user?->membership_number ?? '-' }}</div>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">
+                                                {{ $loan->borrowed_at?->format('Y-m-d') ?? '-' }}
+                                            </td>
+                                            <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">
+                                                <div>{{ $loan->due_at?->format('Y-m-d') ?? 'Be termino' }}</div>
+                                                @if($loan->is_overdue)
+                                                    <div class="mt-1 text-xs font-semibold text-red-600 dark:text-red-300">
+                                                        ({{ $loan->overdue_days }} d. veluoja)
+                                                    </div>
+                                                @elseif($daysUntilDue !== null)
+                                                    <div class="mt-1 text-xs font-semibold text-emerald-600 dark:text-emerald-300">
+                                                        ({{ max($daysUntilDue, 0) }} d. liko)
+                                                    </div>
+                                                @endif
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusMeta['classes'] }}">
+                                                    {{ $statusMeta['label'] }}
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">
+                                                <div class="font-medium text-zinc-900 dark:text-zinc-100">Kopija #{{ $loan->bookCopy?->id ?? '-' }}</div>
+                                                <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{{ $loan->bookCopy?->inventory_code ?? '-' }}</div>
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
+                                                    <a href="{{ route('books.show', $loan->bookCopy->book) }}" title="Perziureti knyga" aria-label="Perziureti knyga" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
+                                                        <flux:icon.eye class="size-4" />
+                                                    </a>
+
+                                                    @if(in_array($loan->status, ['active', 'overdue'], true))
+                                                        <form method="POST" action="{{ route('loans.return', $loan->bookCopy) }}">
+                                                            @csrf
+                                                            <button type="submit" title="Grazinti kopija" aria-label="Grazinti kopija" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
+                                                                <flux:icon.arrow-uturn-left class="size-4" />
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="flex flex-col gap-4 border-t border-zinc-200 px-5 py-4 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-400 sm:flex-row sm:items-center sm:justify-between">
+                            <div>Rodoma {{ $loans->firstItem() }}-{{ $loans->lastItem() }} is {{ $loans->total() }}</div>
+                            <div>{{ $loans->links() }}</div>
+                        </div>
+                    @else
+                        <div class="p-6">
+                            <x-ui.empty-state
+                                title="Isduotu knygu nerasta"
+                                description="Pabandyk pakeisti paieska arba filtrus."
+                            />
+                        </div>
+                    @endif
+                </section>
             </div>
         </div>
-
-        <div class="mt-6">
-            {{ $loans->links() }}
-        </div>
-    </div>
+    </x-ui.page>
 </x-layouts::app>

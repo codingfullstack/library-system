@@ -4,30 +4,67 @@ namespace App\Http\Controllers;
 
 use App\Actions\Loans\BorrowBookCopyAction;
 use App\Actions\Loans\ReturnBookCopyAction;
-use App\Http\Controllers\Controller;
 use App\Http\Requests\BorrowBookCopyRequest;
+use App\Http\Resources\LibraryMemberResource;
 use App\Models\BookCopy;
+use App\Queries\Loans\GetMemberLoansQuery;
 use App\Queries\Loans\GetActiveLibraryLoansQuery;
+use App\Queries\Loans\GetLoanIndexFiltersDataQuery;
 use App\Queries\Users\SearchLibraryMembersQuery;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Http\JsonResponse;
 
 class LoanController extends Controller
 {
-    public function index(Request $request, GetActiveLibraryLoansQuery $getActiveLibraryLoansQuery): View
+    public function index(
+        Request $request,
+        GetMemberLoansQuery $getMemberLoansQuery,
+        GetActiveLibraryLoansQuery $getActiveLibraryLoansQuery,
+        GetLoanIndexFiltersDataQuery $getLoanIndexFiltersDataQuery
+    ): View
     {
+        if ($request->user()->role === 'member') {
+            return view('account.loans.index', [
+                'loans' => $getMemberLoansQuery->handle($request->user(), [
+                    'search' => $request->query('search'),
+                    'status' => $request->query('status'),
+                    'per_page' => $request->query('per_page', 15),
+                ]),
+            ]);
+        }
+
+        $selectedLibraryId = $request->user()->isSuperAdmin()
+            ? (int) $request->query('library_id')
+            : $request->user()->library_id;
+
         $loans = $getActiveLibraryLoansQuery->handle($request->user(), [
             'search' => $request->query('search'),
             'status' => $request->query('status'),
-            'per_page' => $request->query('per_page', 15),
+            'member_id' => $request->query('member_id'),
+            'employee_id' => $request->query('employee_id'),
+            'overdue' => $request->query('overdue'),
+            'due_date' => $request->query('due_date'),
+            'library_id' => $request->query('library_id'),
+            'per_page' => $request->query('per_page', 10),
         ]);
 
-        return view('loans.index', [
-            'loans' => $loans,
+        $summary = $getActiveLibraryLoansQuery->summary($request->user(), [
+            'search' => $request->query('search'),
+            'status' => $request->query('status'),
+            'member_id' => $request->query('member_id'),
+            'employee_id' => $request->query('employee_id'),
+            'overdue' => $request->query('overdue'),
+            'due_date' => $request->query('due_date'),
+            'library_id' => $request->query('library_id'),
         ]);
+
+        return view('loans.index', array_merge(
+            ['loans' => $loans, 'summary' => $summary],
+            $getLoanIndexFiltersDataQuery->handle($request->user(), $selectedLibraryId)
+        ));
     }
 
     public function searchMembers(Request $request, SearchLibraryMembersQuery $searchLibraryMembersQuery): JsonResponse
@@ -37,7 +74,9 @@ class LoanController extends Controller
             (string) $request->query('q', '')
         );
 
-        return response()->json($members);
+        return response()->json(
+            LibraryMemberResource::collection($members)->resolve()
+        );
     }
 
     public function borrow(
@@ -61,7 +100,7 @@ class LoanController extends Controller
         BookCopy $bookCopy,
         ReturnBookCopyAction $returnBookCopyAction
     ): RedirectResponse {
-        Gate::authorize('update', $bookCopy);
+        $this->authorize('update', $bookCopy);
 
         $returnBookCopyAction->handle(
             $request->user(),

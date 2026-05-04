@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class Reservation extends Model
 {
+    use HasFactory;
+
     public const STATUS_RESERVED = 'reserved';
     public const STATUS_FULFILLED = 'fulfilled';
     public const STATUS_CANCELLED = 'cancelled';
@@ -46,7 +49,7 @@ class Reservation extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function scopeActive(Builder $query): Builder
+    public function scopePending(Builder $query): Builder
     {
         return $query
             ->where('status', self::STATUS_RESERVED)
@@ -58,7 +61,18 @@ class Reservation extends Model
             });
     }
 
-    public function isActive(): bool
+    public function scopeActive(Builder $query): Builder
+    {
+        return $this->scopePending($query);
+    }
+
+    public function scopeCurrent(Builder $query): Builder
+    {
+        return $this->scopePending($query)
+            ->whereNotNull('expires_at');
+    }
+
+    public function isPending(): bool
     {
         if ($this->status !== self::STATUS_RESERVED) {
             return false;
@@ -73,5 +87,15 @@ class Reservation extends Model
         }
 
         return true;
+    }
+
+    public function isActive(): bool
+    {
+        return $this->isPending();
+    }
+
+    public function isCurrent(): bool
+    {
+        return $this->isPending() && $this->expires_at !== null;
     }
 }

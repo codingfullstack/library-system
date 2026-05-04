@@ -12,6 +12,16 @@ class ScanLog extends Model
 {
     use HasFactory, BelongsToLibrary;
 
+    public const TYPE_INFO = 'info';
+    public const TYPE_LOAN = 'loan';
+    public const TYPE_RETURN = 'return';
+    public const TYPE_INVENTORY = 'inventory';
+
+    public const RESULT_SUCCESS = 'success';
+    public const RESULT_NOT_FOUND = 'not_found';
+    public const RESULT_BLOCKED = 'blocked';
+    public const RESULT_ERROR = 'error';
+
     protected $fillable = [
         'library_id',
         'book_copy_id',

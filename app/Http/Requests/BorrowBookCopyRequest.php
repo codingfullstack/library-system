@@ -7,26 +7,23 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class BorrowBookCopyRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
     /**
-     * Get the validation rules that apply to the request.
-     *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
- public function rules(): array
+    public function rules(): array
     {
         return [
             'user_id' => ['required', 'integer', 'exists:users,id'],
             'due_at' => ['nullable', 'date_format:Y-m-d', 'after:today'],
             'no_due_date' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string'],
+            'override_reservation' => ['nullable', 'boolean'],
+            'override_reason' => ['nullable', 'string', 'max:2000'],
         ];
     }
 
@@ -50,7 +47,7 @@ class BorrowBookCopyRequest extends FormRequest
             if ($noDueDate && ! empty($dueAt)) {
                 $validator->errors()->add(
                     'due_at',
-                    'Negalima vienu metu nurodyti datos ir pasirinkti „be limito“.'
+                    'Negalima vienu metu nurodyti datos ir pasirinkti „be termino“.'
                 );
             }
         });

@@ -12,12 +12,16 @@ class BookDetailsResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $primaryCategory = $this->categories->first();
+
         return [
             'id' => $this->id,
             'title' => $this->title,
             'subtitle' => $this->subtitle,
             'isbn' => $this->isbn,
             'description' => $this->description,
+            'edition' => $this->edition,
+            'cover_image' => $this->cover_image,
             'publication_year' => $this->publication_year,
             'language' => $this->language,
             'page_count' => $this->page_count,
@@ -28,10 +32,17 @@ class BookDetailsResource extends JsonResource
                 'name' => $this->publisher->name,
             ] : null,
 
-            'category' => $this->category ? [
-                'id' => $this->category->id,
-                'name' => $this->category->name,
+            'category' => $primaryCategory ? [
+                'id' => $primaryCategory->id,
+                'name' => $primaryCategory->name,
             ] : null,
+
+            'categories' => $this->categories->map(function ($category) {
+                return [
+                    'id' => $category->id,
+                    'name' => $category->name,
+                ];
+            })->values(),
 
             'authors' => $this->authors->map(function ($author) {
                 return [
@@ -40,35 +51,16 @@ class BookDetailsResource extends JsonResource
                 ];
             })->values(),
 
-            'book_copies' => $this->bookCopies->map(function ($copy) {
-                return [
-                    'id' => $copy->id,
-                    'inventory_code' => $copy->inventory_code,
-                    'status' => $copy->status ?? null,
-                    'branch' => $copy->branch ? [
-                        'id' => $copy->branch->id,
-                        'name' => $copy->branch->name,
-                    ] : null,
-                    'location' => $copy->location ? [
-                        'id' => $copy->location->id,
-                        'name' => $copy->location->name,
-                        'room' => $copy->location->room,
-                        'shelf' => $copy->location->shelf,
-                    ] : null,
-                    'active_loan' => $copy->activeLoan ? [
-                        'id' => $copy->activeLoan->id,
-                        'status' => $copy->activeLoan->status,
-                        'due_at' => $copy->activeLoan->due_at,
-                        'borrowed_at' => $copy->activeLoan->borrowed_at,
-                        'returned_at' => $copy->activeLoan->returned_at,
-                        'user' => $copy->activeLoan->user ? [
-                            'id' => $copy->activeLoan->user->id,
-                            'name' => $copy->activeLoan->user->name,
-                            'email' => $copy->activeLoan->user->email,
-                            'membership_number' => $copy->activeLoan->user->membership_number,
-                        ] : null,
-                    ] : null,
-                ];
+            'reservations' => $this->whenLoaded(
+                'reservations',
+                fn () => ReservationResource::collection($this->reservations)->resolve()
+            ),
+
+            'book_copies' => $this->bookCopies->map(function ($copy) use ($request) {
+                return (new BookCopyDetailsResource(
+                    $copy,
+                    $request->user()?->can('update', $copy) ?? false
+                ))->resolve();
             })->values(),
         ];
     }
