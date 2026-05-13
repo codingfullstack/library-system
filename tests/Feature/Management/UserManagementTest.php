@@ -108,7 +108,7 @@ test('super admin can create member with generated membership number through liv
         ->test(UserForm::class)
         ->set('name', 'Test Member')
         ->set('email', 'member-created@example.test')
-        ->set('role', 'member')
+        ->set('role', 'narys')
         ->set('libraryId', $library->id)
         ->set('phone', '37060000000')
         ->set('password', 'password123')
@@ -122,9 +122,9 @@ test('super admin can create member with generated membership number through liv
         ->first();
 
     expect($createdUser)->not->toBeNull();
-    expect($createdUser->role)->toBe('member');
+    expect($createdUser->role)->toBe('narys');
     expect($createdUser->library_id)->toBe($library->id);
-    expect($createdUser->membership_number)->toStartWith('KAL-MEM-');
+    expect($createdUser->membership_number)->toStartWith('MEM:');
     expect($createdUser->is_active)->toBeTrue();
 });
 
@@ -136,7 +136,7 @@ test('admin cannot assign super admin role through livewire form', function () {
         ->test(UserForm::class)
         ->set('name', 'Bad Role')
         ->set('email', 'bad-role@example.test')
-        ->set('role', 'super_admin')
+        ->set('role', 'superadministratorius')
         ->set('password', 'password123')
         ->set('passwordConfirmation', 'password123')
         ->call('save')
@@ -194,8 +194,8 @@ test('user with history can not be deleted', function () {
         'inventory_code' => 'INV-DELETE-001',
         'qr_code' => 'QR-DELETE-001',
         'barcode' => '12345678901',
-        'status' => 'available',
-        'condition_status' => 'good',
+        'status' => 'laisva',
+        'condition_status' => 'gera',
         'acquired_at' => now()->toDateString(),
         'notes' => null,
     ]);
@@ -223,11 +223,11 @@ test('admin can not change own role through livewire form', function () {
 
     Livewire::actingAs($admin)
         ->test(UserForm::class, ['managedUser' => $admin])
-        ->set('role', 'staff')
+        ->set('role', 'darbuotojas')
         ->call('save')
         ->assertHasErrors(['role']);
 
-    expect($admin->fresh()->role)->toBe('admin');
+    expect($admin->fresh()->role)->toBe('administratorius');
 });
 
 test('super admin editing own account can not deactivate self through livewire form', function () {
@@ -262,8 +262,8 @@ test('member reservation and loan counts are visible on show page', function () 
         'inventory_code' => 'INV-SHOW-001',
         'qr_code' => 'QR-SHOW-001',
         'barcode' => '12345678902',
-        'status' => 'loaned',
-        'condition_status' => 'good',
+        'status' => 'išduota',
+        'condition_status' => 'gera',
         'acquired_at' => now()->toDateString(),
         'notes' => null,
     ]);
@@ -273,7 +273,7 @@ test('member reservation and loan counts are visible on show page', function () 
         'book_copy_id' => $copy->id,
         'user_id' => $member->id,
         'returned_at' => null,
-        'status' => 'active',
+        'status' => 'aktyvi',
     ]);
 
     Reservation::create([
@@ -293,7 +293,13 @@ test('member reservation and loan counts are visible on show page', function () 
         ->get(route('manage.users.show', $member));
 
     $response->assertOk();
-    $response->assertSee('Aktyviai isduotos knygos');
-    $response->assertSee('Laukiancios rezervacijos');
+    $response->assertSee('Aktyviai išduotos knygos');
+    $response->assertSee('Laukiančios rezervacijos');
     $response->assertSee('Testine knyga');
 });
+
+
+
+
+
+

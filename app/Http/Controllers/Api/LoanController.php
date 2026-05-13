@@ -34,7 +34,7 @@ class LoanController extends Controller
             'per_page' => $request->query('per_page', 1000),
         ];
 
-        $loans = $user?->role === 'member'
+        $loans = $user?->role === 'narys'
             ? $getMemberLoansQuery->handle($user, $filters)
             : $getActiveLibraryLoansQuery->handle($user, $filters);
 
@@ -45,7 +45,7 @@ class LoanController extends Controller
 
     public function searchMembers(Request $request, SearchLibraryMembersQuery $searchLibraryMembersQuery): JsonResponse
     {
-        abort_if($request->user()?->role === 'member', 403);
+        abort_if($request->user()?->role === 'narys', 403);
 
         $members = $searchLibraryMembersQuery->handle(
             $request->user(),
@@ -82,3 +82,12 @@ class LoanController extends Controller
         return response()->json($result);
     }
 }
+
+
+
+
+
+
+
+
+

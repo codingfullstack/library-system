@@ -1,5 +1,5 @@
 <form wire:submit="save" class="space-y-6">
-    <div class="mb-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
+    <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
         <p class="text-sm font-semibold text-zinc-950 dark:text-white">{{ $selectedBook?->title ?: 'Knyga' }}</p>
         <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
             {{ $selectedBook?->authors?->pluck('name')->join(', ') ?: 'Autorius nenurodytas' }}
@@ -20,7 +20,7 @@
             <div class="lg:col-span-2">
                 <label for="copy-library-id" class="app-label">Biblioteka</label>
                 <select id="copy-library-id" wire:model.live="selectedLibraryId" class="app-input" required>
-                    <option value="">Pasirinkti biblioteka</option>
+                    <option value="">Pasirinkti biblioteką</option>
                     @foreach($libraries as $library)
                         <option value="{{ $library->id }}">{{ $library->name }}</option>
                     @endforeach
@@ -32,7 +32,7 @@
         <div>
             <label for="branch_id" class="app-label">Filialas</label>
             <select id="branch_id" wire:model.live="branchId" class="app-input" required>
-                <option value="">Pasirinkti filiala</option>
+                <option value="">Pasirinkti filialą</option>
                 @foreach($branches as $branch)
                     <option value="{{ $branch->id }}">
                         {{ $branch->name }}{{ $branch->code ? ' ('.$branch->code.')' : '' }}
@@ -45,7 +45,7 @@
         <div>
             <label for="location_id" class="app-label">Vieta</label>
             <select id="location_id" wire:model.live="locationId" class="app-input">
-                <option value="">Pasirinkti vieta</option>
+                <option value="">Pasirinkti vietą</option>
                 @foreach($locations as $location)
                     <option value="{{ $location->id }}">
                         {{ $location->branch?->name ? $location->branch->name.' / ' : '' }}{{ $location->name }}{{ $location->room ? ' / '.$location->room : '' }}{{ $location->shelf ? ' / '.$location->shelf : '' }}
@@ -64,49 +64,49 @@
         <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
             <p class="text-xs font-medium uppercase text-zinc-500 dark:text-zinc-400">QR kodas</p>
             <p class="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
-                {{ $bookCopy?->qr_code ?: 'Bus sugeneruotas automatiskai.' }}
+                {{ $bookCopy?->qr_code ?: 'Bus sugeneruotas automatiškai.' }}
             </p>
         </div>
 
         <div>
-            <label for="barcode" class="app-label">Bruksninis kodas</label>
+            <label for="barcode" class="app-label">Brūkšninis kodas</label>
             <input id="barcode" type="text" wire:model="barcode" class="app-input">
             @error('barcode') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
         </div>
 
         <div>
-            <label for="acquired_at" class="app-label">Isigijimo data</label>
+            <label for="acquired_at" class="app-label">Įsigijimo data</label>
             <input id="acquired_at" type="date" wire:model="acquiredAt" class="app-input">
             @error('acquiredAt') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
         </div>
 
         @if(! $isEditing)
             <div>
-                <label for="status" class="app-label">Pradine busena</label>
+                <label for="status" class="app-label">Pradinė būsena</label>
                 <select id="status" wire:model="status" class="app-input" required>
                     @foreach($creatableStatusOptions as $value => $label)
                         <option value="{{ $value }}">{{ $label }}</option>
                     @endforeach
                 </select>
                 <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                    Velesni busenos pakeitimai valdomi per kopijos gyvenimo cikla.
+                    Vėlesni būsenos pakeitimai valdomi per kopijos gyvenimo ciklą.
                 </p>
                 @error('status') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
             </div>
         @else
             <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
-                <p class="text-xs font-medium uppercase text-zinc-500 dark:text-zinc-400">Dabartine busena</p>
+                <p class="text-xs font-medium uppercase text-zinc-500 dark:text-zinc-400">Dabartinė būsena</p>
                 <p class="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
                     {{ $statusOptions[$status] ?? $status }}
                 </p>
                 <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                    Busenos keitimus daryk per gyvenimo ciklo valdymo bloka kopijos perziuroje.
+                    Būsenos keitimus daryk per gyvenimo ciklo valdymo bloką kopijos peržiūroje.
                 </p>
             </div>
         @endif
 
         <div>
-            <label for="condition_status" class="app-label">Fizine bukle</label>
+            <label for="condition_status" class="app-label">Fizinė būklė</label>
             <select id="condition_status" wire:model="conditionStatus" class="app-input" required>
                 @foreach($conditionOptions as $value => $label)
                     <option value="{{ $value }}">{{ $label }}</option>
@@ -126,14 +126,27 @@
         <p class="text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
     @enderror
 
-    <div class="flex flex-col gap-3 sm:flex-row">
+    <div class="{{ $isEditing ? 'flex flex-col gap-3 sm:flex-row' : 'sticky bottom-0 -mx-6 mt-6 flex flex-col gap-3 border-t border-zinc-200 bg-white px-6 py-4 sm:flex-row sm:justify-end dark:border-zinc-800 dark:bg-zinc-950' }}">
         <button type="submit" class="app-button-primary" wire:loading.attr="disabled">
-            <span wire:loading.remove wire:target="save">{{ $isEditing ? 'Issaugoti pakeitimus' : 'Prideti egzemplioriu' }}</span>
+            <span wire:loading.remove wire:target="save">{{ $isEditing ? 'Išsaugoti pakeitimus' : 'Pridėti egzempliorių' }}</span>
             <span wire:loading wire:target="save">{{ $isEditing ? 'Saugoma...' : 'Pridedama...' }}</span>
         </button>
 
-        <a href="{{ $bookCopy ? route('book-copies.show', $bookCopy) : route('manage.book-copies.create', array_filter(['search' => request('search'), 'library_id' => $selectedLibraryId])) }}" class="app-button-secondary">
-            {{ $bookCopy ? 'Grizti' : 'Atsaukti pasirinkima' }}
-        </a>
+        @if($drawerMode)
+            <button type="button" wire:click="$dispatch('book-copy-drawer-close')" class="app-button-secondary">
+                Uždaryti
+            </button>
+        @else
+            <a href="{{ $bookCopy ? route('book-copies.show', $bookCopy) : route('manage.book-copies.create', array_filter(['search' => request('search'), 'library_id' => $selectedLibraryId])) }}" class="app-button-secondary">
+                {{ $bookCopy ? 'Grįžti' : 'Uždaryti' }}
+            </a>
+        @endif
     </div>
 </form>
+
+
+
+
+
+
+

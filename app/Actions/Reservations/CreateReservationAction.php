@@ -28,7 +28,7 @@ class CreateReservationAction
 
         if (! $belongsToLibrary) {
             throw ValidationException::withMessages([
-                'book_id' => 'Si knyga nepriklauso pasirinktai bibliotekai.',
+                'book_id' => 'Ši knyga nepriklauso pasirinktai bibliotekai.',
             ]);
         }
 
@@ -43,7 +43,7 @@ class CreateReservationAction
 
         if ($hasActiveLoan) {
             throw ValidationException::withMessages([
-                'book_id' => 'Sis narys jau turi aktyviai isduota sia knyga.',
+                'book_id' => 'Šis narys jau turi aktyviai išduotą šią knygą.',
             ]);
         }
 
@@ -56,19 +56,19 @@ class CreateReservationAction
 
         if ($hasPendingReservation) {
             throw ValidationException::withMessages([
-                'book_id' => 'Sis narys jau turi laukiancia sios knygos rezervacija.',
+                'book_id' => 'Šis narys jau turi laukiančią šios knygos rezervaciją.',
             ]);
         }
 
         $hasAvailableCopy = BookCopy::query()
             ->where('library_id', $libraryId)
             ->where('book_id', $book->id)
-            ->where('status', 'available')
+            ->where('status', 'laisva')
             ->exists();
 
         if ($hasAvailableCopy) {
             throw ValidationException::withMessages([
-                'book_id' => 'Knyga siuo metu turi laisva kopija, rezervacija nereikalinga.',
+                'book_id' => 'Knyga šiuo metu prieinama pasirinktoje bibliotekoje, rezervacija nereikalinga.',
             ]);
         }
 
@@ -86,7 +86,7 @@ class CreateReservationAction
             'reserved_at' => now(),
             'expires_at' => $hasQueueAhead
                 ? null
-                : (in_array($actor->role, ['super_admin', 'admin', 'staff'], true) ? ($data['expires_at'] ?? null) : null),
+                : ($actor->hasAnyEffectiveRole(['superadministratorius', 'administratorius', 'darbuotojas']) ? ($data['expires_at'] ?? null) : null),
             'fulfilled_at' => null,
             'cancelled_at' => null,
             'notes' => $data['notes'] ?? null,
@@ -119,26 +119,32 @@ class CreateReservationAction
 
     private function resolveMember(User $actor, array $data): User
     {
-        if ($actor->role === 'member') {
+        if ($actor->effectiveRole() === 'narys') {
             if (! $actor->is_active) {
                 throw ValidationException::withMessages([
-                    'user' => 'Jusu paskyra nera aktyvi.',
+                    'user' => 'Jūsų paskyra nėra aktyvi.',
                 ]);
             }
 
             return $actor;
         }
 
-        if (! in_array($actor->role, ['super_admin', 'admin', 'staff'], true)) {
+        if (! $actor->hasAnyEffectiveRole(['superadministratorius', 'administratorius', 'darbuotojas'])) {
             throw ValidationException::withMessages([
-                'user' => 'Neturite teises kurti rezervacijos.',
+                'user' => 'Neturite teisės kurti rezervacijos.',
             ]);
         }
 
         $member = User::query()
             ->whereKey($data['user_id'] ?? null)
-            ->when(! $actor->isSuperAdmin(), fn ($query) => $query->where('library_id', $actor->library_id))
-            ->where('role', 'member')
+            ->when(! $actor->isSuperAdmin(), function ($query) use ($actor) {
+                $libraryId = $actor->activeLibraryId();
+
+                $query->whereHas('libraryMemberships', fn ($membershipQuery) => $membershipQuery
+                    ->where('library_id', $libraryId)
+                    ->where('is_active', true));
+            })
+            ->where('role', 'narys')
             ->where('is_active', true)
             ->first();
 
@@ -153,16 +159,34 @@ class CreateReservationAction
 
     private function resolveLibraryId(User $actor, User $member): int
     {
+        $libraryId = $actor->activeLibraryId();
+
         if ($actor->isSuperAdmin()) {
-            if (! $member->library_id) {
+            $libraryId ??= $member->activeLibraryId();
+
+            if (! $libraryId || ! $member->belongsToLibrary($libraryId)) {
                 throw ValidationException::withMessages([
                     'user_id' => 'Pasirinktas narys neturi priskirtos bibliotekos.',
                 ]);
             }
 
-            return (int) $member->library_id;
+            return (int) $libraryId;
         }
 
-        return (int) $actor->library_id;
+        if (! $libraryId || ! $member->belongsToLibrary($libraryId)) {
+            throw ValidationException::withMessages([
+                'user_id' => 'Pasirinktas narys nepriklauso aktyviai bibliotekai.',
+            ]);
+        }
+
+        return (int) $libraryId;
     }
 }
+
+
+
+
+
+
+
+

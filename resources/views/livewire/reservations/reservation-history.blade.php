@@ -14,8 +14,8 @@
     <div wire:loading.class="opacity-60" class="transition">
         @if($reservations->count() === 0)
             <x-ui.empty-state
-                title="Rezervaciju nera"
-                description="Si knyga dar nebuvo rezervuota."
+                title="Rezervacijų nėra"
+                description="Ši knyga dar nebuvo rezervuota."
             />
         @else
             <div class="space-y-4">
@@ -23,13 +23,13 @@
                     @php
                         $isCurrent = $reservation->id === $currentReservationId;
                         $isPending = $reservation->isPending();
-                        $status = $isPending ? 'reserved' : $reservation->status;
+                        $status = $isPending ? 'rezervuota' : $reservation->status;
                         $statusLabel = match (true) {
                             $isCurrent => 'Rezervuota',
-                            $isPending => 'Laukia eileje',
-                            $reservation->status === 'fulfilled' => 'Ivykdyta',
-                            $reservation->status === 'cancelled' => 'Atsaukta',
-                            $reservation->status === 'expired' => 'Pasibaigusi',
+                            $isPending => 'Laukia eilėje',
+                            $reservation->status === 'įvykdyta' => 'Įvykdyta',
+                            $reservation->status === 'atšaukta' => 'Atšaukta',
+                            $reservation->status === 'pasibaigusi' => 'Pasibaigusi',
                             default => $reservation->status,
                         };
                     @endphp
@@ -38,7 +38,7 @@
                         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <h3 class="text-base font-semibold text-zinc-950 dark:text-white">
-                                    {{ $reservation->user?->name ?: 'Nezinomas narys' }}
+                                    {{ $reservation->user?->name ?: 'Nežinomas narys' }}
                                 </h3>
                                 <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
                                     {{ $reservation->user?->membership_number ?: ($reservation->user?->email ?: '-') }}
@@ -57,7 +57,7 @@
                             </div>
 
                             <div class="app-muted-card">
-                                <p class="app-label">{{ $isCurrent ? 'Galioja iki' : 'Busena eileje' }}</p>
+                                <p class="app-label">{{ $isCurrent ? 'Galioja iki' : 'Būsena eilėje' }}</p>
                                 <p class="mt-1 text-sm font-medium text-zinc-950 dark:text-white">
                                     @if ($isCurrent)
                                         {{ $reservation->expires_at?->format('Y-m-d H:i') ?: '-' }}
@@ -85,7 +85,7 @@
                                     wire:loading.attr="disabled"
                                     class="app-button-primary"
                                 >
-                                    Isduoti pirmam eileje
+                                    Išduoti pirmam eilėje
                                 </button>
                             </div>
                         @endif
@@ -110,3 +110,10 @@
         @endif
     </div>
 </div>
+
+
+
+
+
+
+

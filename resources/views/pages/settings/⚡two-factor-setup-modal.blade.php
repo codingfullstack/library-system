@@ -80,7 +80,7 @@ new class extends Component {
     }
 
     /**
-     * Confirm two-factor authentication for the user.
+     * Patvirtinti two-factor authentication for the user.
      */
     public function confirmTwoFactor(ConfirmTwoFactorAuthentication $confirmTwoFactorAuthentication): void
     {
@@ -106,7 +106,7 @@ new class extends Component {
     }
 
     /**
-     * Close the two-factor authentication modal.
+     * Uždaryti the two-factor authentication modal.
      */
     public function closeModal(): void
     {
@@ -128,24 +128,24 @@ new class extends Component {
     {
         if ($this->setupComplete) {
             return [
-                'title' => __('Two-factor authentication enabled'),
-                'description' => __('Two-factor authentication is now enabled. Scan the QR code or enter the setup key in your authenticator app.'),
-                'buttonText' => __('Close'),
+                'title' => __('Dviejų veiksnių autentifikacija įjungta'),
+                'description' => __('Dviejų veiksnių autentifikacija įjungta. Nuskenuokite QR kodą arba įveskite sąrankos raktą autentifikavimo programėlėje.'),
+                'buttonText' => __('Uždaryti'),
             ];
         }
 
         if ($this->showVerificationStep) {
             return [
-                'title' => __('Verify authentication code'),
-                'description' => __('Enter the 6-digit code from your authenticator app.'),
-                'buttonText' => __('Continue'),
+                'title' => __('Patvirtinti autentifikavimo kodą'),
+                'description' => __('Įveskite 6 skaitmenų kodą iš autentifikavimo programėlės.'),
+                'buttonText' => __('Tęsti'),
             ];
         }
 
         return [
-            'title' => __('Enable two-factor authentication'),
-            'description' => __('To finish enabling two-factor authentication, scan the QR code or enter the setup key in your authenticator app.'),
-            'buttonText' => __('Continue'),
+            'title' => __('Įjungti dviejų veiksnių autentifikaciją'),
+            'description' => __('Norėdami baigti įjungti dviejų veiksnių autentifikaciją, nuskenuokite QR kodą arba įveskite sąrankos raktą autentifikavimo programėlėje.'),
+            'buttonText' => __('Tęsti'),
         ];
     }
 }; ?>
@@ -200,7 +200,7 @@ new class extends Component {
                             class="flex-1"
                             wire:click="resetVerification"
                         >
-                            {{ __('Back') }}
+                            {{ __('Atgal') }}
                         </flux:button>
 
                         <flux:button
@@ -209,7 +209,7 @@ new class extends Component {
                             wire:click="confirmTwoFactor"
                             x-bind:disabled="$wire.code.length < 6"
                         >
-                            {{ __('Confirm') }}
+                            {{ __('Patvirtinti') }}
                         </flux:button>
                     </div>
                 </div>
@@ -225,9 +225,9 @@ new class extends Component {
                                 <flux:icon.loading/>
                             </div>
                         @else
-                            <div x-data class="flex items-center justify-center h-full p-4">
+                            <div x-data class="flex h-full items-center justify-center bg-stone-50 p-4 dark:bg-stone-900">
                                 <div
-                                    class="bg-white p-3 rounded"
+                                    class="rounded border border-stone-200 bg-white p-3 shadow-sm dark:border-stone-600"
                                     :style="($flux.appearance === 'dark' || ($flux.appearance === 'system' && $flux.dark)) ? 'filter: invert(1) brightness(1.5)' : ''"
                                 >
                                     {!! $qrCodeSvg !!}
@@ -252,7 +252,7 @@ new class extends Component {
                     <div class="relative flex items-center justify-center w-full">
                         <div class="absolute inset-0 w-full h-px top-1/2 bg-stone-200 dark:bg-stone-600"></div>
                         <span class="relative px-2 text-sm bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-400">
-                            {{ __('or, enter the code manually') }}
+                            {{ __('arba įveskite kodą rankiniu būdu') }}
                         </span>
                     </div>
 
@@ -302,3 +302,11 @@ new class extends Component {
             @endif
         </div>
 </flux:modal>
+
+
+
+
+
+
+
+

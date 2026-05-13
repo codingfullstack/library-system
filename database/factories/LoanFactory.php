@@ -24,9 +24,10 @@ class LoanFactory extends Factory
             'borrowed_at' => $borrowedAt,
             'due_at' => $dueAt,
             'returned_at' => $returned ? fake()->dateTimeBetween($borrowedAt, 'now') : null,
-            'status' => $returned ? 'returned' : fake()->randomElement(['active', 'overdue']),
+            'status' => $returned ? 'grąžinta' : fake()->randomElement(['aktyvi', 'vėluoja']),
             'renewal_count' => fake()->numberBetween(0, 2),
             'notes' => fake()->optional()->sentence(),
         ];
     }
 }
+

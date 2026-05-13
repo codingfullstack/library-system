@@ -10,6 +10,11 @@ class Loan extends Model
 {
     use HasFactory, BelongsToLibrary;
 
+    public const STATUS_ACTIVE = 'aktyvi';
+    public const STATUS_RETURNED = 'grąžinta';
+    public const STATUS_OVERDUE = 'vėluoja';
+    public const STATUS_LOST = 'prarasta';
+
     protected $fillable = [
         'library_id',
         'book_copy_id',
@@ -98,3 +103,10 @@ class Loan extends Model
     }
 
 }
+
+
+
+
+
+
+

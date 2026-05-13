@@ -15,3 +15,11 @@ class LoginResponse implements LoginResponseContract
         return redirect()->intended(route(ResolvesHomeRoute::routeName($user), absolute: false));
     }
 }
+
+
+
+
+
+
+
+

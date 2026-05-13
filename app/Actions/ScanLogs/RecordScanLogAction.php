@@ -17,7 +17,7 @@ class RecordScanLogAction
         ?string $deviceInfo = null,
         ?int $libraryId = null,
     ): ?ScanLog {
-        $libraryId ??= $bookCopy?->library_id ?? $user->library_id;
+        $libraryId ??= $bookCopy?->library_id ?? $user->activeLibraryId();
 
         if (! $libraryId) {
             return null;
@@ -34,3 +34,11 @@ class RecordScanLogAction
         ]);
     }
 }
+
+
+
+
+
+
+
+

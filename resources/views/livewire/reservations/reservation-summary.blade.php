@@ -8,7 +8,7 @@
         </div>
 
         <x-ui.status-badge
-            :status="$activeCount > 0 ? 'reserved' : 'cancelled'"
+            :status="$activeCount > 0 ? 'rezervuota' : 'atšaukta'"
             :label="$activeCount > 0 ? 'Eilė aktyvi' : 'Nėra eilės'"
         />
     </div>
@@ -28,3 +28,10 @@
         </div>
     @endif
 </div>
+
+
+
+
+
+
+

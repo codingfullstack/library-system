@@ -3,6 +3,7 @@
 namespace App\Actions\Reservations;
 
 use App\Actions\Notifications\CreateUserNotificationAction;
+use App\Models\BookCopy;
 use App\Models\Reservation;
 use Illuminate\Support\Collection;
 
@@ -20,6 +21,16 @@ class SyncReservationQueueAction
             return;
         }
 
+        if ($this->availableCopiesCount($libraryId, $bookId) < 1) {
+            $pendingReservations
+                ->filter(fn (Reservation $reservation) => $reservation->expires_at !== null)
+                ->each(fn (Reservation $reservation) => $reservation->update([
+                    'expires_at' => null,
+                ]));
+
+            return;
+        }
+
         $firstReservation = $pendingReservations->shift();
 
         if ($firstReservation && ($firstReservation->expires_at === null || $firstReservation->expires_at->isPast())) {
@@ -31,10 +42,10 @@ class SyncReservationQueueAction
                 $firstReservation->user()->firstOrFail(),
                 null,
                 'reservation_ready',
-                'Rezervacija paruosta',
+                'Rezervacija paruošta',
                 sprintf(
-                    'Knyga "%s" jau laukia jusu. Atsiimkite iki %s.',
-                    $firstReservation->book?->title ?: 'nezinoma knyga',
+                    'Knyga "%s" jau laukia jūsų. Atsiimkite iki %s.',
+                    $firstReservation->book?->title ?: 'nežinoma knyga',
                     $firstReservation->expires_at?->format('Y-m-d H:i') ?: '-'
                 ),
                 [
@@ -75,6 +86,16 @@ class SyncReservationQueueAction
             });
     }
 
+    private function availableCopiesCount(int $libraryId, int $bookId): int
+    {
+        return BookCopy::query()
+            ->withoutGlobalScope('library')
+            ->where('library_id', $libraryId)
+            ->where('book_id', $bookId)
+            ->where('status', BookCopy::STATUS_AVAILABLE)
+            ->count();
+    }
+
     /**
      * @return Collection<int, Reservation>
      */
@@ -89,3 +110,11 @@ class SyncReservationQueueAction
             ->get();
     }
 }
+
+
+
+
+
+
+
+

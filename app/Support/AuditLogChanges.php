@@ -43,21 +43,21 @@ class AuditLogChanges
     {
         return [
             'title' => 'Pavadinimas',
-            'subtitle' => 'Paantraste',
+            'subtitle' => 'Paantraštė',
             'isbn' => 'ISBN',
-            'description' => 'Aprasymas',
+            'description' => 'Aprašymas',
             'publisher_id' => 'Leidykla',
-            'category_id' => 'Pagrindine kategorija',
+            'category_id' => 'Pagrindinė kategorija',
             'category_ids' => 'Kategorijos',
             'author_ids' => 'Autoriai',
             'publication_year' => 'Leidimo metai',
             'language' => 'Kalba',
-            'page_count' => 'Puslapiu skaicius',
+            'page_count' => 'Puslapių skaičius',
             'edition' => 'Leidimas',
-            'cover_image' => 'Virselio nuoroda',
+            'cover_image' => 'Viršelio nuoroda',
             'name' => 'Pavadinimas',
             'slug' => 'Slug',
-            'country' => 'Salis',
+            'country' => 'Šalis',
             'address' => 'Adresas',
             'city' => 'Miestas',
             'code' => 'Kodas',
@@ -73,15 +73,16 @@ class AuditLogChanges
             'publisher' => 'Leidykla',
             'authors' => 'Autoriai',
             'inventory_code' => 'Inventoriaus kodas',
-            'barcode' => 'Bruksninis kodas',
+            'barcode' => 'Brūkšninis kodas',
             'status' => 'Statusas',
-            'condition_status' => 'Bukle',
-            'acquired_at' => 'Isigijimo data',
+            'condition_status' => 'Būklė',
+            'acquired_at' => 'Įsigijimo data',
             'notes' => 'Pastabos',
-            'email' => 'El. pastas',
-            'role' => 'Role',
+            'email' => 'El. paštas',
+            'role' => 'Rolė',
             'phone' => 'Telefonas',
             'is_active' => 'Aktyvumas',
+            'is_public' => 'Vieša biblioteka',
             'membership_number' => 'Nario numeris',
         ][$field] ?? str($field)->replace('_', ' ')->title()->value();
     }
@@ -102,11 +103,12 @@ class AuditLogChanges
         return match ($field) {
             'status' => BookCopy::statusLabels()[(string) $value] ?? self::stringify($value),
             'is_active' => $value ? 'Aktyvus' : 'Neaktyvus',
+            'is_public' => $value ? 'Vieša' : 'Nevieša',
             'role' => [
-                'super_admin' => 'Superadmin',
-                'admin' => 'Admin',
-                'staff' => 'Staff',
-                'member' => 'Member',
+                'superadministratorius' => 'Superadmin',
+                'administratorius' => 'Admin',
+                'darbuotojas' => 'Darbuotojas',
+                'narys' => 'Narys',
             ][(string) $value] ?? self::stringify($value),
             default => self::stringify($value),
         };
@@ -137,3 +139,12 @@ class AuditLogChanges
         return (string) $value;
     }
 }
+
+
+
+
+
+
+
+
+

@@ -79,15 +79,17 @@ class BorrowBookCopyForm extends Component
         }
 
         $member = User::query()
-            ->with('library:id,name')
+            ->with('libraryMemberships.library:id,name,code')
             ->whereKey($memberId)
-            ->where('library_id', $this->bookCopy->library_id)
-            ->where('role', 'member')
+            ->whereHas('libraryMemberships', fn ($membershipQuery) => $membershipQuery
+                ->where('library_id', $this->bookCopy->library_id)
+                ->where('is_active', true))
+            ->where('role', 'narys')
             ->where('is_active', true)
             ->first();
 
         if (! $member) {
-            $this->addError('selectedMemberId', 'Narys nerastas sioje bibliotekoje.');
+            $this->addError('selectedMemberId', 'Narys nerastas šioje bibliotekoje.');
 
             return;
         }
@@ -130,11 +132,11 @@ class BorrowBookCopyForm extends Component
                 'user_id' => $this->preferredReservation->user_id,
                 'due_at' => $this->preferredReservation->expires_at?->toDateString(),
                 'no_due_date' => false,
-                'notes' => 'Isduota pagal aktyvia rezervacija.',
+                'notes' => 'Išduota pagal aktyvią rezervaciją.',
             ]);
         } catch (ValidationException $exception) {
             foreach ($exception->errors() as $field => $messages) {
-                $this->addError($this->mapActionField($field), $messages[0] ?? 'Nepavyko isduoti kopijos.');
+                $this->addError($this->mapActionField($field), $messages[0] ?? 'Nepavyko išduoti kopijos.');
             }
 
             return null;
@@ -142,7 +144,7 @@ class BorrowBookCopyForm extends Component
 
         return redirect()
             ->route('books.show', $this->bookCopy->book_id)
-            ->with('success', 'Kopija sekmingai isduota rezervavusiam nariui.');
+            ->with('success', 'Kopija sėkmingai išduota rezervavusiam nariui.');
     }
 
     public function save()
@@ -163,9 +165,9 @@ class BorrowBookCopyForm extends Component
             'overrideReservation' => ['boolean'],
             'overrideReason' => ['nullable', 'string', 'max:1000'],
         ], [
-            'selectedMemberId.required' => 'Pasirinkite nari.',
-            'dueAt.date_format' => 'Data turi buti formato YYYY-MM-DD.',
-            'dueAt.after' => 'Grazinimo data turi buti velesne nei siandien.',
+            'selectedMemberId.required' => 'Pasirinkite narį.',
+            'dueAt.date_format' => 'Data turi būti formato YYYY-MM-DD.',
+            'dueAt.after' => 'Grąžinimo data turi būti vėlesnė nei šiandien.',
             'notes.max' => 'Pastabos negali virsyti 1000 simboliu.',
             'overrideReason.max' => 'Komentaras negali virsyti 1000 simboliu.',
         ]);
@@ -187,7 +189,7 @@ class BorrowBookCopyForm extends Component
             ]);
         } catch (ValidationException $exception) {
             foreach ($exception->errors() as $field => $messages) {
-                $this->addError($this->mapActionField($field), $messages[0] ?? 'Nepavyko isduoti kopijos.');
+                $this->addError($this->mapActionField($field), $messages[0] ?? 'Nepavyko išduoti kopijos.');
             }
 
             return null;
@@ -195,7 +197,7 @@ class BorrowBookCopyForm extends Component
 
         return redirect()
             ->route('books.show', $this->bookCopy->book_id)
-            ->with('success', 'Kopija sekmingai isduota.');
+            ->with('success', 'Kopija sėkmingai išduota.');
     }
 
     public function render(SearchLibraryMembersQuery $searchLibraryMembersQuery)
@@ -259,3 +261,11 @@ class BorrowBookCopyForm extends Component
         };
     }
 }
+
+
+
+
+
+
+
+

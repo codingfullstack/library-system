@@ -12,29 +12,29 @@ class CancelReservationAction
 {
     public function handle(User $actor, Reservation $reservation, ?string $reason = null): Reservation
     {
-        if ($reservation->library_id !== $actor->library_id) {
+        if (! $actor->isSuperAdmin() && ! $actor->belongsToLibrary($reservation->library_id)) {
             throw ValidationException::withMessages([
-                'reservation' => 'Negalite atsaukti kitos bibliotekos rezervacijos.',
+                'reservation' => 'Negalite atšaukti kitos bibliotekos rezervacijos.',
             ]);
         }
 
         if (! $this->canCancel($actor, $reservation)) {
             throw ValidationException::withMessages([
-                'reservation' => 'Neturite teises atsaukti sios rezervacijos.',
+                'reservation' => 'Neturite teisės atšaukti šios rezervacijos.',
             ]);
         }
 
         if (! $reservation->isPending()) {
             throw ValidationException::withMessages([
-                'reservation' => 'Galima atsaukti tik laukiancia rezervacija.',
+                'reservation' => 'Galima atšaukti tik laukiančią rezervaciją.',
             ]);
         }
 
         $normalizedReason = trim((string) $reason);
 
-        if (in_array($actor->role, ['admin', 'staff', 'super_admin'], true) && $normalizedReason === '') {
+        if ($actor->hasAnyEffectiveRole(['administratorius', 'darbuotojas', 'superadministratorius'], $reservation->library_id) && $normalizedReason === '') {
             throw ValidationException::withMessages([
-                'reason' => 'Nurodykite, kodel rezervacija atsaukiama.',
+                'reason' => 'Nurodykite, kodėl rezervacija atšaukiama.',
             ]);
         }
 
@@ -42,7 +42,7 @@ class CancelReservationAction
             'status' => Reservation::STATUS_CANCELLED,
             'cancelled_at' => now(),
             'notes' => $normalizedReason !== ''
-                ? trim(implode("\n\n", array_filter([$reservation->notes, 'Atsaukimo priezastis: ' . $normalizedReason])))
+                ? trim(implode("\n\n", array_filter([$reservation->notes, 'Atšaukimo priežastis: ' . $normalizedReason])))
                 : $reservation->notes,
         ]);
 
@@ -55,9 +55,9 @@ class CancelReservationAction
             'reservation_cancelled',
             $reservation,
             sprintf(
-                'Atsaukta rezervacija knygai "%s" nariui %s.',
-                $reservation->book?->title ?: 'nezinoma knyga',
-                $reservation->user?->name ?: 'nezinomas narys'
+                'Atšaukta rezervacija knygai "%s" nariui %s.',
+                $reservation->book?->title ?: 'nežinoma knyga',
+                $reservation->user?->name ?: 'nežinomas narys'
             ),
             [
                 'reservation_id' => $reservation->id,
@@ -71,7 +71,7 @@ class CancelReservationAction
         );
 
         if (
-            in_array($actor->role, ['admin', 'staff', 'super_admin'], true)
+            $actor->hasAnyEffectiveRole(['administratorius', 'darbuotojas', 'superadministratorius'], $reservation->library_id)
             && $reservation->user
             && $reservation->user_id !== $actor->id
         ) {
@@ -79,10 +79,10 @@ class CancelReservationAction
                 $reservation->user,
                 $actor,
                 'reservation_cancelled',
-                'Rezervacija atsaukta',
+                'Rezervacija atšaukta',
                 sprintf(
-                    'Tavo rezervacija knygai "%s" buvo atsaukta. Priezastis: %s',
-                    $reservation->book?->title ?: 'nezinoma knyga',
+                    'Tavo rezervacija knygai "%s" buvo atšaukta. Priežastis: %s',
+                    $reservation->book?->title ?: 'nežinoma knyga',
                     $normalizedReason
                 ),
                 [
@@ -101,10 +101,18 @@ class CancelReservationAction
 
     private function canCancel(User $actor, Reservation $reservation): bool
     {
-        if (in_array($actor->role, ['admin', 'staff', 'super_admin'], true)) {
+        if ($actor->hasAnyEffectiveRole(['administratorius', 'darbuotojas', 'superadministratorius'], $reservation->library_id)) {
             return true;
         }
 
-        return $actor->role === 'member' && $reservation->user_id === $actor->id;
+        return $actor->effectiveRole($reservation->library_id) === 'narys' && $reservation->user_id === $actor->id;
     }
 }
+
+
+
+
+
+
+
+

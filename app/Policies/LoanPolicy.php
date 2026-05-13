@@ -10,7 +10,7 @@ class LoanPolicy
 {
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, ['super_admin', 'admin', 'staff', 'member'], true);
+        return $user->hasAnyEffectiveRole(['superadministratorius', 'administratorius', 'darbuotojas', 'narys']);
     }
 
     public function view(User $user, Loan $loan): bool
@@ -19,9 +19,9 @@ class LoanPolicy
             return true;
         }
 
-        if ($user->role === 'member') {
+        if ($user->effectiveRole($loan->library_id) === 'narys') {
             return $loan->user_id === $user->id
-                && $loan->library_id === $user->library_id;
+                && $user->belongsToLibrary($loan->library_id);
         }
 
         return $user->belongsToLibrary($loan->library_id);
@@ -29,7 +29,7 @@ class LoanPolicy
 
     public function create(User $user): bool
     {
-        return in_array($user->role, ['super_admin', 'admin', 'staff'], true);
+        return $user->hasAnyEffectiveRole(['superadministratorius', 'administratorius', 'darbuotojas']);
     }
 
   public function update(User $user, BookCopy $bookCopy): bool
@@ -38,7 +38,7 @@ class LoanPolicy
         return true;
     }
 
-    return in_array($user->role, ['admin', 'staff'], true)
+    return $user->hasAnyEffectiveRole(['administratorius', 'darbuotojas'], $bookCopy->library_id)
         && $user->belongsToLibrary($bookCopy->library_id);
 }
 
@@ -48,7 +48,15 @@ class LoanPolicy
             return true;
         }
 
-        return $user->role === 'admin'
+        return $user->hasAnyEffectiveRole(['administratorius'], $loan->library_id)
             && $user->belongsToLibrary($loan->library_id);
     }
 }
+
+
+
+
+
+
+
+

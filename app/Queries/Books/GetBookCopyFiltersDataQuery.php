@@ -15,8 +15,14 @@ class GetBookCopyFiltersDataQuery
      */
     public function handle(User $user, Book $book): array
     {
+        $libraryIds = $user->role === 'narys'
+            ? $user->manageableLibraryIds()
+            : ($user->isSuperAdmin() ? null : [$user->activeLibraryId()]);
+
         $visibleCopiesQuery = $book->bookCopies()
-            ->when(! $user->isSuperAdmin(), fn ($query) => $query->where('library_id', $user->library_id));
+            ->when(is_array($libraryIds), fn ($query) => $query
+                ->withoutGlobalScope('library')
+                ->whereIn('library_id', array_filter($libraryIds)));
 
         return [
             'copyBranches' => Branch::query()
@@ -30,3 +36,11 @@ class GetBookCopyFiltersDataQuery
         ];
     }
 }
+
+
+
+
+
+
+
+

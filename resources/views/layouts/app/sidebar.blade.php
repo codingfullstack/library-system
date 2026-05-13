@@ -6,9 +6,9 @@
     <body class="min-h-screen bg-zinc-50 dark:bg-zinc-950">
         @php
             $user = auth()->user();
-            $canSeeDashboard = $user && in_array($user->role, ['super_admin', 'admin', 'staff'], true);
+            $canSeeDashboard = $user?->hasStaffAccess() ?? false;
             $canManageLibrary = $canSeeDashboard;
-            $isMember = $user?->role === 'member';
+            $isMember = $user?->effectiveRole() === 'narys';
             $homeRoute = $canSeeDashboard ? route('dashboard') : ($isMember ? route('account.dashboard') : route('books.index'));
             $unreadNotificationsCount = $user ? $user->notifications()->whereNull('read_at')->count() : 0;
             $desktopSearchRoute = $canManageLibrary ? route('manage.search.index') : route('books.index');
@@ -35,13 +35,13 @@
                 <flux:sidebar.group :heading="__('Pagrindinis')" class="grid gap-1">
                     @if($canSeeDashboard)
                         <flux:sidebar.item icon="home" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
-                            {{ __('Apzvalga') }}
+                            {{ __('Apžvalga') }}
                         </flux:sidebar.item>
                     @endif
 
                     <flux:sidebar.item icon="bell" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('notifications.index')" :current="request()->routeIs('notifications.*')" wire:navigate>
                         <span class="flex items-center gap-2">
-                            <span>{{ __('Pranesimai') }}</span>
+                            <span>{{ __('Pranešimai') }}</span>
                             @if($unreadNotificationsCount > 0)
                                 <span class="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
                                     {{ $unreadNotificationsCount }}
@@ -61,6 +61,10 @@
                         <flux:sidebar.item icon="user" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('account.profile')" :current="request()->routeIs('account.profile')" wire:navigate>
                             {{ __('Profilis') }}
                         </flux:sidebar.item>
+
+                        <flux:sidebar.item icon="building-library" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('public.libraries.index')" :current="request()->routeIs('public.libraries.*')" wire:navigate>
+                            {{ __('Viešosios bibliotekos') }}
+                        </flux:sidebar.item>
                     @endif
 
                     <flux:sidebar.item icon="book-open-text" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('books.index')" :current="request()->routeIs('books.*')" wire:navigate>
@@ -68,7 +72,7 @@
                     </flux:sidebar.item>
 
                     <flux:sidebar.item icon="clipboard-document-list" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('loans.index')" :current="request()->routeIs('loans.*')" wire:navigate>
-                        {{ __('Isduotos knygos') }}
+                        {{ __('Išduotos knygos') }}
                     </flux:sidebar.item>
 
                     <flux:sidebar.item icon="folder-git-2" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('reservations.index')" :current="request()->routeIs('reservations.*')" wire:navigate>
@@ -89,6 +93,10 @@
                         </flux:sidebar.item>
 
                         @if($user?->isSuperAdmin())
+                            <flux:sidebar.item icon="building-library" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('manage.libraries.index')" :current="request()->routeIs('manage.libraries.*')" wire:navigate>
+                                {{ __('Bibliotekos') }}
+                            </flux:sidebar.item>
+
                             <flux:sidebar.item icon="tag" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('manage.categories.index')" :current="request()->routeIs('manage.categories.*')" wire:navigate>
                                 {{ __('Kategorijos') }}
                             </flux:sidebar.item>
@@ -114,7 +122,7 @@
 
                         @if($user?->isSuperAdmin())
                             <flux:sidebar.item icon="clipboard-document" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('manage.audit-logs.index')" :current="request()->routeIs('manage.audit-logs.*')" wire:navigate>
-                                {{ __('Auditu zurnalas') }}
+                                {{ __('Auditų žurnalas') }}
                             </flux:sidebar.item>
                         @endif
                     </flux:sidebar.group>
@@ -132,3 +140,13 @@
         @fluxScripts
     </body>
 </html>
+
+
+
+
+
+
+
+
+
+

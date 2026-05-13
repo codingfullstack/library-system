@@ -2,7 +2,8 @@
 
 namespace Database\Factories;
 
-use App\Models\Library;
+use App\Models\LibraryMembership;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -11,17 +12,60 @@ class UserFactory extends Factory
 {
     protected static ?string $password;
 
+    /**
+     * @var array<string, int>
+     */
+    protected static array $pendingLibraryIds = [];
+
+    public function configure(): static
+    {
+        return $this
+            ->afterMaking(function (User $user) {
+                $attributes = $user->getAttributes();
+                $hasLibraryId = array_key_exists('library_id', $attributes);
+                $libraryId = $attributes['library_id'] ?? null;
+
+                if ($hasLibraryId) {
+                    unset($attributes['library_id']);
+                    $user->setRawAttributes($attributes);
+                }
+
+                if ($libraryId) {
+                    self::$pendingLibraryIds[$user->email] = (int) $libraryId;
+                }
+            })
+            ->afterCreating(function (User $user) {
+                $libraryId = self::$pendingLibraryIds[$user->email] ?? null;
+                unset(self::$pendingLibraryIds[$user->email]);
+
+                if (! $libraryId || $user->isSuperAdmin()) {
+                    return;
+                }
+
+                LibraryMembership::query()->updateOrCreate(
+                    [
+                        'library_id' => $libraryId,
+                        'user_id' => $user->id,
+                    ],
+                    [
+                        'membership_number' => $user->membership_number,
+                        'is_active' => $user->is_active,
+                        'joined_at' => $user->created_at,
+                    ]
+                );
+            });
+    }
+
     public function definition(): array
     {
         return [
-            'library_id' => Library::factory(),
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
-            'role' => 'member',
+            'role' => 'narys',
             'phone' => fake()->phoneNumber(),
-            'membership_number' => 'MEM-' . fake()->unique()->numerify('######'),
+            'membership_number' => fn () => 'MEM:' . (string) Str::ulid(),
             'is_active' => true,
             'remember_token' => Str::random(10),
         ];
@@ -30,8 +74,7 @@ class UserFactory extends Factory
     public function superAdmin(): static
     {
         return $this->state(fn () => [
-            'library_id' => null,
-            'role' => 'super_admin',
+            'role' => 'superadministratorius',
             'membership_number' => null,
         ]);
     }
@@ -39,21 +82,21 @@ class UserFactory extends Factory
     public function admin(): static
     {
         return $this->state(fn () => [
-            'role' => 'admin',
+            'role' => 'administratorius',
         ]);
     }
 
     public function staff(): static
     {
         return $this->state(fn () => [
-            'role' => 'staff',
+            'role' => 'darbuotojas',
         ]);
     }
 
     public function member(): static
     {
         return $this->state(fn () => [
-            'role' => 'member',
+            'role' => 'narys',
         ]);
     }
 
@@ -73,3 +116,5 @@ class UserFactory extends Factory
         ]);
     }
 }
+
+

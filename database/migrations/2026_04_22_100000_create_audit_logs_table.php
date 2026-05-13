@@ -28,3 +28,5 @@ return new class extends Migration
         Schema::dropIfExists('audit_logs');
     }
 };
+
+

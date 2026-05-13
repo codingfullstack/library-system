@@ -12,14 +12,22 @@ class ResolvesHomeRoute
             return 'home';
         }
 
-        if (in_array($user->role, ['super_admin', 'admin', 'staff'], true)) {
+        if ($user->hasStaffAccess()) {
             return 'dashboard';
         }
 
-        if ($user->role === 'member') {
+        if ($user->effectiveRole() === 'narys') {
             return 'account.dashboard';
         }
 
         return 'books.index';
     }
 }
+
+
+
+
+
+
+
+

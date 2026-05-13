@@ -6,7 +6,7 @@
                     <div>
                         <h1 class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">Rezervacijos</h1>
                         <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                            Perziurekite ir tvarkykite knygu rezervacijas
+                            Peržiūrėkite ir tvarkykite knygų rezervacijas
                         </p>
                     </div>
 
@@ -31,7 +31,7 @@
 
                 @if ($errors->any())
                     <x-ui.alert type="error">
-                        <div class="font-semibold">Nepavyko issaugoti:</div>
+                        <div class="font-semibold">Nepavyko išsaugoti:</div>
                         <ul class="mt-2 list-disc space-y-1 pl-5">
                             @foreach ($errors->all() as $error)
                                 <li>{{ $error }}</li>
@@ -49,7 +49,7 @@
                             <div>
                                 <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Visos rezervacijos</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['all_count'] }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Is viso</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Iš viso</div>
                             </div>
                         </div>
                     </section>
@@ -62,7 +62,7 @@
                             <div>
                                 <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Aktyvios</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['active_count'] }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Laukia ivykdymo</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Laukia įvykdymo</div>
                             </div>
                         </div>
                     </section>
@@ -73,7 +73,7 @@
                                 <flux:icon.check-circle class="size-5" />
                             </span>
                             <div>
-                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Ivykdytos</div>
+                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Įvykdytos</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['fulfilled_count'] }}</div>
                                 <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Perduota vartotojui</div>
                             </div>
@@ -86,9 +86,9 @@
                                 <flux:icon.x-circle class="size-5" />
                             </span>
                             <div>
-                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Atsauktos</div>
+                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Atšauktos</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['cancelled_count'] }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Atsauktos vartotojo</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Atšauktos vartotojo</div>
                             </div>
                         </div>
                     </section>
@@ -116,7 +116,7 @@
                                     type="text"
                                     name="search"
                                     value="{{ request('search') }}"
-                                    placeholder="Ieskoti pagal knygos pavadinima, vartotojo varda, el. pasta..."
+                                    placeholder="Ieškoti pagal knygos pavadinimą, vartotojo vardą, el. paštą..."
                                     class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 pl-11 shadow-none dark:border-zinc-700 dark:bg-zinc-950"
                                 >
                                 <div class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
@@ -126,11 +126,11 @@
 
                             <div class="xl:min-w-0">
                                 <select id="status" name="status" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
-                                    <option value="">Busena</option>
-                                    <option value="reserved" {{ request('status') === 'reserved' ? 'selected' : '' }}>Aktyvios</option>
-                                    <option value="fulfilled" {{ request('status') === 'fulfilled' ? 'selected' : '' }}>Ivykdytos</option>
-                                    <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>Atsauktos</option>
-                                    <option value="expired" {{ request('status') === 'expired' ? 'selected' : '' }}>Pasibaigusios</option>
+                                    <option value="">Būsena</option>
+                                    <option value="rezervuota" {{ request('status') === 'rezervuota' ? 'selected' : '' }}>Aktyvios</option>
+                                    <option value="įvykdyta" {{ request('status') === 'įvykdyta' ? 'selected' : '' }}>Įvykdytos</option>
+                                    <option value="atšaukta" {{ request('status') === 'atšaukta' ? 'selected' : '' }}>Atšauktos</option>
+                                    <option value="pasibaigusi" {{ request('status') === 'pasibaigusi' ? 'selected' : '' }}>Pasibaigusios</option>
                                 </select>
                             </div>
 
@@ -160,7 +160,7 @@
                                 </button>
 
                                 <a href="{{ route('reservations.index') }}" class="app-button-secondary h-11 rounded-2xl px-4">
-                                    Isvalyti
+                                    Išvalyti
                                 </a>
                             </div>
 
@@ -181,9 +181,9 @@
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Knyga</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Vartotojas</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Rezervacijos data</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Busena</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Būsena</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Galioja iki</th>
-                                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Eiles nr.</th>
+                                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Eilės nr.</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Veiksmai</th>
                                     </tr>
                                 </thead>
@@ -191,10 +191,10 @@
                                     @foreach ($reservations as $reservation)
                                         @php
                                             $statusMeta = match ($reservation->status) {
-                                                'reserved' => ['label' => 'Aktyvi', 'classes' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'],
-                                                'fulfilled' => ['label' => 'Ivykdyta', 'classes' => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'],
-                                                'cancelled' => ['label' => 'Atsaukta', 'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300'],
-                                                'expired' => ['label' => 'Pasibaigusi', 'classes' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'],
+                                                'rezervuota' => ['label' => 'Aktyvi', 'classes' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'],
+                                                'įvykdyta' => ['label' => 'Įvykdyta', 'classes' => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'],
+                                                'atšaukta' => ['label' => 'Atšaukta', 'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300'],
+                                                'pasibaigusi' => ['label' => 'Pasibaigusi', 'classes' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'],
                                                 default => ['label' => ucfirst((string) $reservation->status), 'classes' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'],
                                             };
                                             $daysUntilExpiry = $reservation->expires_at ? now()->startOfDay()->diffInDays($reservation->expires_at->copy()->startOfDay(), false) : null;
@@ -210,7 +210,7 @@
                                                     </div>
                                                     <div class="min-w-0">
                                                         <a href="{{ route('books.show', $reservation->book) }}" class="font-semibold text-zinc-950 transition hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">
-                                                            {{ $reservation->book?->title ?? 'Nezinoma knyga' }}
+                                                            {{ $reservation->book?->title ?? 'Nežinoma knyga' }}
                                                         </a>
                                                         <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{{ $reservation->book?->isbn ?? '-' }}</div>
                                                     </div>
@@ -251,7 +251,7 @@
                                             </td>
                                             <td class="px-4 py-4 align-middle">
                                                 <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-                                                    <a href="{{ route('books.show', $reservation->book) }}" title="Perziureti knyga" aria-label="Perziureti knyga" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
+                                                    <a href="{{ route('books.show', $reservation->book) }}" title="Peržiūrėti knygą" aria-label="Peržiūrėti knygą" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
                                                         <flux:icon.eye class="size-4" />
                                                     </a>
 
@@ -277,8 +277,8 @@
                     @else
                         <div class="p-6">
                             <x-ui.empty-state
-                                title="Rezervaciju nerasta"
-                                description="Pabandyk pakeisti paieska arba filtrus."
+                                title="Rezervacijų nerasta"
+                                description="Pabandyk pakeisti paiešką arba filtrus."
                             />
                         </div>
                     @endif
@@ -287,3 +287,10 @@
         </div>
     </x-ui.page>
 </x-layouts::app>
+
+
+
+
+
+
+

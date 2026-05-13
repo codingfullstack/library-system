@@ -17,85 +17,101 @@ class BranchImportService
 
     /**
      * @param  array<int, array<string, string|null>>  $rows
-     * @return array{created: int, updated: int, skipped: int, details: array<int, array<string, string|int|null>>}
+     * @return array{created: int, updated: int, skipped: int, failed: int, details: array<int, array<string, string|int|null>>}
      */
     public function import(User $user, array $rows, ?int $selectedLibraryId = null): array
     {
+        $this->resolveLibrary($user, $selectedLibraryId);
+
         $created = 0;
         $updated = 0;
         $skipped = 0;
+        $failed = 0;
         $details = [];
 
-        DB::transaction(function () use ($user, $rows, $selectedLibraryId, &$created, &$updated, &$skipped, &$details): void {
-            foreach ($rows as $index => $row) {
-                $line = $index + 2;
-                $library = $this->resolveLibrary($user, $selectedLibraryId, $line);
-                $name = trim((string) ($row['name'] ?? ''));
-                $code = trim((string) ($row['code'] ?? ''));
+        foreach ($rows as $index => $row) {
+            $line = $index + 2;
 
-                if ($name === '' || $code === '') {
-                    throw new \RuntimeException('Eilute ' . $line . ': privalomi laukeliai name ir code.');
-                }
+            try {
+                DB::transaction(function () use ($user, $row, $selectedLibraryId, $line, &$created, &$skipped, &$details): void {
+                    $library = $this->resolveLibrary($user, $selectedLibraryId);
+                    $name = trim((string) ($row['name'] ?? ''));
+                    $code = trim((string) ($row['code'] ?? ''));
 
-                $branch = Branch::query()
-                    ->where('library_id', $library->id)
-                    ->where('code', $code)
-                    ->first();
+                    if ($name === '' || $code === '') {
+                        throw new \RuntimeException('Privalomi laukeliai name ir code.');
+                    }
 
-                if ($branch) {
-                    $skipped++;
+                    $branch = Branch::query()
+                        ->where('library_id', $library->id)
+                        ->where('code', $code)
+                        ->first();
+
+                    if ($branch) {
+                        $skipped++;
+                        $details[] = [
+                            'line' => $line,
+                            'status' => 'praleista',
+                            'label' => $name,
+                            'message' => 'Filialas su tokiu kodu jau yra šioje bibliotekoje.',
+                        ];
+
+                        return;
+                    }
+
+                    $branch = new Branch();
+
+                    $branch->fill([
+                        'library_id' => $library->id,
+                        'name' => $name,
+                        'code' => $code,
+                        'address' => $row['address'] ?? null,
+                        'city' => $row['city'] ?? null,
+                    ]);
+
+                    $branch->save();
+
+                    $created++;
                     $details[] = [
                         'line' => $line,
-                        'status' => 'praleista',
+                        'status' => 'sukurta',
                         'label' => $name,
-                        'message' => 'Filialas su tokiu kodu jau yra sioje bibliotekoje.',
+                        'message' => 'Sukurtas naujas filialas.',
                     ];
-                    continue;
-                }
-
-                $branch = new Branch();
-
-                $branch->fill([
-                    'library_id' => $library->id,
-                    'name' => $name,
-                    'code' => $code,
-                    'address' => $row['address'] ?? null,
-                    'city' => $row['city'] ?? null,
-                ]);
-
-                $branch->save();
-
-                $created++;
+                });
+            } catch (\Throwable $exception) {
+                $failed++;
                 $details[] = [
                     'line' => $line,
-                    'status' => 'sukurta',
-                    'label' => $name,
-                    'message' => 'Sukurtas naujas filialas.',
+                    'status' => 'klaida',
+                    'label' => $this->rowLabel($row),
+                    'message' => $exception->getMessage(),
                 ];
             }
+        }
 
-            $this->recordAuditLogAction->handle(
-                $user,
-                'branches_imported',
-                null,
-                sprintf('Importuoti filialai: sukurta %d, praleista %d.', $created, $skipped),
-                [
-                    'created' => $created,
-                    'updated' => $updated,
-                    'skipped' => $skipped,
-                    'rows' => count($rows),
-                ],
-                $selectedLibraryId ?: $user->library_id
-            );
-        });
+        $this->recordAuditLogAction->handle(
+            $user,
+            'branches_imported',
+            null,
+            sprintf('Importuoti filialai: sukurta %d, praleista %d, klaidų %d.', $created, $skipped, $failed),
+            [
+                'created' => $created,
+                'updated' => $updated,
+                'skipped' => $skipped,
+                'failed' => $failed,
+                'rows' => count($rows),
+            ],
+            $selectedLibraryId ?: $user->activeLibraryId()
+        );
 
-        return compact('created', 'updated', 'skipped', 'details');
+        return compact('created', 'updated', 'skipped', 'failed', 'details');
     }
 
-    private function resolveLibrary(User $user, ?int $selectedLibraryId, int $line): Library
+    private function resolveLibrary(User $user, ?int $selectedLibraryId): Library
     {
         if (! $user->isSuperAdmin()) {
-            return Library::query()->findOrFail($user->library_id);
+            return Library::query()->findOrFail($user->activeLibraryId());
         }
 
         if (! $selectedLibraryId) {
@@ -104,4 +120,23 @@ class BranchImportService
 
         return Library::query()->findOrFail($selectedLibraryId);
     }
+
+    /**
+     * @param  array<string, string|null>  $row
+     */
+    private function rowLabel(array $row): string
+    {
+        $name = trim((string) ($row['name'] ?? ''));
+        $code = trim((string) ($row['code'] ?? ''));
+
+        return $name !== '' ? $name : ($code !== '' ? $code : '-');
+    }
 }
+
+
+
+
+
+
+
+

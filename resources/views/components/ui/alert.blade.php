@@ -13,3 +13,10 @@
 <div {{ $attributes->merge(['class' => 'mb-6 rounded-lg border px-4 py-3 text-sm '.$classes]) }}>
     {{ $slot }}
 </div>
+
+
+
+
+
+
+

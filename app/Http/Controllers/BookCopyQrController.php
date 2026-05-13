@@ -16,7 +16,7 @@ class BookCopyQrController extends Controller
         $copy = $getVisibleBookCopyQuery->handle(auth()->user(), $id);
 
         if (empty($copy->qr_code)) {
-            abort(404, 'QR code reiksme nerasta');
+            abort(404, 'QR kodo reikšmė nerasta');
         }
 
         $renderer = new ImageRenderer(
@@ -32,3 +32,11 @@ class BookCopyQrController extends Controller
         ]);
     }
 }
+
+
+
+
+
+
+
+

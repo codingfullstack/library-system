@@ -41,13 +41,13 @@ class BookCopyStatusHistory extends Model
     {
         return [
             'created' => 'Sukurtas egzempliorius',
-            'issued' => 'Egzempliorius isduotas',
-            'returned' => 'Egzempliorius grazintas',
-            'marked_lost' => 'Pazymetas kaip prarastas',
-            'marked_damaged' => 'Pazymetas kaip sugadintas',
-            'sent_to_maintenance' => 'Issiustas tvarkymui',
-            'restored_to_active' => 'Grazintas i aktyvu fonda',
-            'withdrawn' => 'Nurasyta',
+            'issued' => 'Egzempliorius išduotas',
+            'grąžinta' => 'Egzempliorius grąžintas',
+            'marked_lost' => 'Pažymėtas kaip prarastas',
+            'marked_damaged' => 'Pažymėtas kaip sugadintas',
+            'sent_to_maintenance' => 'Išsiųstas tvarkymui',
+            'restored_to_active' => 'Grąžintas į aktyvų fondą',
+            'nurašyta' => 'Nurašyta',
             'status_adjusted' => 'Statusas pakoreguotas',
         ];
     }
@@ -57,3 +57,11 @@ class BookCopyStatusHistory extends Model
         return self::reasonLabels()[$this->reason_code] ?? (string) $this->reason_code;
     }
 }
+
+
+
+
+
+
+
+

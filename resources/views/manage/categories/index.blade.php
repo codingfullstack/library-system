@@ -12,7 +12,7 @@
                 <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div>
                         <h1 class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">Kategorijos</h1>
-                        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Tvarkykite bibliotekos knygu kategorijas</p>
+                        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Tvarkykite bibliotekos knygų kategorijas</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
                         <a href="{{ route('exports.list', array_merge(request()->query(), ['resource' => 'categories'])) }}" class="inline-flex h-11 items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
@@ -21,7 +21,7 @@
                         </a>
                         <a href="{{ route('manage.categories.create') }}" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600">
                             <flux:icon.plus class="size-4" />
-                            Prideti kategorija
+                            Pridėti kategoriją
                             <flux:icon.chevron-down class="size-4" />
                         </a>
                     </div>
@@ -44,7 +44,7 @@
                             <div>
                                 <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Visos kategorijos</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $categories->total() }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Is viso</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Iš viso</div>
                             </div>
                         </div>
                     </section>
@@ -56,7 +56,7 @@
                             <div>
                                 <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Su knygomis</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $withBooks }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Siame puslapyje</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Šiame puslapyje</div>
                             </div>
                         </div>
                     </section>
@@ -66,9 +66,9 @@
                                 <flux:icon.archive-box class="size-5" />
                             </span>
                             <div>
-                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Be knygu</div>
+                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Be knygų</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $withoutBooks }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Siame puslapyje</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Šiame puslapyje</div>
                             </div>
                         </div>
                     </section>
@@ -78,9 +78,9 @@
                                 <flux:icon.document-text class="size-5" />
                             </span>
                             <div>
-                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Su aprasu</div>
+                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Su aprašu</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $withDescription }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Siame puslapyje</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Šiame puslapyje</div>
                             </div>
                         </div>
                     </section>
@@ -90,7 +90,7 @@
                     <div class="px-5 py-4">
                         <form method="GET" action="{{ route('manage.categories.index') }}" class="grid gap-3 xl:grid-cols-[minmax(320px,1.5fr)_auto_auto] xl:items-center">
                             <div class="relative xl:min-w-0">
-                                <input type="text" name="search" value="{{ request('search') }}" placeholder="Ieskoti kategorijos pagal pavadinima..." class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 pl-11 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
+                                <input type="text" name="search" value="{{ request('search') }}" placeholder="Ieškoti kategorijos pagal pavadinimą..." class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 pl-11 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
                                 <div class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
                                     <flux:icon.magnifying-glass class="size-4" />
                                 </div>
@@ -99,7 +99,7 @@
                                 <flux:icon.funnel class="mr-2 size-4" />
                                 Filtruoti
                             </button>
-                            <a href="{{ route('manage.categories.index') }}" class="app-button-secondary h-11 rounded-2xl px-4">Isvalyti</a>
+                            <a href="{{ route('manage.categories.index') }}" class="app-button-secondary h-11 rounded-2xl px-4">Išvalyti</a>
                         </form>
                     </div>
                 </section>
@@ -113,9 +113,9 @@
                                         <th class="px-4 py-3 text-left"><input type="checkbox" class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"></th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Kategorija</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Slug</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Aprasas</th>
-                                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Knygu sk.</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Busena</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Aprašas</th>
+                                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Knygų sk.</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Būsena</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Veiksmai</th>
                                     </tr>
                                 </thead>
@@ -124,7 +124,7 @@
                                         @php
                                             $statusMeta = $category->books_count > 0
                                                 ? ['label' => 'Aktyvi', 'classes' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300']
-                                                : ['label' => 'Tuscia', 'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300'];
+                                                : ['label' => 'Tuščia', 'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300'];
                                         @endphp
                                         <tr class="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40">
                                             <td class="px-4 py-4 align-middle"><input type="checkbox" class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"></td>
@@ -137,13 +137,13 @@
                                             <td class="px-4 py-4 align-middle"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusMeta['classes'] }}">{{ $statusMeta['label'] }}</span></td>
                                             <td class="px-4 py-4 align-middle">
                                                 <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-                                                    <a href="{{ route('manage.categories.edit', $category) }}" title="Redaguoti kategorija" aria-label="Redaguoti kategorija" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
+                                                    <a href="{{ route('manage.categories.edit', $category) }}" title="Redaguoti kategoriją" aria-label="Redaguoti kategoriją" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
                                                         <flux:icon.pencil-square class="size-4" />
                                                     </a>
-                                                    <form method="POST" action="{{ route('manage.categories.destroy', $category) }}" onsubmit="return confirm('Ar tikrai nori istrinti sia kategorija?')">
+                                                    <form method="POST" action="{{ route('manage.categories.destroy', $category) }}" onsubmit="return confirm('Ar tikrai nori ištrinti šią kategoriją?')">
                                                         @csrf
                                                         @method('DELETE')
-                                                        <button type="submit" title="Istrinti kategorija" aria-label="Istrinti kategorija" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-red-600 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-red-300">
+                                                        <button type="submit" title="Ištrinti kategorija" aria-label="Ištrinti kategorija" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-red-600 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-red-300">
                                                             <flux:icon.trash class="size-4" />
                                                         </button>
                                                     </form>
@@ -160,7 +160,7 @@
                         </div>
                     @else
                         <div class="p-6">
-                            <x-ui.empty-state title="Kategoriju nerasta" description="Pabandykite pakeisti paieska arba sukurkite nauja kategorija." />
+                            <x-ui.empty-state title="Kategorijų nerasta" description="Pabandykite pakeisti paiešką arba sukurkite naują kategoriją." />
                         </div>
                     @endif
                 </section>
@@ -168,3 +168,10 @@
         </div>
     </x-ui.page>
 </x-layouts::app>
+
+
+
+
+
+
+

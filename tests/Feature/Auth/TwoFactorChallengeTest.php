@@ -26,3 +26,7 @@ test('two factor challenge can be rendered', function () {
         'password' => 'password',
     ])->assertRedirect(route('two-factor.login'));
 });
+
+
+
+

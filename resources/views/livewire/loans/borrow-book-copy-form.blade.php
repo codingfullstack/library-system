@@ -7,11 +7,11 @@
                         <div class="space-y-3">
                             <div class="flex flex-wrap items-center gap-2">
                                 <span class="app-priority-pill">Aktyvi rezervacija</span>
-                                <span class="app-subtle-pill">Pirmumas siam nariui</span>
+                                <span class="app-subtle-pill">Pirmumas šiam nariui</span>
                             </div>
 
                             <div>
-                                <p class="text-sm font-medium text-sky-800 dark:text-sky-200">Rezervuota siam nariui</p>
+                                <p class="text-sm font-medium text-sky-800 dark:text-sky-200">Rezervuota šiam nariui</p>
                                 <p class="mt-1 text-lg font-semibold text-zinc-950 dark:text-white">
                                     {{ $preferredReservation->user?->name }}
                                 </p>
@@ -31,7 +31,7 @@
                                 <div class="rounded-lg border border-white/70 bg-white/80 p-3 dark:border-zinc-800 dark:bg-zinc-950/40">
                                     <p class="text-xs font-medium uppercase text-zinc-500 dark:text-zinc-400">Veiksmas</p>
                                     <p class="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
-                                        Greiciausias kelias isduoti kopija pirmajam eileje.
+                                        Greičiausias kelias išduoti kopiją pirmajam eilėje.
                                     </p>
                                 </div>
                             </div>
@@ -43,7 +43,7 @@
                             wire:loading.attr="disabled"
                             class="app-button-primary shrink-0 sm:min-w-36"
                         >
-                            <span wire:loading.remove wire:target="issuePreferred">Isduoti jam</span>
+                            <span wire:loading.remove wire:target="issuePreferred">Išduoti jam</span>
                             <span wire:loading wire:target="issuePreferred">Isduodama...</span>
                         </button>
                     </div>
@@ -52,22 +52,22 @@
 
             @if(! $isOpen)
                 <button type="button" wire:click="open" class="app-button-secondary">
-                    {{ $canIssuePreferred ? 'Isduoti kitam nariui' : 'Isduoti' }}
+                    {{ $canIssuePreferred ? 'Išduoti kitam nariui' : 'Išduoti' }}
                 </button>
             @else
                 <div class="fixed inset-0 z-50 bg-zinc-950/50" wire:key="borrow-modal-{{ $bookCopy->id }}">
-                    <button type="button" wire:click="close" class="absolute inset-0 cursor-default" aria-label="Uzdaryti"></button>
+                    <button type="button" wire:click="close" class="absolute inset-0 cursor-default" aria-label="Uždaryti"></button>
 
                     <form wire:submit="save" class="absolute inset-y-0 right-0 z-10 flex h-full w-96 max-w-[calc(100vw-1rem)] flex-col overflow-hidden border-l border-zinc-200 bg-white shadow-2xl sm:w-[32rem] dark:border-zinc-800 dark:bg-zinc-900">
                         <div class="flex items-start justify-between gap-3 border-b border-zinc-200 px-6 py-5 dark:border-zinc-800">
                             <div>
-                                <h4 class="text-lg font-semibold text-zinc-950 dark:text-white">Isduoti kopija</h4>
+                                <h4 class="text-lg font-semibold text-zinc-950 dark:text-white">Išduoti kopija</h4>
                                 <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                                    Kopija #{{ $bookCopy->id }} bus priskirta pasirinktam nariui.
+                                    {{ $bookCopy->inventory_code ?: ('Kopija #'.$bookCopy->id) }} bus priskirta pasirinktam nariui.
                                 </p>
                             </div>
 
-                            <button type="button" wire:click="close" title="Uzdaryti isdavimo langa" aria-label="Uzdaryti isdavimo langa" class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-500 transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:text-white">
+                            <button type="button" wire:click="close" title="Uždaryti išdavimo langą" aria-label="Uždaryti išdavimo langą" class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-500 transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:text-white">
                                 <flux:icon.x-mark class="size-4" />
                             </button>
                         </div>
@@ -75,7 +75,7 @@
                         <div class="space-y-4 overflow-y-auto px-6 py-5">
                             @if(auth()->user()?->isSuperAdmin() && $issueLibraryName)
                                 <div class="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
-                                    <p class="text-xs font-medium uppercase text-zinc-500 dark:text-zinc-400">Isdavimas vyksta bibliotekoje</p>
+                                    <p class="text-xs font-medium uppercase text-zinc-500 dark:text-zinc-400">Išdavimas vyksta bibliotekoje</p>
                                     <p class="mt-2 text-sm font-semibold text-zinc-950 dark:text-white">{{ $issueLibraryName }}</p>
                                 </div>
                             @endif
@@ -114,7 +114,7 @@
                                         type="search"
                                         wire:model.live.debounce.300ms="memberSearch"
                                         class="app-input"
-                                        placeholder="Ieskoti pagal varda, el. pasta, nario numeri arba telefona"
+                                        placeholder="Ieškoti pagal vardą, el. paštą, nario numeri arba telefona"
                                         autocomplete="off"
                                     >
 
@@ -141,7 +141,7 @@
                                                 </button>
                                             @empty
                                                 <div class="px-4 py-5 text-sm text-zinc-500 dark:text-zinc-400">
-                                                    Nariu pagal sia paieska nerasta.
+                                                    Narių pagal šią paiešką nerasta.
                                                 </div>
                                             @endforelse
                                         </div>
@@ -155,7 +155,7 @@
 
                             <div class="grid gap-4 sm:grid-cols-2">
                                 <div>
-                                    <label for="borrow-due-at-{{ $bookCopy->id }}" class="app-label">Grazinti iki</label>
+                                    <label for="borrow-due-at-{{ $bookCopy->id }}" class="app-label">Grąžinti iki</label>
                                     <input
                                         id="borrow-due-at-{{ $bookCopy->id }}"
                                         type="date"
@@ -195,16 +195,16 @@
                                     <div class="space-y-3">
                                         <div>
                                             <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">
-                                                Si knyga turi aktyvia rezervacija kitam nariui
+                                                Ši knyga turi aktyvią rezervaciją kitam nariui
                                             </p>
                                             <p class="mt-1 text-sm text-amber-800 dark:text-amber-300">
-                                                Jei tesisite isdavima, tai bus laikoma rezervacijos override veiksmu ir bus irasyta i audita.
+                                                Jei tęsite išdavimą, tai bus laikoma rezervacijos override veiksmu ir bus įrašyta į auditą.
                                             </p>
                                         </div>
 
                                         <label class="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
                                             <input type="checkbox" wire:model.live="overrideReservation" class="rounded border-zinc-300 text-amber-700 focus:ring-amber-600 dark:border-zinc-700 dark:bg-zinc-900">
-                                            Patvirtinu, kad noriu apeiti aktyvia rezervacija
+                                            Patvirtinu, kad noriu apeiti aktyvią rezervaciją
                                         </label>
 
                                         <div>
@@ -214,7 +214,7 @@
                                                 wire:model="overrideReason"
                                                 rows="3"
                                                 class="app-input mt-2"
-                                                placeholder="Paaiskinkite, kodel apeinama aktyvi rezervacija"
+                                                placeholder="Paaiškinkite, kodėl apeinama aktyvi rezervacija"
                                             ></textarea>
                                             @error('overrideReason')
                                                 <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
@@ -234,11 +234,11 @@
 
                         <div class="flex flex-col gap-3 border-t border-zinc-200 px-6 py-4 sm:flex-row sm:justify-end dark:border-zinc-800">
                             <button type="button" wire:click="close" class="app-button-secondary">
-                                Uzdaryti
+                                Uždaryti
                             </button>
 
                             <button type="submit" class="app-button-primary" wire:loading.attr="disabled">
-                                <span wire:loading.remove wire:target="save">Isduoti kopija</span>
+                                <span wire:loading.remove wire:target="save">Išduoti kopija</span>
                                 <span wire:loading wire:target="save">Isduodama...</span>
                             </button>
                         </div>
@@ -248,7 +248,14 @@
         </div>
     @else
         <button type="button" class="app-button-secondary opacity-60" disabled>
-            {{ $bookCopy->activeLoan ? 'Siuo metu isduota' : 'Isduoti negalima' }}
+            {{ $bookCopy->activeLoan ? 'Šiuo metu išduota' : 'Išduoti negalima' }}
         </button>
     @endif
 </div>
+
+
+
+
+
+
+

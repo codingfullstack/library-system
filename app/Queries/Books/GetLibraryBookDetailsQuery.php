@@ -10,11 +10,15 @@ class GetLibraryBookDetailsQuery
 {
     public function handle(User $user, Book $book, array $filters = []): Book
     {
+        $libraryIds = $this->visibleLibraryIds($user);
+
         $hasVisibleCopies = $book->bookCopies()
-            ->when(! $user->isSuperAdmin(), fn ($query) => $query->where('library_id', $user->library_id))
+            ->when(is_array($libraryIds), fn ($query) => $query
+                ->withoutGlobalScope('library')
+                ->whereIn('library_id', $libraryIds))
             ->exists();
 
-        if (! $user->isSuperAdmin() && ! $hasVisibleCopies) {
+        if ($user->role === 'narys' && is_array($libraryIds) && ! $hasVisibleCopies) {
             throw (new ModelNotFoundException())->setModel(Book::class, [$book->id]);
         }
 
@@ -27,18 +31,20 @@ class GetLibraryBookDetailsQuery
             'publisher:id,name',
             'categories:id,name',
             'authors:id,name',
-            'reservations' => function ($q) use ($user) {
-                $q->when(! $user->isSuperAdmin(), fn ($reservationQuery) => $reservationQuery->where('library_id', $user->library_id))
+            'reservations' => function ($q) use ($libraryIds) {
+                $q->when(is_array($libraryIds), fn ($reservationQuery) => $reservationQuery->whereIn('library_id', $libraryIds))
                     ->with('user:id,name,email,membership_number')
                     ->orderBy('reserved_at');
             },
-            'bookCopies' => function ($q) use ($user, $copyStatus, $copyLifecycle, $branchId, $locationId) {
-                $q->when(! $user->isSuperAdmin(), fn ($copyQuery) => $copyQuery->where('library_id', $user->library_id))
+            'bookCopies' => function ($q) use ($libraryIds, $copyStatus, $copyLifecycle, $branchId, $locationId) {
+                $q->when(is_array($libraryIds), fn ($copyQuery) => $copyQuery
+                        ->withoutGlobalScope('library')
+                        ->whereIn('library_id', $libraryIds))
                     ->when(! empty($copyLifecycle), function ($copyQuery) use ($copyLifecycle) {
                         match ($copyLifecycle) {
-                            'active' => $copyQuery->whereIn('status', ['available', 'loaned']),
-                            'issues' => $copyQuery->whereIn('status', ['lost', 'damaged', 'maintenance']),
-                            'removed' => $copyQuery->where('status', 'withdrawn'),
+                            'aktyvi' => $copyQuery->whereIn('status', ['laisva', 'išduota']),
+                            'issues' => $copyQuery->whereIn('status', ['prarasta', 'sugadinta', 'tvarkoma']),
+                            'removed' => $copyQuery->where('status', 'nurašyta'),
                             default => null,
                         };
                     })
@@ -47,6 +53,7 @@ class GetLibraryBookDetailsQuery
                     ->when(! empty($locationId), fn ($copyQuery) => $copyQuery->where('location_id', $locationId))
                     ->with([
                         'branch:id,name',
+                        'library:id,name,code,address,city',
                         'location:id,name,room,shelf',
                         'activeLoan' => function ($loanQuery) {
                             $loanQuery->select([
@@ -67,13 +74,46 @@ class GetLibraryBookDetailsQuery
         ]);
 
         $book->loadCount([
-            'bookCopies as copies_count' => function ($q) use ($user) {
-                if (! $user->isSuperAdmin()) {
-                    $q->where('library_id', $user->library_id);
+            'bookCopies as copies_count' => function ($q) use ($libraryIds) {
+                if (is_array($libraryIds)) {
+                    $q->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
                 }
+            },
+            'bookCopies as available_copies_count' => function ($q) use ($libraryIds) {
+                if (is_array($libraryIds)) {
+                    $q->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
+                }
+
+                $q->where('status', 'laisva');
             },
         ]);
 
         return $book;
     }
+
+    /**
+     * @return list<int>|null
+     */
+    private function visibleLibraryIds(User $user): ?array
+    {
+        if ($user->isSuperAdmin()) {
+            return null;
+        }
+
+        if ($user->role === 'narys') {
+            return $user->manageableLibraryIds();
+        }
+
+        $libraryId = $user->activeLibraryId();
+
+        return $libraryId ? [(int) $libraryId] : [];
+    }
 }
+
+
+
+
+
+
+
+

@@ -60,7 +60,7 @@ class BookCopyController extends Controller
     ): JsonResponse {
         if ($bookCopy->activeLoan()->exists()) {
             return response()->json([
-                'message' => 'Negalima keisti egzemplioriaus gyvavimo ciklo, kol jis yra aktyviai isduotas.',
+                'message' => 'Negalima keisti egzemplioriaus gyvavimo ciklo, kol jis yra aktyviai išduotas.',
             ], 422);
         }
 
@@ -71,18 +71,18 @@ class BookCopyController extends Controller
             BookCopy::STATUS_DAMAGED => 'marked_damaged',
             BookCopy::STATUS_MAINTENANCE => 'sent_to_maintenance',
             BookCopy::STATUS_AVAILABLE => 'restored_to_active',
-            BookCopy::STATUS_WITHDRAWN => 'withdrawn',
+            BookCopy::STATUS_WITHDRAWN => 'nurašyta',
             default => 'status_adjusted',
         };
 
         $attributes = [];
 
         if ($targetStatus === BookCopy::STATUS_DAMAGED) {
-            $attributes['condition_status'] = 'damaged';
+            $attributes['condition_status'] = 'sugadinta';
         }
 
-        if ($targetStatus === BookCopy::STATUS_AVAILABLE && $bookCopy->condition_status === 'damaged') {
-            $attributes['condition_status'] = 'good';
+        if ($targetStatus === BookCopy::STATUS_AVAILABLE && $bookCopy->condition_status === 'sugadinta') {
+            $attributes['condition_status'] = 'gera';
         }
 
         $copy = $changeBookCopyStatusAction->handle(
@@ -95,8 +95,16 @@ class BookCopyController extends Controller
         );
 
         return response()->json([
-            'message' => 'Egzemplioriaus busena atnaujinta.',
+            'message' => 'Egzemplioriaus būsena atnaujinta.',
             'book_copy' => (new BookCopyDetailsResource($copy, $request->user()->can('update', $copy)))->resolve(),
         ]);
     }
 }
+
+
+
+
+
+
+
+

@@ -41,7 +41,23 @@ it('allows only superadmin to edit existing books', function () {
     $this->actingAs($superAdmin)
         ->get(route('manage.books.edit', $book))
         ->assertOk()
-        ->assertSee('Redaguoti knyga');
+        ->assertSee('Redaguoti knygą');
+});
+
+it('lets staff open a catalog book detail before their library has a copy', function () {
+    $library = Library::factory()->create();
+    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create([
+        'title' => 'Dar nepridėta knyga',
+        'isbn' => '9786090000000',
+    ]);
+
+    $this->actingAs($staff)
+        ->withSession(['active_library_id' => $library->id])
+        ->get(route('books.show', $book))
+        ->assertOk()
+        ->assertSee('Dar nepridėta knyga')
+        ->assertSee('9786090000000');
 });
 
 it('allows only superadmin to delete existing books', function () {
@@ -87,6 +103,11 @@ it('hides book edit and delete actions from admin and staff book pages', functio
     $this->actingAs($staff)
         ->get(route('books.show', $book))
         ->assertOk()
-        ->assertDontSee('Redaguoti knyga')
-        ->assertDontSee('Istrinti knyga');
+        ->assertDontSee('Redaguoti knygą')
+        ->assertDontSee('Ištrinti knygą');
 });
+
+
+
+
+

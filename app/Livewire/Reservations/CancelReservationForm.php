@@ -45,13 +45,13 @@ class CancelReservationForm extends Component
             );
         } catch (ValidationException $exception) {
             foreach ($exception->errors() as $field => $messages) {
-                $this->addError($field, $messages[0] ?? 'Nepavyko atsaukti rezervacijos.');
+                $this->addError($field, $messages[0] ?? 'Nepavyko atšaukti rezervacijos.');
             }
 
             return null;
         }
 
-        return redirect(request()->fullUrl())->with('success', 'Rezervacija atsaukta.');
+        return redirect(request()->fullUrl())->with('success', 'Rezervacija atšaukta.');
     }
 
     public function render()
@@ -59,7 +59,15 @@ class CancelReservationForm extends Component
         $actor = Auth::user();
 
         return view('livewire.reservations.cancel-reservation-form', [
-            'requiresReason' => $actor && in_array($actor->role, ['admin', 'staff', 'super_admin'], true),
+            'requiresReason' => $actor && $actor->hasAnyEffectiveRole(['administratorius', 'darbuotojas', 'superadministratorius'], $this->reservation->library_id),
         ]);
     }
 }
+
+
+
+
+
+
+
+

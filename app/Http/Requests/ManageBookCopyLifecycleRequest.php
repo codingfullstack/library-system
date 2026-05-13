@@ -34,7 +34,15 @@ class ManageBookCopyLifecycleRequest extends FormRequest
     {
         return [
             'target_status' => 'tikslinis statusas',
-            'reason_notes' => 'priezastis',
+            'reason_notes' => 'priežastis',
         ];
     }
 }
+
+
+
+
+
+
+
+

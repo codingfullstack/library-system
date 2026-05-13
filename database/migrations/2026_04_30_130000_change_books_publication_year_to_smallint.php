@@ -23,3 +23,5 @@ return new class extends Migration
         DB::statement('ALTER TABLE books MODIFY publication_year YEAR NULL');
     }
 };
+
+

@@ -17,26 +17,26 @@ class DashboardReportExport
     {
         return [
             [
-                'title' => 'Suvestine',
-                'headers' => ['Rodiklis', 'Reiksme'],
+                'title' => 'Suvestinė',
+                'headers' => ['Rodiklis', 'Reikšmė'],
                 'rows' => [
-                    ['Knygu egzemplioriai', $report['summary']['book_copies_count']],
+                    ['Knygų egzemplioriai', $report['summary']['book_copies_count']],
                     ['Laisvi egzemplioriai', $report['summary']['available_book_copies_count']],
-                    ['Aktyviai isduotos knygos', $report['summary']['active_loans_count']],
-                    ['Grazintos isduotos knygos', $report['summary']['returned_loans_count']],
+                    ['Aktyviai išduotos knygos', $report['summary']['active_loans_count']],
+                    ['Grąžintos išduotos knygos', $report['summary']['returned_loans_count']],
                     ['Aktyvios rezervacijos', $report['summary']['active_reservations_count']],
-                    ['Ivykdytos rezervacijos', $report['summary']['fulfilled_reservations_count']],
-                    ['Veluojancios isduotos knygos', $report['summary']['overdue_loans_count']],
+                    ['Įvykdytos rezervacijos', $report['summary']['fulfilled_reservations_count']],
+                    ['Vėluojančios išduotos knygos', $report['summary']['overdue_loans_count']],
                     ['Prarasti egzemplioriai', $report['summary']['lost_book_copies_count']],
                     ['Sugadinti egzemplioriai', $report['summary']['damaged_book_copies_count']],
                     ['Tvarkomi egzemplioriai', $report['summary']['maintenance_book_copies_count']],
-                    ['Nurasyti egzemplioriai', $report['summary']['withdrawn_book_copies_count']],
-                    ['Aktyvus nariai', $report['summary']['active_members_count']],
+                    ['Nurašyti egzemplioriai', $report['summary']['withdrawn_book_copies_count']],
+                    ['Aktyvūs nariai', $report['summary']['active_members_count']],
                 ],
             ],
             [
-                'title' => 'Biblioteku palyginimas',
-                'headers' => ['Biblioteka', 'Egz.', 'Laisvi', 'Aktyviai isduotos', 'Visi isdavimai', 'Aktyvios rezervacijos', 'Visos rezervacijos', 'Aktyvus nariai', 'Veluojancios', 'Prarasti', 'Sugadinti', 'Tvarkomi', 'Nurasyti'],
+                'title' => 'Bibliotekų palyginimas',
+                'headers' => ['Biblioteka', 'Egz.', 'Laisvi', 'Aktyviai išduotos', 'Visi išdavimai', 'Aktyvios rezervacijos', 'Visos rezervacijos', 'Aktyvūs nariai', 'Vėluojančios', 'Prarasti', 'Sugadinti', 'Tvarkomi', 'Nurašyti'],
                 'rows' => collect($report['libraryComparison'])->map(fn ($library) => [
                     $library->name,
                     $library->book_copies_count,
@@ -55,7 +55,7 @@ class DashboardReportExport
             ],
             [
                 'title' => 'Veiklos laiko juosta',
-                'headers' => ['Periodas', 'Isduota', 'Grazinta', 'Rezervuota'],
+                'headers' => ['Periodas', 'Išduota', 'Grąžinta', 'Rezervuota'],
                 'rows' => collect($report['activityTimeline'])->map(fn ($row) => [
                     $row->label,
                     $row->issued_loans_count,
@@ -64,8 +64,8 @@ class DashboardReportExport
                 ])->all(),
             ],
             [
-                'title' => 'Populiariausios knygos',
-                'headers' => ['Knyga', 'ISBN', 'Isdavimai', 'Rezervacijos'],
+                'title' => 'Populiariaušios knygos',
+                'headers' => ['Knyga', 'ISBN', 'Išdavimai', 'Rezervacijos'],
                 'rows' => collect($report['popularBooks'])->map(fn ($book) => [
                     $book->title,
                     $book->isbn,
@@ -75,7 +75,7 @@ class DashboardReportExport
             ],
             [
                 'title' => 'Top autoriai',
-                'headers' => ['Autorius', 'Knygu', 'Isdavimai', 'Rezervacijos'],
+                'headers' => ['Autorius', 'Knygų', 'Išdavimai', 'Rezervacijos'],
                 'rows' => collect($report['popularAuthors'])->map(fn ($author) => [
                     $author->name,
                     $author->books_count,
@@ -85,7 +85,7 @@ class DashboardReportExport
             ],
             [
                 'title' => 'Top kategorijos',
-                'headers' => ['Kategorija', 'Knygu', 'Isdavimai', 'Rezervacijos'],
+                'headers' => ['Kategorija', 'Knygų', 'Išdavimai', 'Rezervacijos'],
                 'rows' => collect($report['popularCategories'])->map(fn ($category) => [
                     $category->name,
                     $category->books_count,
@@ -95,7 +95,7 @@ class DashboardReportExport
             ],
             [
                 'title' => 'Top leidyklos',
-                'headers' => ['Leidykla', 'Knygu', 'Isdavimai', 'Rezervacijos'],
+                'headers' => ['Leidykla', 'Knygų', 'Išdavimai', 'Rezervacijos'],
                 'rows' => collect($report['popularPublishers'])->map(fn ($publisher) => [
                     $publisher->name,
                     $publisher->books_count,
@@ -105,7 +105,7 @@ class DashboardReportExport
             ],
             [
                 'title' => 'Top egzemplioriai',
-                'headers' => ['Inventoriaus kodas', 'Knyga', 'Biblioteka', 'Filialas', 'Busena', 'Isdavimai'],
+                'headers' => ['Inventoriaus kodas', 'Knyga', 'Biblioteka', 'Filialas', 'Būsena', 'Išdavimai'],
                 'rows' => collect($report['popularBookCopies'])->map(fn ($copy) => [
                     $copy->inventory_code,
                     $copy->book?->title,
@@ -117,7 +117,7 @@ class DashboardReportExport
             ],
             [
                 'title' => 'Aktyviausi nariai',
-                'headers' => ['Narys', 'Nario numeris', 'Biblioteka', 'Aktyvumo taskai', 'Isduotos knygos', 'Rezervacijos'],
+                'headers' => ['Narys', 'Nario numeris', 'Biblioteka', 'Aktyvumo taškai', 'Išduotos knygos', 'Rezervacijos'],
                 'rows' => collect($report['activeMembers'])->map(fn ($member) => [
                     $member->name,
                     $member->membership_number,
@@ -128,8 +128,8 @@ class DashboardReportExport
                 ])->all(),
             ],
             [
-                'title' => 'Egzemplioriu busenos',
-                'headers' => ['Busena', 'Kiekis'],
+                'title' => 'Egzempliorių būsenos',
+                'headers' => ['Būsena', 'Kiekis'],
                 'rows' => collect($report['copiesByStatus'])->map(fn ($status) => [
                     $status->label,
                     $status->count,
@@ -137,7 +137,7 @@ class DashboardReportExport
             ],
             [
                 'title' => 'Egzemplioriai pagal filialus',
-                'headers' => ['Biblioteka', 'Filialas', 'Egz.', 'Laisvi', 'Isduoti', 'Aktyvios rezervacijos', 'Prarasti', 'Sugadinti', 'Tvarkomi', 'Nurasyti'],
+                'headers' => ['Biblioteka', 'Filialas', 'Egz.', 'Laisvi', 'Išduoti', 'Aktyvios rezervacijos', 'Prarasti', 'Sugadinti', 'Tvarkomi', 'Nurašyti'],
                 'rows' => collect($report['copiesByBranch'])->map(fn ($branch) => [
                     $branch->library?->name,
                     $branch->name,
@@ -209,3 +209,11 @@ class DashboardReportExport
             ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
     }
 }
+
+
+
+
+
+
+
+

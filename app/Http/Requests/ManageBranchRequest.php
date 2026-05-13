@@ -17,7 +17,7 @@ class ManageBranchRequest extends FormRequest
         $branchId = $this->route('branch')?->id;
         $libraryId = $this->user()?->isSuperAdmin()
             ? $this->input('library_id')
-            : $this->user()?->library_id;
+            : $this->user()?->activeLibraryId();
 
         return [
             'library_id' => [
@@ -40,3 +40,11 @@ class ManageBranchRequest extends FormRequest
         ];
     }
 }
+
+
+
+
+
+
+
+

@@ -26,3 +26,11 @@ class GenerateUniqueCategorySlugQuery
         return $candidate;
     }
 }
+
+
+
+
+
+
+
+

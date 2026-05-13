@@ -26,3 +26,11 @@ class BookCopyLookupResource extends JsonResource
         ];
     }
 }
+
+
+
+
+
+
+
+

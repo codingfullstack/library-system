@@ -9,9 +9,17 @@ class HasAnotherActiveSuperAdminQuery
     public function handle(User $user): bool
     {
         return User::query()
-            ->where('role', 'super_admin')
+            ->where('role', 'superadministratorius')
             ->whereKeyNot($user->id)
             ->where('is_active', true)
             ->exists();
     }
 }
+
+
+
+
+
+
+
+

@@ -1,15 +1,15 @@
-<x-layouts::app :title="'Vartotojo perziura'">
+<x-layouts::app :title="'Vartotojo peržiūra'">
     @php
         $roleLabels = [
-            'super_admin' => 'Superadmin',
-            'admin' => 'Admin',
-            'staff' => 'Staff',
-            'member' => 'Member',
+            'superadministratorius' => 'Superadministratorius',
+            'administratorius' => 'Administratorius',
+            'darbuotojas' => 'Darbuotojas',
+            'narys' => 'Narys',
         ];
     @endphp
 
     <x-ui.page>
-        <x-ui.page-header eyebrow="Valdymas" title="Vartotojo perziura" :description="$managedUser->name">
+        <x-ui.page-header eyebrow="Valdymas" title="Vartotojo peržiūra" :description="$managedUser->name">
             <x-slot:actions>
                 <div class="flex flex-col gap-3 sm:flex-row">
                     @if(auth()->id() !== $managedUser->id)
@@ -37,7 +37,7 @@
         @endif
 
         <div class="grid gap-6 lg:grid-cols-3">
-            <x-ui.panel class="lg:col-span-2" title="Pagrindine informacija" description="Vartotojo duomenys ir role sistemoje.">
+            <x-ui.panel class="lg:col-span-2" title="Pagrindinė informacija" description="Vartotojo duomenys ir rolė sistemoje.">
                 <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div class="app-muted-card">
                         <dt class="app-label">Vardas</dt>
@@ -45,12 +45,12 @@
                     </div>
 
                     <div class="app-muted-card">
-                        <dt class="app-label">Role</dt>
+                        <dt class="app-label">Rolė</dt>
                         <dd class="mt-1 text-sm font-medium text-zinc-950 dark:text-white">{{ $roleLabels[$managedUser->role] ?? $managedUser->role }}</dd>
                     </div>
 
                     <div class="app-muted-card">
-                        <dt class="app-label">El. pastas</dt>
+                        <dt class="app-label">El. paštas</dt>
                         <dd class="mt-1 text-sm font-medium text-zinc-950 dark:text-white">{{ $managedUser->email }}</dd>
                     </div>
 
@@ -90,20 +90,20 @@
                 </dl>
             </x-ui.panel>
 
-            <x-ui.panel title="Suvestine" description="Svarbiausi susije skaiciai.">
+            <x-ui.panel title="Suvestinė" description="Svarbiausi susiję skaičiai.">
                 <div class="grid gap-3">
                     <div class="app-muted-card">
-                        <p class="app-label">Aktyviai isduotos knygos</p>
+                        <p class="app-label">Aktyviai išduotos knygos</p>
                         <p class="mt-2 text-2xl font-semibold text-zinc-950 dark:text-white">{{ $managedUser->active_loans_count }}</p>
                     </div>
 
                     <div class="app-muted-card">
-                        <p class="app-label">Visos isduotos knygos</p>
+                        <p class="app-label">Visos išduotos knygos</p>
                         <p class="mt-2 text-2xl font-semibold text-zinc-950 dark:text-white">{{ $managedUser->loans_count }}</p>
                     </div>
 
                     <div class="app-muted-card">
-                        <p class="app-label">Laukiancios rezervacijos</p>
+                        <p class="app-label">Laukiančios rezervacijos</p>
                         <p class="mt-2 text-2xl font-semibold text-zinc-950 dark:text-white">{{ $managedUser->pending_reservations_count }}</p>
                     </div>
 
@@ -112,14 +112,14 @@
                         <p class="mt-2 text-2xl font-semibold text-zinc-950 dark:text-white">{{ $managedUser->reservations_count }}</p>
                     </div>
 
-                    @if($managedUser->role !== 'member')
+                    @if($managedUser->role !== 'narys')
                         <div class="app-muted-card">
-                            <p class="app-label">Isduota knygu</p>
+                            <p class="app-label">Išduota knygų</p>
                             <p class="mt-2 text-2xl font-semibold text-zinc-950 dark:text-white">{{ $managedUser->issued_loans_count }}</p>
                         </div>
 
                         <div class="app-muted-card">
-                            <p class="app-label">Priimta knygu</p>
+                            <p class="app-label">Priimta knygų</p>
                             <p class="mt-2 text-2xl font-semibold text-zinc-950 dark:text-white">{{ $managedUser->received_loans_count }}</p>
                         </div>
                     @endif
@@ -127,8 +127,9 @@
             </x-ui.panel>
         </div>
 
+
         <div class="mt-6 grid gap-6 lg:grid-cols-2">
-            <x-ui.panel title="Paskutines isduotos knygos" description="Naujausios su vartotoju susijusios isduotos knygos.">
+            <x-ui.panel title="Paskutinės išduotos knygos" description="Naujausios su vartotoju susijusios išduotos knygos.">
                 @if($recentLoans->count())
                     <div class="space-y-3">
                         @foreach($recentLoans as $loan)
@@ -137,11 +138,11 @@
                                     {{ $loan->bookCopy?->book?->title ?: 'Knyga' }}
                                 </p>
                                 <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                                    Isduota: {{ $loan->borrowed_at?->format('Y-m-d') ?: '-' }}
-                                    - Grazinti iki: {{ $loan->due_at?->format('Y-m-d') ?: '-' }}
+                                    Išduota: {{ $loan->borrowed_at?->format('Y-m-d') ?: '-' }}
+                                    - Grąžinti iki: {{ $loan->due_at?->format('Y-m-d') ?: '-' }}
                                 </p>
                                 <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                                    Statusas: {{ $loan->returned_at ? 'Grazinta' : 'Aktyvi' }}
+                                    Statusas: {{ $loan->returned_at ? 'Grąžinta' : 'Aktyvi' }}
                                 </p>
                             </div>
                         @endforeach
@@ -153,11 +154,11 @@
                         </div>
                     @endif
                 @else
-                    <x-ui.empty-state title="Isduotu knygu nera" description="Sis vartotojas dar neturi isduotu knygu istorijos." />
+                    <x-ui.empty-state title="Išduotų knygų nėra" description="Šis vartotojas dar neturi išduotų knygų istorijos." />
                 @endif
             </x-ui.panel>
 
-            <x-ui.panel title="Paskutines rezervacijos" description="Naujausios sio vartotojo rezervacijos.">
+            <x-ui.panel title="Paskutinės rezervacijos" description="Naujausios šio vartotojo rezervacijos.">
                 @if($recentReservations->count())
                     <div class="space-y-3">
                         @foreach($recentReservations as $reservation)
@@ -169,7 +170,7 @@
                                     Rezervuota: {{ $reservation->reserved_at?->format('Y-m-d H:i') ?: '-' }}
                                 </p>
                                 <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                                    Statusas: {{ $reservation->status }}
+                                    Statusas: {{ $reservation->statusLabel() }}
                                 </p>
                             </div>
                         @endforeach
@@ -181,21 +182,29 @@
                         </div>
                     @endif
                 @else
-                    <x-ui.empty-state title="Rezervaciju nera" description="Sis vartotojas dar neturi rezervaciju istorijos." />
+                    <x-ui.empty-state title="Rezervacijų nėra" description="Šis vartotojas dar neturi rezervacijų istorijos." />
                 @endif
             </x-ui.panel>
         </div>
 
         @if(auth()->user()?->isSuperAdmin())
             <div class="mt-6">
-                <x-ui.panel title="Veiksmu istorija" description="Paskutiniai veiksmai, kurie buvo atlikti siam vartotojui.">
+                <x-ui.panel title="Veiksmų istorija" description="Paskutiniai veiksmai, kurie buvo atlikti šiam vartotojui.">
                     @include('manage.audit-logs._list', [
                         'auditLogs' => $auditLogs,
-                        'emptyTitle' => 'Veiksmu dar nera',
-                        'emptyDescription' => 'Siam vartotojui audit irasu dar nesukaupta.',
+                        'emptyTitle' => 'Veiksmų dar nėra',
+                        'emptyDescription' => 'Šiam vartotojui audito įrašų dar nesukaupta.',
                     ])
                 </x-ui.panel>
             </div>
         @endif
     </x-ui.page>
 </x-layouts::app>
+
+
+
+
+
+
+
+

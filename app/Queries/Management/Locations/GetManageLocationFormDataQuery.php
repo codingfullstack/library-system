@@ -13,7 +13,7 @@ class GetManageLocationFormDataQuery
     {
         $selectedLibraryId = $user->isSuperAdmin()
             ? ($location->library_id ?: old('library_id'))
-            : $user->library_id;
+            : $user->activeLibraryId();
 
         return [
             'location' => $location,
@@ -26,3 +26,11 @@ class GetManageLocationFormDataQuery
         ];
     }
 }
+
+
+
+
+
+
+
+

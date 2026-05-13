@@ -3,6 +3,7 @@
 namespace App\Queries\Books;
 
 use App\Models\Book;
+use App\Models\BookCopy;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
@@ -16,7 +17,7 @@ class GetLibraryBooksQuery
         $authorId = $filters['author_id'] ?? null;
         $publisherId = $filters['publisher_id'] ?? null;
         $availability = $filters['availability'] ?? null;
-        $libraryId = $user->isSuperAdmin() ? ($filters['library_id'] ?? null) : $user->library_id;
+        $libraryIds = $this->visibleLibraryIds($user, $filters);
         $sort = $filters['sort'] ?? 'title';
         $direction = strtolower($filters['direction'] ?? 'asc');
 
@@ -42,6 +43,14 @@ class GetLibraryBooksQuery
                 'categories:id,name',
                 'authors:id,name',
             ])
+            ->when($user->role === 'narys', fn ($builder) => $builder->with([
+                'bookCopies' => fn ($copyQuery) => $copyQuery
+                    ->withoutGlobalScope('library')
+                    ->whereIn('library_id', $libraryIds)
+                    ->with('library:id,name,code,address,city')
+                    ->orderBy('library_id')
+                    ->orderBy('inventory_code'),
+            ]))
             ->select([
                 'id',
                 'title',
@@ -58,39 +67,48 @@ class GetLibraryBooksQuery
                 'updated_at',
             ])
             ->when(
-                ! empty($libraryId),
-                fn ($builder) => $builder->whereHas('bookCopies', fn ($copyQuery) => $copyQuery->where('library_id', $libraryId))
+                is_array($libraryIds),
+                fn ($builder) => $libraryIds === []
+                    ? $builder->whereRaw('1 = 0')
+                    : $builder->whereHas('bookCopies', fn ($copyQuery) => $copyQuery
+                        ->withoutGlobalScope('library')
+                        ->whereIn('library_id', $libraryIds))
             )
             ->withCount([
-                'bookCopies as copies_count' => function ($copyQuery) use ($libraryId) {
-                    if (! empty($libraryId)) {
-                        $copyQuery->where('library_id', $libraryId);
+                'bookCopies as copies_count' => function ($copyQuery) use ($libraryIds) {
+                    if (is_array($libraryIds)) {
+                        $copyQuery->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
                     }
                 },
-                'bookCopies as available_copies_count' => function ($copyQuery) use ($libraryId) {
-                    if (! empty($libraryId)) {
-                        $copyQuery->where('library_id', $libraryId);
-                    }
-
-                    $copyQuery->where('status', 'available');
-                },
-                'bookCopies as loaned_copies_count' => function ($copyQuery) use ($libraryId) {
-                    if (! empty($libraryId)) {
-                        $copyQuery->where('library_id', $libraryId);
+                'bookCopies as available_copies_count' => function ($copyQuery) use ($libraryIds) {
+                    if (is_array($libraryIds)) {
+                        $copyQuery->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
                     }
 
-                    $copyQuery->whereIn('status', ['loaned', 'overdue']);
+                    $copyQuery->where('status', BookCopy::STATUS_AVAILABLE);
                 },
-                'bookCopies as unavailable_copies_count' => function ($copyQuery) use ($libraryId) {
-                    if (! empty($libraryId)) {
-                        $copyQuery->where('library_id', $libraryId);
+                'bookCopies as loaned_copies_count' => function ($copyQuery) use ($libraryIds) {
+                    if (is_array($libraryIds)) {
+                        $copyQuery->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
                     }
 
-                    $copyQuery->whereIn('status', ['lost', 'damaged', 'maintenance', 'withdrawn']);
+                    $copyQuery->where('status', BookCopy::STATUS_LOANED);
                 },
-                'reservations as active_reservations_count' => function ($reservationQuery) use ($libraryId) {
-                    if (! empty($libraryId)) {
-                        $reservationQuery->where('library_id', $libraryId);
+                'bookCopies as unavailable_copies_count' => function ($copyQuery) use ($libraryIds) {
+                    if (is_array($libraryIds)) {
+                        $copyQuery->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
+                    }
+
+                    $copyQuery->whereIn('status', [
+                        BookCopy::STATUS_LOST,
+                        BookCopy::STATUS_DAMAGED,
+                        BookCopy::STATUS_MAINTENANCE,
+                        BookCopy::STATUS_WITHDRAWN,
+                    ]);
+                },
+                'reservations as active_reservations_count' => function ($reservationQuery) use ($libraryIds) {
+                    if (is_array($libraryIds)) {
+                        $reservationQuery->whereIn('library_id', $libraryIds);
                     }
 
                     $reservationQuery->active();
@@ -131,29 +149,29 @@ class GetLibraryBooksQuery
             $query->where('publisher_id', $publisherId);
         }
 
-        if ($availability === 'available') {
-            $query->whereHas('bookCopies', function ($copyQuery) use ($libraryId) {
-                if (! empty($libraryId)) {
-                    $copyQuery->where('library_id', $libraryId);
+        if ($availability === BookCopy::STATUS_AVAILABLE) {
+            $query->whereHas('bookCopies', function ($copyQuery) use ($libraryIds) {
+                if (is_array($libraryIds)) {
+                    $copyQuery->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
                 }
 
-                $copyQuery->where('status', 'available');
+                $copyQuery->where('status', BookCopy::STATUS_AVAILABLE);
             });
         }
 
         if ($availability === 'unavailable') {
             $query
-                ->whereHas('bookCopies', function ($copyQuery) use ($libraryId) {
-                    if (! empty($libraryId)) {
-                        $copyQuery->where('library_id', $libraryId);
+                ->whereHas('bookCopies', function ($copyQuery) use ($libraryIds) {
+                    if (is_array($libraryIds)) {
+                        $copyQuery->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
                     }
                 })
-                ->whereDoesntHave('bookCopies', function ($copyQuery) use ($libraryId) {
-                    if (! empty($libraryId)) {
-                        $copyQuery->where('library_id', $libraryId);
+                ->whereDoesntHave('bookCopies', function ($copyQuery) use ($libraryIds) {
+                    if (is_array($libraryIds)) {
+                        $copyQuery->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
                     }
 
-                    $copyQuery->where('status', 'available');
+                    $copyQuery->where('status', BookCopy::STATUS_AVAILABLE);
                 });
         }
 
@@ -161,4 +179,32 @@ class GetLibraryBooksQuery
 
         return $query->paginate($perPage)->withQueryString();
     }
+
+    /**
+     * @return list<int>|null
+     */
+    private function visibleLibraryIds(User $user, array $filters): ?array
+    {
+        if ($user->isSuperAdmin()) {
+            $libraryId = $filters['library_id'] ?? null;
+
+            return $libraryId ? [(int) $libraryId] : null;
+        }
+
+        if ($user->role === 'narys') {
+            return $user->manageableLibraryIds();
+        }
+
+        $libraryId = $user->activeLibraryId();
+
+        return $libraryId ? [(int) $libraryId] : [];
+    }
 }
+
+
+
+
+
+
+
+

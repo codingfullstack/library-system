@@ -17,7 +17,7 @@ class GetManageBranchesQuery
         return Branch::query()
             ->with(['library:id,name'])
             ->withCount(['locations', 'bookCopies'])
-            ->when(! $user->isSuperAdmin(), fn ($query) => $query->where('library_id', $user->library_id))
+            ->when(! $user->isSuperAdmin(), fn ($query) => $query->where('library_id', $user->activeLibraryId()))
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($innerQuery) use ($search) {
                     $innerQuery->where('name', 'like', "%{$search}%")
@@ -30,3 +30,11 @@ class GetManageBranchesQuery
             ->withQueryString();
     }
 }
+
+
+
+
+
+
+
+

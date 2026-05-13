@@ -27,3 +27,4 @@ class ScanLogFactory extends Factory
         ];
     }
 }
+

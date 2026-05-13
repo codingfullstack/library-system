@@ -48,7 +48,7 @@ class GetActiveLibraryLoansQuery
         $base = $this->baseQuery($user, $filters);
 
         return [
-            'active_loans_count' => (clone $base)->whereIn('status', ['active', 'overdue'])->count(),
+            'active_loans_count' => (clone $base)->whereIn('status', ['aktyvi', 'vėluoja'])->count(),
             'unique_members_count' => (clone $base)->distinct('user_id')->count('user_id'),
             'due_today_count' => (clone $base)
                 ->whereNull('returned_at')
@@ -69,7 +69,7 @@ class GetActiveLibraryLoansQuery
         $memberId = $filters['member_id'] ?? null;
         $employeeId = $filters['employee_id'] ?? null;
         $overdue = $filters['overdue'] ?? null;
-        $libraryId = $user->isSuperAdmin() ? ($filters['library_id'] ?? null) : $user->library_id;
+        $libraryId = $user->isSuperAdmin() ? ($filters['library_id'] ?? null) : $user->activeLibraryId();
         $dueDate = $filters['due_date'] ?? null;
 
         $query = Loan::query()
@@ -78,7 +78,7 @@ class GetActiveLibraryLoansQuery
         if (! empty($status)) {
             $query->where('status', $status);
         } else {
-            $query->whereIn('status', ['active', 'overdue']);
+            $query->whereIn('status', ['aktyvi', 'vėluoja']);
         }
 
         if ($search !== '') {
@@ -132,3 +132,12 @@ class GetActiveLibraryLoansQuery
         return $query;
     }
 }
+
+
+
+
+
+
+
+
+

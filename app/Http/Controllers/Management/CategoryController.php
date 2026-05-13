@@ -88,14 +88,14 @@ class CategoryController extends Controller
     public function destroy(Category $category): RedirectResponse
     {
         if ($category->books()->exists() || $category->primaryBooks()->exists()) {
-            return back()->with('error', 'Kategorijos istrinti negalima, nes ji naudojama knygose.');
+            return back()->with('error', 'Kategorijos ištrinti negalima, nes ji naudojama knygose.');
         }
 
         app(RecordAuditLogAction::class)->handle(
             $request->user(),
             'category_deleted',
             $category,
-            sprintf('Istrinta kategorija "%s".', $category->name),
+            sprintf('Ištrinta kategorija "%s".', $category->name),
             [
                 'category_name' => $category->name,
                 'snapshot' => [
@@ -110,7 +110,7 @@ class CategoryController extends Controller
 
         return redirect()
             ->route('manage.categories.index')
-            ->with('success', 'Kategorija istrinta.');
+            ->with('success', 'Kategorija ištrinta.');
     }
 
     private function payload(
@@ -128,3 +128,11 @@ class CategoryController extends Controller
         ];
     }
 }
+
+
+
+
+
+
+
+

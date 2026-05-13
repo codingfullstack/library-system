@@ -24,11 +24,58 @@ it('allows only superadmin to open the audit log page', function () {
     $this->actingAs($superAdmin)
         ->get(route('manage.audit-logs.index'))
         ->assertOk()
-        ->assertSee('Auditu zurnalas');
+        ->assertSee('Audito žurnalas');
 
     $this->actingAs($admin)
         ->get(route('manage.audit-logs.index'))
         ->assertForbidden();
+});
+
+it('stores actor object and request context with new audit logs', function () {
+    $superAdmin = User::factory()->superAdmin()->create([
+        'name' => 'Audito administratorius',
+        'email' => 'audit@example.test',
+    ]);
+    $book = Book::factory()->create(['title' => 'Konteksto knyga']);
+
+    $this->actingAs($superAdmin)
+        ->withHeader('User-Agent', 'Feature Test Browser')
+        ->put(route('manage.books.update', $book), [
+            'title' => 'Konteksto knyga po pakeitimo',
+            'subtitle' => '',
+            'isbn' => $book->isbn,
+            'description' => '',
+            'publisher_id' => '',
+            'publication_year' => '',
+            'language' => 'lt',
+            'page_count' => '',
+            'edition' => '',
+            'cover_image' => '',
+            'author_ids' => [],
+            'category_ids' => [],
+        ])
+        ->assertRedirect(route('books.index'));
+
+    $log = \App\Models\AuditLog::query()
+        ->where('action', 'book_updated')
+        ->where('auditable_id', $book->id)
+        ->firstOrFail();
+
+    expect(data_get($log->metadata, 'actor_snapshot.name'))->toBe('Audito administratorius')
+        ->and(data_get($log->metadata, 'actor_snapshot.email'))->toBe('audit@example.test')
+        ->and(data_get($log->metadata, 'auditable_snapshot.type_label'))->toBe('Knyga')
+        ->and(data_get($log->metadata, 'auditable_snapshot.label'))->toBe('Konteksto knyga po pakeitimo')
+        ->and(data_get($log->metadata, 'request_context.method'))->toBe('PUT')
+        ->and(data_get($log->metadata, 'request_context.route'))->toBe('manage.books.update')
+        ->and(data_get($log->metadata, 'request_context.user_agent'))->toContain('Feature Test Browser');
+
+    $this->actingAs($superAdmin)
+        ->get(route('manage.audit-logs.index', ['search' => 'Feature Test Browser']))
+        ->assertOk()
+        ->assertSee('Objektas')
+        ->assertSee('Šaltinis')
+        ->assertSee('Konteksto knyga po pakeitimo')
+        ->assertSee('Feature Test Browser');
 });
 
 it('records an audit log when a book is updated', function () {
@@ -42,7 +89,7 @@ it('records an audit log when a book is updated', function () {
         'title' => 'Atnaujinta knyga',
         'subtitle' => '',
         'isbn' => '1234567890',
-        'description' => 'Naujas aprasymas',
+        'description' => 'Naujas aprašymas',
         'publisher_id' => '',
         'publication_year' => '',
         'language' => 'lt',
@@ -71,7 +118,7 @@ it('records an audit log when a book is issued and when copy status changes', fu
         'name' => 'Jonas Skaitytojas',
         'membership_number' => 'TES-MEM-001',
     ]);
-    $book = Book::factory()->create(['title' => 'Isskirtine knyga']);
+    $book = Book::factory()->create(['title' => 'Išskirtinė knyga']);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $bookCopy = BookCopy::factory()->create([
@@ -86,7 +133,7 @@ it('records an audit log when a book is issued and when copy status changes', fu
     app(BorrowBookCopyAction::class)->handle($staff, $bookCopy, [
         'user_id' => $member->id,
         'due_at' => now()->addDays(14)->toDateString(),
-        'notes' => 'Testinis isdavimas',
+        'notes' => 'Testinis išdavimas',
         'no_due_date' => false,
     ]);
 
@@ -110,14 +157,14 @@ it('shows recent audit logs on the managed user page for superadmin', function (
     $library = Library::factory()->create(['name' => 'Centrine biblioteka']);
     $managedUser = User::factory()->member()->create([
         'library_id' => $library->id,
-        'name' => 'Perziuros narys',
+        'name' => 'Peržiūros narys',
     ]);
 
     app(RecordAuditLogAction::class)->handle(
         $superAdmin,
         'user_updated',
         $managedUser,
-        'Atnaujintas vartotojas "Perziuros narys".',
+        'Atnaujintas vartotojas "Peržiūros narys".',
         ['changed_fields' => ['name']],
         $library->id
     );
@@ -125,10 +172,10 @@ it('shows recent audit logs on the managed user page for superadmin', function (
     $this->actingAs($superAdmin)
         ->get(route('manage.users.show', $managedUser))
         ->assertOk()
-        ->assertSee('Veiksmu istorija')
-        ->assertSee('Atnaujintas vartotojas &quot;Perziuros narys&quot;.', false)
+        ->assertSee('Veiksmų istorija')
+        ->assertSee('Atnaujintas vartotojas &quot;Peržiūros narys&quot;.', false)
         ->assertSee('Pavadinimas')
-        ->assertSee('Nauji atnaujinimai rodomi su pakeitimu is -> i.', false);
+        ->assertSee('Nauji atnaujinimai rodomi su pakeitimu iš -> į.', false);
 });
 
 it('shows related reservation and issue audit logs on the book page for superadmin', function () {
@@ -162,7 +209,7 @@ it('shows related reservation and issue audit logs on the book page for superadm
         'book_copy_id' => $bookCopy->id,
         'user_id' => $activeLoanMember->id,
         'issued_by' => $staff->id,
-        'status' => 'active',
+        'status' => 'aktyvi',
         'borrowed_at' => now()->subDays(5),
         'due_at' => now()->addDays(5),
         'returned_at' => null,
@@ -175,7 +222,7 @@ it('shows related reservation and issue audit logs on the book page for superadm
     ]);
 
     $existingLoan->update([
-        'status' => 'returned',
+        'status' => 'grąžinta',
         'returned_at' => now()->subMinute(),
         'received_by' => $staff->id,
     ]);
@@ -185,17 +232,17 @@ it('shows related reservation and issue audit logs on the book page for superadm
     app(BorrowBookCopyAction::class)->handle($staff, $bookCopy, [
         'user_id' => $member->id,
         'due_at' => now()->addDays(7)->toDateString(),
-        'notes' => 'Testinis isdavimas po rezervacijos',
+        'notes' => 'Testinis išdavimas po rezervacijos',
         'no_due_date' => false,
     ]);
 
     $this->actingAs($superAdmin)
         ->get(route('books.show', $book))
         ->assertOk()
-        ->assertSee('Veiksmu istorija')
+        ->assertSee('Veiksmų istorija')
         ->assertSee('Rezervacija sukurta')
-        ->assertSee('Rezervacija ivykdyta')
-        ->assertSee('Knyga isduota');
+        ->assertSee('Rezervacija įvykdyta')
+        ->assertSee('Knyga išduota');
 });
 
 it('shows related audit logs on category and publisher edit pages for superadmin', function () {
@@ -223,28 +270,28 @@ it('shows related audit logs on category and publisher edit pages for superadmin
     $this->actingAs($superAdmin)
         ->get(route('manage.categories.edit', $category))
         ->assertOk()
-        ->assertSee('Veiksmu istorija')
+        ->assertSee('Veiksmų istorija')
         ->assertSee('Susieta knyga');
 
     $this->actingAs($superAdmin)
         ->get(route('manage.publishers.edit', $publisher))
         ->assertOk()
-        ->assertSee('Veiksmu istorija')
+        ->assertSee('Veiksmų istorija')
         ->assertSee('Susieta knyga');
 });
 
 it('allows superadmin to open a book page even when it has no copies yet', function () {
     $superAdmin = User::factory()->superAdmin()->create();
     $book = Book::factory()->create([
-        'title' => 'Katalogo knyga be egzemplioriu',
+        'title' => 'Katalogo knyga be egzempliorių',
     ]);
 
     $this->actingAs($superAdmin)
         ->get(route('books.show', $book))
         ->assertOk()
-        ->assertSee('Katalogo knyga be egzemplioriu')
-        ->assertSee('Kopiju nerasta')
-        ->assertSee('Prideti egzemplioriu');
+        ->assertSee('Katalogo knyga be egzempliorių')
+        ->assertSee('Kopijų nerasta')
+        ->assertSee('Pridėti egzempliorių');
 });
 
 it('shows related audit logs on author edit page for superadmin', function () {
@@ -269,7 +316,7 @@ it('shows related audit logs on author edit page for superadmin', function () {
     $this->actingAs($superAdmin)
         ->get(route('manage.authors.edit', $author))
         ->assertOk()
-        ->assertSee('Veiksmu istorija')
+        ->assertSee('Veiksmų istorija')
         ->assertSee('Autoriaus knyga');
 });
 
@@ -298,7 +345,7 @@ it('shows related audit logs on book edit page for superadmin', function () {
     $this->actingAs($superAdmin)
         ->get(route('manage.books.edit', $book))
         ->assertOk()
-        ->assertSee('Veiksmu istorija')
+        ->assertSee('Veiksmų istorija')
         ->assertSee('Atnaujinta knygos &quot;Redaguojama knyga&quot; informacija.', false);
 });
 
@@ -337,13 +384,13 @@ it('shows direct audit logs on book copy edit page for superadmin', function () 
     $this->actingAs($superAdmin)
         ->get(route('manage.book-copies.edit', $bookCopy))
         ->assertOk()
-        ->assertSee('Veiksmu istorija')
+        ->assertSee('Veiksmų istorija')
         ->assertSee('Atnaujintas egzempliorius INV-EDIT-001.');
 });
 
 it('shows related audit logs on user edit page for superadmin', function () {
     $superAdmin = User::factory()->superAdmin()->create();
-    $library = Library::factory()->create(['name' => 'Vartotoju biblioteka']);
+    $library = Library::factory()->create(['name' => 'Vartotojų biblioteka']);
     $managedUser = User::factory()->member()->create([
         'library_id' => $library->id,
         'name' => 'Editinamas vartotojas',
@@ -369,6 +416,11 @@ it('shows related audit logs on user edit page for superadmin', function () {
     $this->actingAs($superAdmin)
         ->get(route('manage.users.edit', $managedUser))
         ->assertOk()
-        ->assertSee('Veiksmu istorija')
+        ->assertSee('Veiksmų istorija')
         ->assertSee('Atnaujintas vartotojas &quot;Editinamas vartotojas&quot;.', false);
 });
+
+
+
+
+

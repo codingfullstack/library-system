@@ -12,7 +12,7 @@
                 <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div>
                         <h1 class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">Vietos</h1>
-                        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Tvarkykite bibliotekos knygu laikymo vietas</p>
+                        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Tvarkykite bibliotekos knygų laikymo vietas</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
                         <a href="{{ route('exports.list', array_merge(request()->query(), ['resource' => 'locations'])) }}" class="inline-flex h-11 items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
@@ -25,7 +25,7 @@
                         </a>
                         <a href="{{ route('manage.locations.create') }}" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600">
                             <flux:icon.plus class="size-4" />
-                            Prideti vieta
+                            Pridėti vietą
                             <flux:icon.chevron-down class="size-4" />
                         </a>
                     </div>
@@ -50,7 +50,7 @@
                             <div>
                                 <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Visos vietos</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $locations->total() }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Is viso</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Iš viso</div>
                             </div>
                         </div>
                     </section>
@@ -62,7 +62,7 @@
                             <div>
                                 <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Su egzemploriais</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $withCopies }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Siame puslapyje</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Šiame puslapyje</div>
                             </div>
                         </div>
                     </section>
@@ -74,7 +74,7 @@
                             <div>
                                 <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Tuscios</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $withoutCopies }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Siame puslapyje</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Šiame puslapyje</div>
                             </div>
                         </div>
                     </section>
@@ -86,7 +86,7 @@
                             <div>
                                 <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Su kodu</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $withCode }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Siame puslapyje</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Šiame puslapyje</div>
                             </div>
                         </div>
                     </section>
@@ -96,7 +96,7 @@
                     <div class="px-5 py-4">
                         <form method="GET" action="{{ route('manage.locations.index') }}" class="grid gap-3 xl:grid-cols-[minmax(320px,1.5fr)_auto_auto] xl:items-center">
                             <div class="relative xl:min-w-0">
-                                <input type="text" name="search" value="{{ request('search') }}" placeholder="Ieskoti vietos pagal pavadinima, koda ar filiala..." class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 pl-11 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
+                                <input type="text" name="search" value="{{ request('search') }}" placeholder="Ieškoti vietos pagal pavadinimą, kodą ar filialą..." class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 pl-11 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
                                 <div class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
                                     <flux:icon.magnifying-glass class="size-4" />
                                 </div>
@@ -105,7 +105,7 @@
                                 <flux:icon.funnel class="mr-2 size-4" />
                                 Filtruoti
                             </button>
-                            <a href="{{ route('manage.locations.index') }}" class="app-button-secondary h-11 rounded-2xl px-4">Isvalyti</a>
+                            <a href="{{ route('manage.locations.index') }}" class="app-button-secondary h-11 rounded-2xl px-4">Išvalyti</a>
                         </form>
                     </div>
                 </section>
@@ -141,13 +141,13 @@
                                             <td class="px-4 py-4 align-middle text-center text-sm font-semibold text-emerald-700 dark:text-emerald-300">{{ $location->book_copies_count }}</td>
                                             <td class="px-4 py-4 align-middle">
                                                 <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-                                                    <a href="{{ route('manage.locations.edit', $location) }}" title="Redaguoti vieta" aria-label="Redaguoti vieta" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
+                                                    <a href="{{ route('manage.locations.edit', $location) }}" title="Redaguoti vietą" aria-label="Redaguoti vietą" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
                                                         <flux:icon.pencil-square class="size-4" />
                                                     </a>
-                                                    <form method="POST" action="{{ route('manage.locations.destroy', $location) }}" onsubmit="return confirm('Ar tikrai nori istrinti sia vieta?')">
+                                                    <form method="POST" action="{{ route('manage.locations.destroy', $location) }}" onsubmit="return confirm('Ar tikrai nori ištrinti šią vietą?')">
                                                         @csrf
                                                         @method('DELETE')
-                                                        <button type="submit" title="Istrinti vieta" aria-label="Istrinti vieta" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-red-600 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-red-300">
+                                                        <button type="submit" title="Ištrinti vieta" aria-label="Ištrinti vieta" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-red-600 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-red-300">
                                                             <flux:icon.trash class="size-4" />
                                                         </button>
                                                     </form>
@@ -164,7 +164,7 @@
                         </div>
                     @else
                         <div class="p-6">
-                            <x-ui.empty-state title="Vietu nerasta" description="Pabandykite pakeisti paieska arba sukurti nauja vieta." />
+                            <x-ui.empty-state title="Vietų nerasta" description="Pabandykite pakeisti paiešką arba sukurti naują vietą." />
                         </div>
                     @endif
                 </section>
@@ -172,3 +172,10 @@
         </div>
     </x-ui.page>
 </x-layouts::app>
+
+
+
+
+
+
+

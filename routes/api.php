@@ -6,8 +6,10 @@ use App\Http\Controllers\Api\BookCopyController as ApiBookCopyController;
 use App\Http\Controllers\Api\LoanController;
 use App\Http\Controllers\Api\MemberDashboardController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\PublicLibraryController;
 use App\Http\Controllers\Api\ReservationController;
 use App\Http\Controllers\Api\ScanController;
+use App\Http\Controllers\Api\UserMembershipScanController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
@@ -32,7 +34,11 @@ Route::prefix('auth')->group(function () {
         Route::get('/notifications', [NotificationController::class, 'index']);
         Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
         Route::get('/member/dashboard', MemberDashboardController::class);
+        Route::get('/libraries/public', [PublicLibraryController::class, 'index']);
+        Route::post('/libraries/{library}/join', [PublicLibraryController::class, 'join']);
         Route::post('/scan', [ScanController::class, 'scan']);
         Route::get('/book-copies/by-qr/{qrCode}', [ApiBookCopyController::class, 'findByQr']);
+        Route::get('/members/by-membership/{membershipNumber}', [UserMembershipScanController::class, 'show']);
+        Route::post('/memberships/scan', [UserMembershipScanController::class, 'store']);
     });
 });

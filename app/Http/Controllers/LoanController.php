@@ -26,19 +26,22 @@ class LoanController extends Controller
         GetLoanIndexFiltersDataQuery $getLoanIndexFiltersDataQuery
     ): View
     {
-        if ($request->user()->role === 'member') {
+        if ($request->user()->effectiveRole() === 'narys') {
+            $filters = [
+                'search' => $request->query('search'),
+                'status' => $request->query('status'),
+                'per_page' => $request->query('per_page', 15),
+            ];
+
             return view('account.loans.index', [
-                'loans' => $getMemberLoansQuery->handle($request->user(), [
-                    'search' => $request->query('search'),
-                    'status' => $request->query('status'),
-                    'per_page' => $request->query('per_page', 15),
-                ]),
+                'loans' => $getMemberLoansQuery->handle($request->user(), $filters),
+                'summary' => $getMemberLoansQuery->summary($request->user(), $filters),
             ]);
         }
 
         $selectedLibraryId = $request->user()->isSuperAdmin()
             ? (int) $request->query('library_id')
-            : $request->user()->library_id;
+            : $request->user()->activeLibraryId();
 
         $loans = $getActiveLibraryLoansQuery->handle($request->user(), [
             'search' => $request->query('search'),
@@ -110,3 +113,12 @@ class LoanController extends Controller
         return back()->with('success', 'Kopija sėkmingai grąžinta.');
     }
 }
+
+
+
+
+
+
+
+
+

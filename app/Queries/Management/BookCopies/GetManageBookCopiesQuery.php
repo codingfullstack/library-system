@@ -57,8 +57,8 @@ class GetManageBookCopiesQuery
 
         return [
             'total' => $total,
-            'available' => $available,
-            'loaned' => $loaned,
+            'laisva' => $available,
+            'išduota' => $loaned,
             'unavailable' => $unavailable,
         ];
     }
@@ -66,7 +66,7 @@ class GetManageBookCopiesQuery
     public function branches(User $user): Collection
     {
         return Branch::query()
-            ->when(! $user->isSuperAdmin(), fn (Builder $query) => $query->where('library_id', $user->library_id))
+            ->when(! $user->isSuperAdmin(), fn (Builder $query) => $query->where('library_id', $user->activeLibraryId()))
             ->orderBy('name')
             ->get(['id', 'name']);
     }
@@ -81,6 +81,14 @@ class GetManageBookCopiesQuery
                 'library:id,name',
                 'activeLoan.user:id,name,membership_number',
             ])
-            ->when(! $user->isSuperAdmin(), fn (Builder $query) => $query->where('library_id', $user->library_id));
+            ->when(! $user->isSuperAdmin(), fn (Builder $query) => $query->where('library_id', $user->activeLibraryId()));
     }
 }
+
+
+
+
+
+
+
+

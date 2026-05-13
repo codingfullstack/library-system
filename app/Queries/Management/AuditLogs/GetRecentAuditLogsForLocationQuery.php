@@ -54,3 +54,11 @@ class GetRecentAuditLogsForLocationQuery
             ->get();
     }
 }
+
+
+
+
+
+
+
+

@@ -1,6 +1,7 @@
 @php
     $user = auth()->user();
     $unreadNotificationsCount = $user?->notifications()->whereNull('read_at')->count() ?? 0;
+    $displayLibrary = $user?->library?->name;
 @endphp
 
 <div class="border-t border-zinc-200 px-3 py-3 dark:border-zinc-800">
@@ -16,16 +17,18 @@
 
             <span class="min-w-0 flex-1">
                 <span class="block truncate text-sm font-semibold text-zinc-950 dark:text-white">{{ $user?->name }}</span>
-                <span class="block truncate text-xs text-zinc-500 dark:text-zinc-400">{{ $user?->email }}</span>
+                <span class="block truncate text-xs text-zinc-500 dark:text-zinc-400">
+                    {{ $displayLibrary ?? $user?->email }}
+                </span>
             </span>
 
             <flux:icon.chevron-up-down class="size-4 text-zinc-400" />
         </button>
 
-        <flux:menu class="min-w-60">
+        <flux:menu class="min-w-64">
             <flux:menu.item :href="route('notifications.index')" icon="bell" wire:navigate>
                 <span class="flex items-center gap-2">
-                    <span>{{ __('Pranesimai') }}</span>
+                    <span>{{ __('Pranešimai') }}</span>
                     @if($unreadNotificationsCount > 0)
                         <span class="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
                             {{ $unreadNotificationsCount }}
@@ -33,6 +36,12 @@
                     @endif
                 </span>
             </flux:menu.item>
+
+            @if($user?->role === 'narys')
+                <flux:menu.item :href="route('public.libraries.index')" icon="building-library" wire:navigate>
+                    {{ __('Viešosios bibliotekos') }}
+                </flux:menu.item>
+            @endif
 
             <flux:menu.item :href="route('profile.edit')" icon="cog-6-tooth" wire:navigate>
                 {{ __('Nustatymai') }}
@@ -53,3 +62,10 @@
         </flux:menu>
     </flux:dropdown>
 </div>
+
+
+
+
+
+
+

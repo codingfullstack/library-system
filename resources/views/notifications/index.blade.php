@@ -1,4 +1,4 @@
-<x-layouts::app :title="'Pranesimai'">
+<x-layouts::app :title="'Pranešimai'">
     @php
         $categoryMeta = static function ($type): array {
             return match ($type) {
@@ -17,15 +17,15 @@
             <div class="mx-auto max-w-[1500px] space-y-6">
                 <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div>
-                        <h1 class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">Pranesimai</h1>
-                        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Perziurekite ir valdykite sistemos pranesimus</p>
+                        <h1 class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">Pranešimai</h1>
+                        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Peržiūrėkite ir valdykite sistemos pranešimus</p>
                     </div>
 
                     <form method="POST" action="{{ route('notifications.mark-all-read', request()->query()) }}">
                         @csrf
                         <button type="submit" class="inline-flex h-11 items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20">
                             <flux:icon.check class="size-4" />
-                            Pazymeti visus kaip perskaitytus
+                            Pažymėti visus kaip perskaitytus
                         </button>
                     </form>
                 </div>
@@ -102,16 +102,16 @@
                                     <option value="system" @selected(($filters['category'] ?? '') === 'system')>Sistemos</option>
                                     <option value="reminder" @selected(($filters['category'] ?? '') === 'reminder')>Priminimai</option>
                                     <option value="reservation" @selected(($filters['category'] ?? '') === 'reservation')>Rezervacijos</option>
-                                    <option value="warning" @selected(($filters['category'] ?? '') === 'warning')>Ispėjimai</option>
+                                    <option value="warning" @selected(($filters['category'] ?? '') === 'warning')>Įspėjimai</option>
                                     <option value="info" @selected(($filters['category'] ?? '') === 'info')>Informacija</option>
                                     <option value="report" @selected(($filters['category'] ?? '') === 'report')>Ataskaitos</option>
                                 </select>
                             </div>
 
                             <div>
-                                <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Busena</label>
+                                <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Būsena</label>
                                 <select name="status" class="app-input h-10 rounded-xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
-                                    <option value="all" @selected(($filters['status'] ?? 'all') === 'all')>Visos busenos</option>
+                                    <option value="all" @selected(($filters['status'] ?? 'all') === 'all')>Visos būsenos</option>
                                     <option value="unread" @selected(($filters['status'] ?? '') === 'unread')>Neskaityti</option>
                                     <option value="read" @selected(($filters['status'] ?? '') === 'read')>Perskaityti</option>
                                 </select>
@@ -146,10 +146,10 @@
                                 <thead class="bg-zinc-50/80 dark:bg-zinc-950/50">
                                     <tr>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"></th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Pranesimas</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Pranešimas</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Kategorija</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Data</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Busena</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Būsena</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Veiksmai</th>
                                     </tr>
                                 </thead>
@@ -216,10 +216,10 @@
                                             </td>
                                             <td class="px-4 py-4 align-top">
                                                 <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-                                                    <button type="button" title="Perziureti pranesima" aria-label="Perziureti pranesima" class="transition hover:text-zinc-800 dark:hover:text-zinc-200">
+                                                    <button type="button" title="Peržiūrėti pranešimą" aria-label="Peržiūrėti pranešimą" class="transition hover:text-zinc-800 dark:hover:text-zinc-200">
                                                         <flux:icon.eye class="size-4" />
                                                     </button>
-                                                    <button type="button" title="Daugiau veiksmu" aria-label="Daugiau veiksmu" class="transition hover:text-zinc-800 dark:hover:text-zinc-200">
+                                                    <button type="button" title="Daugiau veiksmų" aria-label="Daugiau veiksmų" class="transition hover:text-zinc-800 dark:hover:text-zinc-200">
                                                         <flux:icon.ellipsis-vertical class="size-4" />
                                                     </button>
                                                 </div>
@@ -237,8 +237,8 @@
                     @else
                         <div class="p-6">
                             <x-ui.empty-state
-                                title="Pranesimu nera"
-                                description="Kai sistema tures ka pranesti, nauji irasai atsiras cia."
+                                title="Pranešimų nėra"
+                                description="Kai sistema turės ką pranešti, nauji įrašai atsiras čia."
                             />
                         </div>
                     @endif
@@ -247,3 +247,10 @@
         </div>
     </x-ui.page>
 </x-layouts::app>
+
+
+
+
+
+
+

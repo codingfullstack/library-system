@@ -23,6 +23,8 @@ class BookCopyForm extends Component
 
     public bool $isEditing = false;
 
+    public bool $drawerMode = false;
+
     public $selectedLibraryId = null;
 
     public $branchId = null;
@@ -35,17 +37,19 @@ class BookCopyForm extends Component
 
     public string $status = BookCopy::STATUS_AVAILABLE;
 
-    public string $conditionStatus = 'good';
+    public string $conditionStatus = 'gera';
 
     public string $acquiredAt = '';
 
     public string $notes = '';
 
-    public function mount(?Book $selectedBook = null, ?BookCopy $bookCopy = null, $selectedLibraryId = null): void
+    public function mount(?Book $selectedBook = null, ?BookCopy $bookCopy = null, $selectedLibraryId = null, bool $drawerMode = false): void
     {
         $actor = Auth::user();
 
         abort_unless($actor, 403);
+
+        $this->drawerMode = $drawerMode;
 
         if ($bookCopy) {
             Gate::authorize('update', $bookCopy);
@@ -61,7 +65,7 @@ class BookCopyForm extends Component
             $this->inventoryCode = (string) $bookCopy->inventory_code;
             $this->barcode = (string) ($bookCopy->barcode ?? '');
             $this->status = (string) ($bookCopy->status ?: BookCopy::STATUS_AVAILABLE);
-            $this->conditionStatus = (string) ($bookCopy->condition_status ?: 'good');
+            $this->conditionStatus = (string) ($bookCopy->condition_status ?: 'gera');
             $this->acquiredAt = $bookCopy->acquired_at?->format('Y-m-d') ?? '';
             $this->notes = (string) ($bookCopy->notes ?? '');
 
@@ -77,7 +81,7 @@ class BookCopyForm extends Component
         $this->selectedBook = $selectedBook;
         $this->selectedLibraryId = $actor->isSuperAdmin()
             ? $selectedLibraryId
-            : $actor->library_id;
+            : $actor->activeLibraryId();
     }
 
     public function updatedSelectedLibraryId(): void
@@ -107,13 +111,13 @@ class BookCopyForm extends Component
 
         if (! $this->selectedBook) {
             throw ValidationException::withMessages([
-                'selectedBook' => 'Pirma pasirink knyga.',
+                'selectedBook' => 'Pirma pasirinkite knygą.',
             ]);
         }
 
         $libraryId = $actor->isSuperAdmin()
             ? $this->selectedLibraryId
-            : $actor->library_id;
+            : $actor->activeLibraryId();
 
         $bookCopyId = $this->bookCopy?->id;
 
@@ -159,18 +163,18 @@ class BookCopyForm extends Component
             'branchId' => 'filialas',
             'locationId' => 'vieta',
             'inventoryCode' => 'inventoriaus kodas',
-            'barcode' => 'bruksninis kodas',
-            'status' => 'pradine busena',
-            'conditionStatus' => 'fizine bukle',
+            'barcode' => 'brūkšninis kodas',
+            'status' => 'pradinė būsena',
+            'conditionStatus' => 'fizinė būklė',
             'acquiredAt' => 'isigijimo data',
-            'notes' => 'pastabos',
+            'notes' => 'paštąbos',
         ]);
 
         if ($validated['locationId']) {
             $location = Location::query()->find($validated['locationId']);
 
             if (! $location || (int) $location->branch_id !== (int) $validated['branchId']) {
-                $this->addError('locationId', 'Pasirinkta vieta nepriklauso siam filialui.');
+                $this->addError('locationId', 'Pasirinkta vieta nepriklauso šiam filialui.');
 
                 return null;
             }
@@ -211,7 +215,7 @@ class BookCopyForm extends Component
 
         return redirect()
             ->route('book-copies.show', $copy)
-            ->with('success', 'Egzempliorius sekmingai pridetas prie esamos knygos.');
+            ->with('success', 'Egzempliorius sėkmingai pridėtas prie esamos knygos.');
     }
 
     public function render()
@@ -219,7 +223,7 @@ class BookCopyForm extends Component
         $actor = Auth::user();
         $libraryId = $actor?->isSuperAdmin()
             ? $this->selectedLibraryId
-            : $actor?->library_id;
+            : $actor?->activeLibraryId();
 
         $libraries = $actor?->isSuperAdmin()
             ? Library::query()->orderBy('name')->get(['id', 'name'])
@@ -227,14 +231,14 @@ class BookCopyForm extends Component
 
         $branches = Branch::query()
             ->when($libraryId, fn ($query) => $query->where('library_id', $libraryId))
-            ->when(! $actor?->isSuperAdmin(), fn ($query) => $query->where('library_id', $actor?->library_id))
+            ->when(! $actor?->isSuperAdmin(), fn ($query) => $query->where('library_id', $actor?->activeLibraryId()))
             ->orderBy('name')
             ->get(['id', 'name', 'code']);
 
         $locations = Location::query()
             ->when($libraryId, fn ($query) => $query->where('library_id', $libraryId))
             ->when($this->branchId, fn ($query) => $query->where('branch_id', $this->branchId))
-            ->when(! $actor?->isSuperAdmin(), fn ($query) => $query->where('library_id', $actor?->library_id))
+            ->when(! $actor?->isSuperAdmin(), fn ($query) => $query->where('library_id', $actor?->activeLibraryId()))
             ->with('branch:id,name')
             ->orderBy('name')
             ->get(['id', 'branch_id', 'name', 'room', 'shelf']);
@@ -261,17 +265,17 @@ class BookCopyForm extends Component
             BookCopy::STATUS_DAMAGED => 'Sugadinta',
             BookCopy::STATUS_MAINTENANCE => 'Tvarkoma',
             BookCopy::STATUS_LOST => 'Prarasta',
-            BookCopy::STATUS_WITHDRAWN => 'Nurasytas fondas',
+            BookCopy::STATUS_WITHDRAWN => 'Nurašytas fondas',
         ];
     }
 
     private function conditionOptions(): array
     {
         return [
-            'new' => 'Nauja',
-            'good' => 'Gera',
-            'worn' => 'Padeveta',
-            'damaged' => 'Pazeista',
+            'nauja' => 'Nauja',
+            'gera' => 'Gera',
+            'padėvėta' => 'Padeveta',
+            'sugadinta' => 'Pazeista',
         ];
     }
 
@@ -289,3 +293,11 @@ class BookCopyForm extends Component
         return $candidate;
     }
 }
+
+
+
+
+
+
+
+

@@ -18,6 +18,7 @@ class ReservationResource extends JsonResource
             'book_id' => $this->book_id,
             'user_id' => $this->user_id,
             'status' => $this->status,
+            'status_label' => $this->statusLabel(),
             'reserved_at' => $this->reserved_at,
             'expires_at' => $this->expires_at,
             'fulfilled_at' => $this->fulfilled_at,
@@ -51,3 +52,11 @@ class ReservationResource extends JsonResource
         ];
     }
 }
+
+
+
+
+
+
+
+

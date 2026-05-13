@@ -32,7 +32,15 @@ class NotificationController extends Controller
             ->update(['read_at' => now()]);
 
         return response()->json([
-            'message' => 'Pranesimai pazymeti kaip perskaityti.',
+            'message' => 'Pranešimai pažymėti kaip perskaityti.',
         ]);
     }
 }
+
+
+
+
+
+
+
+

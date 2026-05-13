@@ -5,7 +5,7 @@
                 <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div>
                         <h1 class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">Egzemplioriai</h1>
-                        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Perziurekite ir tvarkykite bibliotekos knygu egzempliorius</p>
+                        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Peržiūrėkite ir tvarkykite bibliotekos knygų egzempliorius</p>
                     </div>
 
                     <div class="flex flex-wrap items-center gap-3">
@@ -16,7 +16,7 @@
 
                         <a href="{{ route('manage.book-copies.create') }}" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600">
                             <flux:icon.plus class="size-4" />
-                            Prideti egzemplioriu
+                            Pridėti egzempliorių
                             <flux:icon.chevron-down class="size-4" />
                         </a>
                     </div>
@@ -39,7 +39,7 @@
                             <div>
                                 <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Visi egzemplioriai</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['total'] }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Is viso</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Iš viso</div>
                             </div>
                         </div>
                     </section>
@@ -51,8 +51,8 @@
                             </span>
                             <div>
                                 <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Laisvi</div>
-                                <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['available'] }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Galimi isdavimui</div>
+                                <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['laisva'] }}</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Galimi išdavimai</div>
                             </div>
                         </div>
                     </section>
@@ -63,9 +63,9 @@
                                 <flux:icon.book-open-text class="size-5" />
                             </span>
                             <div>
-                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Isduoti</div>
-                                <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['loaned'] }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Siuo metu</div>
+                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Išduoti</div>
+                                <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['išduota'] }}</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Šiuo metu</div>
                             </div>
                         </div>
                     </section>
@@ -92,7 +92,7 @@
                                     type="text"
                                     name="search"
                                     value="{{ request('search') }}"
-                                    placeholder="Ieskoti pagal knyga, inventoriaus koda, filiala ar vieta..."
+                                    placeholder="Ieškoti pagal knygą, inventoriaus kodą, filialą ar vietą..."
                                     class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 pl-11 shadow-none dark:border-zinc-700 dark:bg-zinc-950"
                                 >
                                 <div class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
@@ -102,7 +102,7 @@
 
                             <div class="xl:min-w-0">
                                 <select name="status" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
-                                    <option value="">Busena</option>
+                                    <option value="">Būsena</option>
                                     @foreach($statusLabels as $statusValue => $statusLabel)
                                         <option value="{{ $statusValue }}" @selected(request('status') === $statusValue)>{{ $statusLabel }}</option>
                                     @endforeach
@@ -124,7 +124,7 @@
                             </button>
 
                             <a href="{{ route('manage.book-copies.index') }}" class="app-button-secondary h-11 rounded-2xl px-4">
-                                Isvalyti
+                                Išvalyti
                             </a>
                         </form>
                     </div>
@@ -141,8 +141,8 @@
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Kopija</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Filialas</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Vieta</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Busena</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Bukle</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Būsena</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Būklė</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Atnaujinta</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Veiksmai</th>
                                     </tr>
@@ -174,7 +174,7 @@
                                                         @endif
                                                     </div>
                                                     <div class="min-w-0">
-                                                        <a href="{{ route('books.show', $copy->book_id) }}" class="font-semibold text-zinc-950 transition hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">
+                                                        <a href="{{ route('book-copies.show', $copy) }}" class="font-semibold text-zinc-950 transition hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">
                                                             {{ $copy->book?->title ?? '-' }}
                                                         </a>
                                                         <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{{ $copy->book?->isbn ?? '-' }}</div>
@@ -196,19 +196,23 @@
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">{{ $copy->updated_at?->format('Y-m-d') ?? '-' }}</td>
                                             <td class="px-4 py-4 align-middle">
                                                 <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-                                                    <a href="{{ route('book-copies.show', $copy) }}" title="Perziureti egzemplioriu" aria-label="Perziureti egzemplioriu" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
+                                                    <a href="{{ route('book-copies.show', $copy) }}" title="Peržiūrėti egzempliorių" aria-label="Peržiūrėti egzempliorių" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
                                                         <flux:icon.eye class="size-4" />
                                                     </a>
-                                                    <a href="{{ route('manage.book-copies.edit', $copy) }}" title="Redaguoti egzemplioriu" aria-label="Redaguoti egzemplioriu" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
-                                                        <flux:icon.pencil-square class="size-4" />
-                                                    </a>
-                                                    <form method="POST" action="{{ route('manage.book-copies.destroy', $copy) }}" onsubmit="return confirm('Ar tikrai nori istrinti si egzemplioriu?')">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" title="Istrinti egzemplioriu" aria-label="Istrinti egzemplioriu" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-red-600 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-red-300">
-                                                            <flux:icon.trash class="size-4" />
-                                                        </button>
-                                                    </form>
+                                                    @can('update', $copy)
+                                                        <a href="{{ route('manage.book-copies.edit', $copy) }}" title="Redaguoti egzempliorių" aria-label="Redaguoti egzempliorių" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
+                                                            <flux:icon.pencil-square class="size-4" />
+                                                        </a>
+                                                    @endcan
+                                                    @can('delete', $copy)
+                                                        <form method="POST" action="{{ route('manage.book-copies.destroy', $copy) }}" onsubmit="return confirm('Ar tikrai nori ištrinti šį egzempliorių?')">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" title="Ištrinti egzempliorių" aria-label="Ištrinti egzempliorių" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-red-600 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-red-300">
+                                                                <flux:icon.trash class="size-4" />
+                                                            </button>
+                                                        </form>
+                                                    @endcan
                                                 </div>
                                             </td>
                                         </tr>
@@ -223,7 +227,7 @@
                         </div>
                     @else
                         <div class="p-6">
-                            <x-ui.empty-state title="Egzemplioriu nerasta" description="Pabandykite pakeisti paieska arba prideti nauja egzemplioriu." />
+                            <x-ui.empty-state title="Egzempliorių nerasta" description="Pabandykite pakeisti paiešką arba pridėti naują egzempliorių." />
                         </div>
                     @endif
                 </section>
@@ -231,3 +235,10 @@
         </div>
     </x-ui.page>
 </x-layouts::app>
+
+
+
+
+
+
+

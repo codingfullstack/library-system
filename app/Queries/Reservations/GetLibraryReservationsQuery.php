@@ -85,7 +85,7 @@ class GetLibraryReservationsQuery
     {
         $search = trim((string) ($filters['search'] ?? ''));
         $status = $filters['status'] ?? null;
-        $libraryId = $user->isSuperAdmin() ? ($filters['library_id'] ?? null) : $user->library_id;
+        $libraryId = $user->isSuperAdmin() ? ($filters['library_id'] ?? null) : $user->activeLibraryId();
         $reservationDate = $filters['reservation_date'] ?? null;
 
         return Reservation::query()
@@ -108,3 +108,11 @@ class GetLibraryReservationsQuery
             });
     }
 }
+
+
+
+
+
+
+
+

@@ -97,7 +97,7 @@ class LocationController extends Controller
         $this->ensureVisible($request, $location);
 
         if ($location->bookCopies()->exists()) {
-            return back()->with('error', 'Vietos ištrinti negalima, nes ji naudojama egzemplioriuose.');
+            return back()->with('error', 'Vietos ištrinti negalima, nes ji naudojama egzemplioriųose.');
         }
 
         $location->loadMissing('branch:id,name');
@@ -106,7 +106,7 @@ class LocationController extends Controller
             $request->user(),
             'location_deleted',
             $location,
-            sprintf('Istrinta vieta "%s".', $location->name),
+            sprintf('Ištrinta vieta "%s".', $location->name),
             [
                 'location_name' => $location->name,
                 'snapshot' => [
@@ -133,7 +133,7 @@ class LocationController extends Controller
         return [
             'library_id' => $request->user()->isSuperAdmin()
                 ? $request->integer('library_id')
-                : $request->user()->library_id,
+                : $request->user()->activeLibraryId(),
             'branch_id' => $request->integer('branch_id'),
             'name' => $request->validated('name'),
             'code' => $request->validated('code'),
@@ -149,6 +149,14 @@ class LocationController extends Controller
             return;
         }
 
-        abort_unless($location->library_id === $request->user()->library_id, 404);
+        abort_unless($location->library_id === $request->user()->activeLibraryId(), 404);
     }
 }
+
+
+
+
+
+
+
+

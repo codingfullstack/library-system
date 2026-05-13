@@ -81,15 +81,15 @@ class Overview extends Component
         $cards = $this->summaryCards($report, $previousReport);
         $snapshot = $this->snapshotItems($report, $filters);
         $alerts = $this->alertItems($report);
-        $quickActions = $this->quickActions($actor->role);
+        $quickActions = $this->quickActions($actor->effectiveRole());
         $copiesBreakdown = $this->copiesBreakdown($report);
 
         $this->chartPayload = [
             'timeline' => [
                 'categories' => $timeline->pluck('label')->values()->all(),
                 'series' => [
-                    ['name' => 'Isduota', 'data' => $timeline->pluck('issued_loans_count')->values()->all()],
-                    ['name' => 'Grazinta', 'data' => $timeline->pluck('returned_loans_count')->values()->all()],
+                    ['name' => 'Išduota', 'data' => $timeline->pluck('issued_loans_count')->values()->all()],
+                    ['name' => 'Grąžinta', 'data' => $timeline->pluck('returned_loans_count')->values()->all()],
                     ['name' => 'Rezervuota', 'data' => $timeline->pluck('reservations_count')->values()->all()],
                 ],
             ],
@@ -124,17 +124,17 @@ class Overview extends Component
 
         return [
             $this->card(
-                'Knygu egzemplioriai',
+                'Knygų egzemplioriai',
                 (int) $report['summary']['book_copies_count'],
-                'Is viso',
+                'Iš viso',
                 'book-open-text',
                 'text-teal-600 bg-teal-50 dark:bg-teal-500/10 dark:text-teal-300',
                 $previousReport['summary']['book_copies_count'] ?? null,
             ),
             $this->card(
-                'Isduotos knygos',
+                'Išduotos knygos',
                 (int) $report['summary']['active_loans_count'],
-                'Siuo metu',
+                'Šiuo metu',
                 'chevrons-up-down',
                 'text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-300',
                 $previousReport['summary']['active_loans_count'] ?? null,
@@ -148,23 +148,23 @@ class Overview extends Component
                 $previousReport['summary']['active_reservations_count'] ?? null,
             ),
             $this->card(
-                'Aktyvus nariai',
+                'Aktyvūs nariai',
                 (int) $report['summary']['active_members_count'],
-                'Siuo metu',
+                'Šiuo metu',
                 'users',
                 'text-violet-600 bg-violet-50 dark:bg-violet-500/10 dark:text-violet-300',
                 $previousReport['summary']['active_members_count'] ?? null,
             ),
             $this->card(
-                'Veluojancios knygos',
+                'Vėluojančios knygos',
                 (int) $report['summary']['overdue_loans_count'],
-                'Reikalauja demesio',
+                'Reikalauja dėmesio',
                 'bell',
                 'text-red-600 bg-red-50 dark:bg-red-500/10 dark:text-red-300',
                 $previousReport['summary']['overdue_loans_count'] ?? null,
             ),
             [
-                'label' => 'Siandien isduota',
+                'label' => 'Šiandien išduota',
                 'value' => $todayIssued,
                 'caption' => 'Knygos',
                 'icon' => 'layout-grid',
@@ -218,13 +218,13 @@ class Overview extends Component
                 'accent' => 'sky',
             ],
             [
-                'label' => 'Siandien grazinta',
+                'label' => 'Šiandien grąžinta',
                 'value' => $this->todayReturnedCount(),
                 'caption' => 'Knygos',
                 'accent' => 'teal',
             ],
             [
-                'label' => 'Laukiancios rezervacijos',
+                'label' => 'Laukiančios rezervacijos',
                 'value' => (int) $report['summary']['active_reservations_count'],
                 'caption' => 'Aktyvios',
                 'accent' => 'amber',
@@ -240,24 +240,24 @@ class Overview extends Component
     {
         return [
             [
-                'title' => $report['summary']['overdue_loans_count'] . ' knygu veluoja',
-                'description' => 'Patikrink isduotas knygas ir susisiek su nariais.',
+                'title' => $report['summary']['overdue_loans_count'] . ' knygų vėluoja',
+                'description' => 'Patikrink išduotas knygas ir susisiek su nariais.',
                 'route' => route('loans.index'),
-                'link' => 'Perziureti sarasa',
+                'link' => 'Peržiūrėti sąrašą',
                 'tone' => 'warning',
             ],
             [
                 'title' => $report['summary']['active_reservations_count'] . ' rezervacijos laukia',
-                'description' => 'Paziurek, ar eileje esantiems nariams jau galima pasiulyti kopija.',
+                'description' => 'Pažiūrėk, ar eilėje esantiems nariams jau galima pasiūlyti kopiją.',
                 'route' => route('reservations.index'),
-                'link' => 'Perziureti rezervacijas',
+                'link' => 'Peržiūrėti rezervacijas',
                 'tone' => 'info',
             ],
             [
                 'title' => $report['summary']['damaged_book_copies_count'] . ' sugadintos kopijos',
-                'description' => 'Perziurek bukles ir nuspresk, ka reikia tvarkyti ar nurasyti.',
+                'description' => 'Peržiūrėk būkles ir nuspręsk, ką reikia tvarkyti ar nurašyti.',
                 'route' => route('manage.book-copies.create'),
-                'link' => 'Atnaujinti busenas',
+                'link' => 'Atnaujinti būsenas',
                 'tone' => 'warning',
             ],
         ];
@@ -270,15 +270,15 @@ class Overview extends Component
     {
         $actions = [
             [
-                'label' => 'Prideti egzemplioriu',
+                'label' => 'Pridėti egzempliorių',
                 'route' => route('manage.book-copies.create'),
             ],
             [
-                'label' => 'Isduoti knyga',
+                'label' => 'Išduoti knygą',
                 'route' => route('loans.index'),
             ],
             [
-                'label' => 'Registruoti grazinima',
+                'label' => 'Registruoti grąžinimą',
                 'route' => route('loans.index'),
             ],
             [
@@ -287,7 +287,7 @@ class Overview extends Component
             ],
         ];
 
-        if ($role === 'super_admin') {
+        if ($role === 'superadministratorius') {
             array_unshift($actions, [
                 'label' => 'Nauja knyga',
                 'route' => route('manage.books.create'),
@@ -312,10 +312,10 @@ class Overview extends Component
                     'count' => (int) $row->count,
                     'share' => round(((int) $row->count / $total) * 100, 1),
                     'color' => match ($row->status) {
-                        'available' => '#0f9f6e',
-                        'loaned' => '#2563eb',
-                        'lost' => '#f97316',
-                        'damaged' => '#ef4444',
+                        'laisva' => '#0f9f6e',
+                        'išduota' => '#2563eb',
+                        'prarasta' => '#f97316',
+                        'sugadinta' => '#ef4444',
                         default => '#d4d4d8',
                     },
                 ];
@@ -341,7 +341,7 @@ class Overview extends Component
         $actor = Auth::user();
 
         return Loan::query()
-            ->when(! $actor?->isSuperAdmin(), fn ($query) => $query->where('library_id', $actor?->library_id))
+            ->when(! $actor?->isSuperAdmin(), fn ($query) => $query->where('library_id', $actor?->activeLibraryId()))
             ->whereBetween('borrowed_at', [now()->startOfDay(), now()->endOfDay()])
             ->count();
     }
@@ -351,7 +351,7 @@ class Overview extends Component
         $actor = Auth::user();
 
         return Loan::query()
-            ->when(! $actor?->isSuperAdmin(), fn ($query) => $query->where('library_id', $actor?->library_id))
+            ->when(! $actor?->isSuperAdmin(), fn ($query) => $query->where('library_id', $actor?->activeLibraryId()))
             ->whereNotNull('returned_at')
             ->whereBetween('returned_at', [now()->startOfDay(), now()->endOfDay()])
             ->count();
@@ -362,9 +362,19 @@ class Overview extends Component
         $actor = Auth::user();
 
         return \App\Models\User::query()
-            ->where('role', 'member')
-            ->when(! $actor?->isSuperAdmin(), fn ($query) => $query->where('library_id', $actor?->library_id))
+            ->where('role', 'narys')
+            ->when(! $actor?->isSuperAdmin(), fn ($query) => $query->whereHas('libraryMemberships', fn ($membershipQuery) => $membershipQuery
+                ->where('library_id', $actor?->activeLibraryId())
+                ->where('is_active', true)))
             ->when($filters['date_from'] && $filters['date_to'], fn ($query) => $query->whereBetween('created_at', [$filters['date_from'], $filters['date_to']]))
             ->count();
     }
 }
+
+
+
+
+
+
+
+

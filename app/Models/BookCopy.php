@@ -12,12 +12,12 @@ class BookCopy extends Model
 {
     use HasFactory, BelongsToLibrary;
 
-    public const STATUS_AVAILABLE = 'available';
-    public const STATUS_LOANED = 'loaned';
-    public const STATUS_LOST = 'lost';
-    public const STATUS_DAMAGED = 'damaged';
-    public const STATUS_MAINTENANCE = 'maintenance';
-    public const STATUS_WITHDRAWN = 'withdrawn';
+    public const STATUS_AVAILABLE = 'laisva';
+    public const STATUS_LOANED = 'išduota';
+    public const STATUS_LOST = 'prarasta';
+    public const STATUS_DAMAGED = 'sugadinta';
+    public const STATUS_MAINTENANCE = 'tvarkoma';
+    public const STATUS_WITHDRAWN = 'nurašyta';
 
     protected $fillable = [
         'library_id',
@@ -85,11 +85,11 @@ class BookCopy extends Model
     {
         return [
             self::STATUS_AVAILABLE => 'Laisva',
-            self::STATUS_LOANED => 'Isduota',
+            self::STATUS_LOANED => 'Išduota',
             self::STATUS_LOST => 'Prarasta',
             self::STATUS_DAMAGED => 'Sugadinta',
             self::STATUS_MAINTENANCE => 'Tvarkoma',
-            self::STATUS_WITHDRAWN => 'Nurasytas fondas',
+            self::STATUS_WITHDRAWN => 'Nurašytas fondas',
         ];
     }
 
@@ -101,11 +101,11 @@ class BookCopy extends Model
     public static function lifecycleTargetLabels(): array
     {
         return [
-            self::STATUS_LOST => 'Pazymeti kaip prarasta',
-            self::STATUS_DAMAGED => 'Pazymeti kaip sugadinta',
-            self::STATUS_MAINTENANCE => 'Siusti tvarkyti',
-            self::STATUS_AVAILABLE => 'Grazinti i aktyvu fonda',
-            self::STATUS_WITHDRAWN => 'Nurasyti',
+            self::STATUS_LOST => 'Pažymėti kaip prarastą',
+            self::STATUS_DAMAGED => 'Pažymėti kaip sugadintą',
+            self::STATUS_MAINTENANCE => 'Siųsti tvarkyti',
+            self::STATUS_AVAILABLE => 'Grąžinti į aktyvų fondą',
+            self::STATUS_WITHDRAWN => 'Nurašyti',
         ];
     }
 
@@ -150,3 +150,11 @@ class BookCopy extends Model
         };
     }
 }
+
+
+
+
+
+
+
+

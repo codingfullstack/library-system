@@ -10,6 +10,7 @@ use App\Models\BookCopy;
 use App\Models\Loan;
 use App\Models\Reservation;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class BorrowBookCopyAction
@@ -20,43 +21,64 @@ class BorrowBookCopyAction
      */
     public function handle(User $authUser, BookCopy $bookCopy, array $validated): array
     {
+        return DB::transaction(function () use ($authUser, $bookCopy, $validated): array {
+            $bookCopy = BookCopy::query()
+                ->whereKey($bookCopy->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            return $this->issueLocked($authUser, $bookCopy, $validated);
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function issueLocked(User $authUser, BookCopy $bookCopy, array $validated): array
+    {
         if ($bookCopy->status !== BookCopy::STATUS_AVAILABLE) {
             throw ValidationException::withMessages([
-                'book_copy' => ['Sios kopijos isduoti negalima.'],
+                'book_copy' => ['Šios kopijos išduoti negalima.'],
             ]);
         }
 
         $member = User::query()
             ->where('id', $validated['user_id'])
-            ->where('library_id', $bookCopy->library_id)
-            ->where('role', 'member')
+            ->whereHas('libraryMemberships', fn ($membershipQuery) => $membershipQuery
+                ->where('library_id', $bookCopy->library_id)
+                ->where('is_active', true))
+            ->where('role', 'narys')
             ->where('is_active', true)
             ->first();
 
         if (! $member) {
             throw ValidationException::withMessages([
-                'user_id' => ['Narys nerastas sioje bibliotekoje.'],
+                'user_id' => ['Narys nerastas šioje bibliotekoje.'],
             ]);
         }
 
-        $priorityReservation = Reservation::query()
+        $pendingReservations = Reservation::query()
             ->where('library_id', $bookCopy->library_id)
             ->where('book_id', $bookCopy->book_id)
             ->pending()
             ->orderBy('reserved_at')
-            ->first();
+            ->lockForUpdate()
+            ->get();
+
+        $priorityReservation = $pendingReservations->first();
 
         $overrideReservation = $priorityReservation && $priorityReservation->user_id !== $member->id;
 
         if ($overrideReservation && ! ($validated['override_reservation'] ?? false)) {
             throw ValidationException::withMessages([
-                'reservation_override' => ['Si knyga turi aktyvia rezervacija kitam nariui.'],
+                'reservation_override' => ['Ši knyga turi aktyvią rezervaciją kitam nariui.'],
             ]);
         }
 
         if ($overrideReservation && trim((string) ($validated['override_reason'] ?? '')) === '') {
             throw ValidationException::withMessages([
-                'override_reason' => ['Nurodykite, kodel apeinate aktyvia rezervacija.'],
+                'override_reason' => ['Nurodykite, kodėl apeinate aktyvią rezervaciją.'],
             ]);
         }
 
@@ -75,16 +97,11 @@ class BorrowBookCopyAction
             'issued_by' => $authUser->id,
             'borrowed_at' => now()->toDateString(),
             'due_at' => $dueAt,
-            'status' => 'active',
+            'status' => 'aktyvi',
             'notes' => $validated['notes'] ?? null,
         ]);
 
-        $reservation = Reservation::query()
-            ->where('library_id', $bookCopy->library_id)
-            ->where('book_id', $bookCopy->book_id)
-            ->where('user_id', $member->id)
-            ->pending()
-            ->first();
+        $reservation = $pendingReservations->firstWhere('user_id', $member->id);
 
         if ($reservation) {
             $reservation->update([
@@ -96,10 +113,10 @@ class BorrowBookCopyAction
                 $member,
                 $authUser,
                 'reservation_fulfilled',
-                'Rezervacija ivykdyta',
+                'Rezervacija įvykdyta',
                 sprintf(
-                    'Pagal jusu rezervacija isduota knyga "%s".',
-                    $bookCopy->book?->title ?: 'nezinoma knyga'
+                    'Pagal jūsų rezervaciją išduota knyga "%s".',
+                    $bookCopy->book?->title ?: 'nežinoma knyga'
                 ),
                 [
                     'reservation_id' => $reservation->id,
@@ -119,8 +136,8 @@ class BorrowBookCopyAction
                 'reservation_fulfilled',
                 $reservation,
                 sprintf(
-                    'Rezervacija knygai "%s" ivykdyta nariui %s.',
-                    $bookCopy->book?->title ?: 'nezinoma knyga',
+                    'Rezervacija knygai "%s" įvykdyta nariui %s.',
+                    $bookCopy->book?->title ?: 'nežinoma knyga',
                     $member->name
                 ),
                 [
@@ -152,7 +169,7 @@ class BorrowBookCopyAction
             'loan_issued',
             $loan,
             sprintf(
-                'Egzempliorius %s isduotas nariui %s.',
+                'Egzempliorius %s išduotas nariui %s.',
                 $bookCopy->inventory_code,
                 $member->name
             ),
@@ -176,8 +193,8 @@ class BorrowBookCopyAction
                 'reservation_override_issued',
                 $priorityReservation,
                 sprintf(
-                    'Apeita aktyvi rezervacija knygai "%s" ir egzempliorius %s isduotas nariui %s.',
-                    $bookCopy->book?->title ?: 'nezinoma knyga',
+                    'Apeita aktyvi rezervacija knygai "%s" ir egzempliorius %s išduotas nariui %s.',
+                    $bookCopy->book?->title ?: 'nežinoma knyga',
                     $bookCopy->inventory_code,
                     $member->name
                 ),
@@ -198,8 +215,15 @@ class BorrowBookCopyAction
         }
 
         return [
-            'message' => 'Kopija sekmingai isduota.',
+            'message' => 'Kopija sėkmingai išduota.',
             'loan' => $loan,
         ];
     }
 }
+
+
+
+
+
+
+

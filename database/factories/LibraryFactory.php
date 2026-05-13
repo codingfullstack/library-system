@@ -16,6 +16,9 @@ class LibraryFactory extends Factory
             'address' => fake()->streetAddress(),
             'city' => fake()->city(),
             'is_active' => true,
+            'is_public' => true,
         ];
     }
 }
+
+

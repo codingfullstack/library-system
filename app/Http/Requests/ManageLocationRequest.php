@@ -17,7 +17,7 @@ class ManageLocationRequest extends FormRequest
         $locationId = $this->route('location')?->id;
         $libraryId = $this->user()?->isSuperAdmin()
             ? $this->input('library_id')
-            : $this->user()?->library_id;
+            : $this->user()?->activeLibraryId();
 
         return [
             'library_id' => [
@@ -46,3 +46,11 @@ class ManageLocationRequest extends FormRequest
         ];
     }
 }
+
+
+
+
+
+
+
+

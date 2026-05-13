@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Library;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -32,15 +33,12 @@ class AuthController extends Controller
             ], 403);
         }
 
-        $user->loadMissing('library:id,name');
         $token = $user->createToken('android-app')->plainTextToken;
 
         return response()->json([
-            'message' => 'Prisijungta sekmingai.',
+            'message' => 'Prisijungta sėkmingai.',
             'token' => $token,
-            'user' => array_merge($user->toArray(), [
-                'library_name' => $user->library?->name,
-            ]),
+            'user' => $this->userPayload($user),
         ]);
     }
 
@@ -49,18 +47,47 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()?->delete();
 
         return response()->json([
-            'message' => 'Atsijungta sekmingai.',
+            'message' => 'Atsijungta sėkmingai.',
         ]);
     }
 
     public function me(Request $request): JsonResponse
     {
-        $user = $request->user()->loadMissing('library:id,name');
+        $user = $request->user();
 
         return response()->json([
-            'user' => array_merge($user->toArray(), [
-                'library_name' => $user->library?->name,
-            ]),
+            'user' => $this->userPayload($user),
         ]);
     }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function userPayload(User $user): array
+    {
+        $libraryId = $user->activeLibraryId();
+        $library = $libraryId
+            ? Library::query()->whereKey($libraryId)->first(['id', 'name'])
+            : null;
+
+        return [
+            'id' => $user->id,
+            'library_id' => $library?->id,
+            'library_name' => $library?->name,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role,
+            'phone' => $user->phone,
+            'membership_number' => $user->membership_number,
+            'is_active' => (bool) $user->is_active,
+        ];
+    }
 }
+
+
+
+
+
+
+
+

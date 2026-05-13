@@ -175,7 +175,7 @@ class BookController extends Controller
             $request->user(),
             'book_deleted',
             $book,
-            sprintf('Istrinta knyga "%s".', $book->title),
+            sprintf('Ištrinta knyga "%s".', $book->title),
             [
                 'book_title' => $book->title,
                 'isbn' => $book->isbn,
@@ -217,3 +217,11 @@ class BookController extends Controller
         abort_unless($request->user()?->isSuperAdmin(), 403);
     }
 }
+
+
+
+
+
+
+
+

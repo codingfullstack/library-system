@@ -18,3 +18,10 @@
     <button type="submit" class="app-button-primary">{{ $submitLabel }}</button>
     <a href="{{ route('manage.authors.index') }}" class="app-button-secondary">Grįžti</a>
 </div>
+
+
+
+
+
+
+

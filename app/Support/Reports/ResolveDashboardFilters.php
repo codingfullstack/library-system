@@ -34,42 +34,42 @@ class ResolveDashboardFilters
             'today' => [
                 now()->toImmutable()->startOfDay(),
                 now()->toImmutable()->endOfDay(),
-                'Siandiena',
+                'Šiandiena',
             ],
             'this_week' => [
                 now()->toImmutable()->startOfWeek(),
                 now()->toImmutable()->endOfWeek(),
-                'Si savaite',
+                'Ši savaitė',
             ],
             '7_days' => [
                 now()->toImmutable()->subDays(6)->startOfDay(),
                 now()->toImmutable()->endOfDay(),
-                'Paskutines 7 dienos',
+                'Paskutinės 7 dienos',
             ],
             '30_days' => [
                 now()->toImmutable()->subDays(29)->startOfDay(),
                 now()->toImmutable()->endOfDay(),
-                'Paskutines 30 dienu',
+                'Paskutinės 30 dienų',
             ],
             'this_month' => [
                 now()->toImmutable()->startOfMonth(),
                 now()->toImmutable()->endOfMonth(),
-                'Sis menuo',
+                'Šis mėnuo',
             ],
             'last_month' => [
                 now()->toImmutable()->subMonthNoOverflow()->startOfMonth(),
                 now()->toImmutable()->subMonthNoOverflow()->endOfMonth(),
-                'Praejes menuo',
+                'Praėjęs mėnuo',
             ],
             'this_quarter' => [
                 now()->toImmutable()->startOfQuarter(),
                 now()->toImmutable()->endOfQuarter(),
-                'Sis ketvirtis',
+                'Šis ketvirtis',
             ],
             'this_year' => [
                 now()->toImmutable()->startOfYear(),
                 now()->toImmutable()->endOfDay(),
-                'Sie metai',
+                'Šie metai',
             ],
             'custom' => $this->resolveCustomRange($dateFrom, $dateTo),
             default => [null, null, 'Visas laikotarpis'],
@@ -145,3 +145,11 @@ class ResolveDashboardFilters
         ];
     }
 }
+
+
+
+
+
+
+
+

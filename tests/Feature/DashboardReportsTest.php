@@ -67,7 +67,7 @@ it('shows extended dashboard reports scoped to the staff library', function () {
         'library_id' => $library->id,
         'book_copy_id' => $activeCopy->id,
         'user_id' => $member->id,
-        'status' => 'active',
+        'status' => 'aktyvi',
         'returned_at' => null,
         'borrowed_at' => now()->subDays(2),
         'due_at' => now()->addDays(5),
@@ -77,7 +77,7 @@ it('shows extended dashboard reports scoped to the staff library', function () {
         'library_id' => $library->id,
         'book_copy_id' => $activeCopy->id,
         'user_id' => $member->id,
-        'status' => 'returned',
+        'status' => 'grąžinta',
         'returned_at' => now()->subDay(),
         'borrowed_at' => now()->subDays(10),
         'due_at' => now()->subDays(2),
@@ -87,7 +87,7 @@ it('shows extended dashboard reports scoped to the staff library', function () {
         'library_id' => $library->id,
         'book_copy_id' => $lostCopy->id,
         'user_id' => $member->id,
-        'status' => 'overdue',
+        'status' => 'vėluoja',
         'returned_at' => null,
         'borrowed_at' => now()->subDays(15),
         'due_at' => now()->subDays(1),
@@ -97,7 +97,7 @@ it('shows extended dashboard reports scoped to the staff library', function () {
         'library_id' => $otherLibrary->id,
         'book_copy_id' => $otherLibraryCopy->id,
         'user_id' => $otherMember->id,
-        'status' => 'active',
+        'status' => 'aktyvi',
         'returned_at' => null,
         'borrowed_at' => now()->subDay(),
         'due_at' => now()->addDays(7),
@@ -139,13 +139,13 @@ it('shows extended dashboard reports scoped to the staff library', function () {
     $response = $this->actingAs($staff)->get(route('dashboard'));
 
     $response->assertOk();
-    $response->assertSee('Apzvalga');
-    $response->assertSee('Biblioteku palyginimas');
-    $response->assertSee('Isdavimu, grazinimu ir rezervaciju dinamika');
-    $response->assertSee('Populiariausios knygos');
+    $response->assertSee('Apžvalga');
+    $response->assertSee('Bibliotekų palyginimas');
+    $response->assertSee('Išdavimų, grąžinimų ir rezervacijų dinamika');
+    $response->assertSee('Populiariaušios knygos');
     $response->assertSee('Aktyviausi nariai');
-    $response->assertSee('Veiklos suvestine');
-    $response->assertSee('Egzemplioriu busenos');
+    $response->assertSee('Veiklos suvestinė');
+    $response->assertSee('Egzempliorių būsenos');
     $response->assertSee('Populiari knyga');
     $response->assertSee('Rasa Autore');
     $response->assertSee('Aktyvus narys');
@@ -171,7 +171,7 @@ it('shows dashboard reports across libraries for super admin', function () {
     $response = $this->actingAs($superAdmin)->get(route('dashboard'));
 
     $response->assertOk();
-    $response->assertSee('Apzvalga');
+    $response->assertSee('Apžvalga');
     $response->assertSee('Pirma biblioteka');
     $response->assertSee('Antra biblioteka');
 });
@@ -206,7 +206,7 @@ it('filters dashboard activity by the selected period', function () {
         'library_id' => $library->id,
         'book_copy_id' => $recentCopy->id,
         'user_id' => $member->id,
-        'status' => 'active',
+        'status' => 'aktyvi',
         'returned_at' => null,
         'borrowed_at' => now()->subDays(2),
         'due_at' => now()->addDays(7),
@@ -216,7 +216,7 @@ it('filters dashboard activity by the selected period', function () {
         'library_id' => $library->id,
         'book_copy_id' => $oldCopy->id,
         'user_id' => $member->id,
-        'status' => 'active',
+        'status' => 'aktyvi',
         'returned_at' => null,
         'borrowed_at' => now()->subDays(45),
         'due_at' => now()->subDays(30),
@@ -249,7 +249,7 @@ it('filters dashboard activity by the selected period', function () {
     ]));
 
     $response->assertOk();
-    $response->assertSee('Paskutines 7 dienos');
+    $response->assertSee('Paskutinės 7 dienos');
     $response->assertSee('Nauja knyga');
     $response->assertDontSee('Sena knyga');
 });
@@ -268,8 +268,8 @@ it('exports dashboard reports to csv', function () {
 
     $response->assertOk();
     $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
-    $response->assertSee('Suvestine');
-    $response->assertSee('Biblioteku palyginimas');
+    $response->assertSee('Suvestinė');
+    $response->assertSee('Bibliotekų palyginimas');
 });
 
 it('exports dashboard reports to excel format', function () {
@@ -287,5 +287,10 @@ it('exports dashboard reports to excel format', function () {
     $response->assertOk();
     $response->assertHeader('content-type', 'application/vnd.ms-excel; charset=UTF-8');
     $response->assertSee('Bibliotekos ataskaita');
-    $response->assertSee('Suvestine');
+    $response->assertSee('Suvestinė');
 });
+
+
+
+
+

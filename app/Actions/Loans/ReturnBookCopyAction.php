@@ -21,12 +21,12 @@ class ReturnBookCopyAction
 
         if (! $activeLoan) {
             throw ValidationException::withMessages([
-                'book_copy' => ['Aktyviai isduota knyga nerasta.'],
+                'book_copy' => ['Aktyviai išduota knyga nerasta.'],
             ]);
         }
 
         $activeLoan->update([
-            'status' => 'returned',
+            'status' => 'grąžinta',
             'returned_at' => now(),
             'received_by' => $authUser->id,
         ]);
@@ -36,10 +36,10 @@ class ReturnBookCopyAction
                 $activeLoan->user,
                 $authUser,
                 'book_returned',
-                'Knyga grazinta',
+                'Knyga grąžinta',
                 sprintf(
-                    'Knygos "%s" egzempliorius %s sekmingai grazintas.',
-                    $bookCopy->book?->title ?: 'nezinoma knyga',
+                    'Knygos "%s" egzempliorius %s sėkmingai grąžintas.',
+                    $bookCopy->book?->title ?: 'nežinoma knyga',
                     $bookCopy->inventory_code ?: ('#'.$bookCopy->id)
                 ),
                 [
@@ -59,7 +59,7 @@ class ReturnBookCopyAction
             $bookCopy,
             BookCopy::STATUS_AVAILABLE,
             $authUser,
-            'returned'
+            'grąžinta'
         );
 
         app(SyncReservationQueueAction::class)->handle($bookCopy->library_id, $bookCopy->book_id);
@@ -69,9 +69,9 @@ class ReturnBookCopyAction
             'loan_returned',
             $activeLoan,
             sprintf(
-                'Egzempliorius %s grazintas is nario %s.',
+                'Egzempliorius %s grąžintas iš nario %s.',
                 $bookCopy->inventory_code,
-                $activeLoan->user?->name ?: 'nezinomas narys'
+                $activeLoan->user?->name ?: 'nežinomas narys'
             ),
             [
                 'loan_id' => $activeLoan->id,
@@ -91,3 +91,11 @@ class ReturnBookCopyAction
         ];
     }
 }
+
+
+
+
+
+
+
+

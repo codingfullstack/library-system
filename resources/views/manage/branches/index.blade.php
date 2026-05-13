@@ -28,7 +28,7 @@
 
                         <a href="{{ route('manage.branches.create') }}" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600">
                             <flux:icon.plus class="size-4" />
-                            Prideti filiala
+                            Pridėti filialą
                             <flux:icon.chevron-down class="size-4" />
                         </a>
                     </div>
@@ -53,7 +53,7 @@
                             <div>
                                 <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Visi filialai</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $branches->total() }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Is viso</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Iš viso</div>
                             </div>
                         </div>
                     </section>
@@ -66,7 +66,7 @@
                             <div>
                                 <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Su vietomis</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $branchesWithLocations }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Siame puslapyje</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Šiame puslapyje</div>
                             </div>
                         </div>
                     </section>
@@ -92,7 +92,7 @@
                             <div>
                                 <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Miestai</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $citiesCount }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Siame puslapyje</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Šiame puslapyje</div>
                             </div>
                         </div>
                     </section>
@@ -102,7 +102,7 @@
                     <div class="px-5 py-4">
                         <form method="GET" action="{{ route('manage.branches.index') }}" class="grid gap-3 xl:grid-cols-[minmax(320px,1.5fr)_auto_auto] xl:items-center">
                             <div class="relative xl:min-w-0">
-                                <input type="text" name="search" value="{{ request('search') }}" placeholder="Ieskoti pagal pavadinima, koda ar miesta..." class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 pl-11 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
+                                <input type="text" name="search" value="{{ request('search') }}" placeholder="Ieškoti pagal pavadinimą, kodą ar miestą..." class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 pl-11 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
                                 <div class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
                                     <flux:icon.magnifying-glass class="size-4" />
                                 </div>
@@ -111,7 +111,7 @@
                                 <flux:icon.funnel class="mr-2 size-4" />
                                 Filtruoti
                             </button>
-                            <a href="{{ route('manage.branches.index') }}" class="app-button-secondary h-11 rounded-2xl px-4">Isvalyti</a>
+                            <a href="{{ route('manage.branches.index') }}" class="app-button-secondary h-11 rounded-2xl px-4">Išvalyti</a>
                         </form>
                     </div>
                 </section>
@@ -147,13 +147,13 @@
                                             <td class="px-4 py-4 align-middle text-center text-sm font-semibold text-emerald-700 dark:text-emerald-300">{{ $branch->book_copies_count }}</td>
                                             <td class="px-4 py-4 align-middle">
                                                 <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-                                                    <a href="{{ route('manage.branches.edit', $branch) }}" title="Redaguoti filiala" aria-label="Redaguoti filiala" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
+                                                    <a href="{{ route('manage.branches.edit', $branch) }}" title="Redaguoti filialą" aria-label="Redaguoti filialą" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
                                                         <flux:icon.pencil-square class="size-4" />
                                                     </a>
-                                                    <form method="POST" action="{{ route('manage.branches.destroy', $branch) }}" onsubmit="return confirm('Ar tikrai nori istrinti si filiala?')">
+                                                    <form method="POST" action="{{ route('manage.branches.destroy', $branch) }}" onsubmit="return confirm('Ar tikrai nori ištrinti šį filialą?')">
                                                         @csrf
                                                         @method('DELETE')
-                                                        <button type="submit" title="Istrinti filiala" aria-label="Istrinti filiala" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-red-600 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-red-300">
+                                                        <button type="submit" title="Ištrinti filialą" aria-label="Ištrinti filialą" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-red-600 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-red-300">
                                                             <flux:icon.trash class="size-4" />
                                                         </button>
                                                     </form>
@@ -171,7 +171,7 @@
                         </div>
                     @else
                         <div class="p-6">
-                            <x-ui.empty-state title="Filialu nerasta" description="Pabandykite pakeisti paieska arba sukurkite nauja filiala." />
+                            <x-ui.empty-state title="Filialų nerasta" description="Pabandykite pakeisti paiešką arba sukurkite naują filialą." />
                         </div>
                     @endif
                 </section>
@@ -179,3 +179,10 @@
         </div>
     </x-ui.page>
 </x-layouts::app>
+
+
+
+
+
+
+

@@ -10,9 +10,12 @@ class GetMemberDashboardDataQuery
 {
     public function handle(User $user): array
     {
+        $libraryId = $user->activeLibraryId();
+
         $activeLoans = Loan::query()
             ->where('user_id', $user->id)
-            ->whereIn('status', ['active', 'overdue'])
+            ->when($libraryId, fn ($query) => $query->where('library_id', $libraryId))
+            ->whereIn('status', ['aktyvi', 'vėluoja'])
             ->whereNull('returned_at')
             ->with(['bookCopy.book:id,title,subtitle,isbn'])
             ->orderByRaw('CASE WHEN due_at IS NULL THEN 1 ELSE 0 END')
@@ -22,6 +25,7 @@ class GetMemberDashboardDataQuery
 
         $activeReservations = Reservation::query()
             ->where('user_id', $user->id)
+            ->when($libraryId, fn ($query) => $query->where('library_id', $libraryId))
             ->with(['book:id,title,subtitle,isbn', 'library:id,name'])
             ->latest('reserved_at')
             ->limit(5)
@@ -37,13 +41,15 @@ class GetMemberDashboardDataQuery
             'activeLoansCount' => $activeLoans->count(),
             'activeReservationsCount' => Reservation::query()
                 ->where('user_id', $user->id)
+                ->when($libraryId, fn ($query) => $query->where('library_id', $libraryId))
                 ->where('status', Reservation::STATUS_RESERVED)
                 ->whereNull('fulfilled_at')
                 ->whereNull('cancelled_at')
                 ->count(),
             'overdueLoansCount' => Loan::query()
                 ->where('user_id', $user->id)
-                ->where('status', 'overdue')
+                ->when($libraryId, fn ($query) => $query->where('library_id', $libraryId))
+                ->where('status', 'vėluoja')
                 ->whereNull('returned_at')
                 ->count(),
             'unreadNotificationsCount' => $user->notifications()->whereNull('read_at')->count(),
@@ -53,3 +59,12 @@ class GetMemberDashboardDataQuery
         ];
     }
 }
+
+
+
+
+
+
+
+
+

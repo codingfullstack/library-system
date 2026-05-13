@@ -12,11 +12,11 @@ class GetManageUsersQuery
     {
         $search = trim((string) ($filters['search'] ?? ''));
         $role = $filters['role'] ?? null;
-        $active = $filters['active'] ?? null;
+        $active = $filters['aktyvi'] ?? null;
         $perPage = (int) ($filters['per_page'] ?? 15);
 
         return UserManagement::scopeVisibleUsers(
-            User::query()->with('library:id,name'),
+            User::query()->with('libraryMemberships.library:id,name,code'),
             $actor
         )
             ->when($search !== '', function ($query) use ($search) {
@@ -34,3 +34,11 @@ class GetManageUsersQuery
             ->withQueryString();
     }
 }
+
+
+
+
+
+
+
+

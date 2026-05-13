@@ -35,3 +35,10 @@ class Branch extends Model
         return $this->hasMany(BookCopy::class);
     }
 }
+
+
+
+
+
+
+

@@ -91,7 +91,7 @@ class ManageBookRequest extends FormRequest
                 $validator->errors()->add(
                     'title',
                     sprintf(
-                        'Tokia knyga jau yra kataloge%s. Vietoje naujo iraso redaguokite esama.',
+                        'Tokia knyga jau yra kataloge%s. Vietoje naujo įrašo redaguokite esamą.',
                         $duplicate->isbn ? ' (ISBN: ' . $duplicate->isbn . ')' : ''
                     )
                 );
@@ -99,3 +99,11 @@ class ManageBookRequest extends FormRequest
         ];
     }
 }
+
+
+
+
+
+
+
+

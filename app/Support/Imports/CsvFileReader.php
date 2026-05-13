@@ -29,7 +29,7 @@ class CsvFileReader
         if ($firstLine === false) {
             fclose($handle);
 
-            throw new RuntimeException('Importo failas tuscias.');
+            throw new RuntimeException('Importo failas tuščias.');
         }
 
         $firstLine = $this->stripBom($firstLine);
@@ -132,3 +132,11 @@ class CsvFileReader
         return preg_replace('/^\xEF\xBB\xBF/', '', $value) ?? $value;
     }
 }
+
+
+
+
+
+
+
+

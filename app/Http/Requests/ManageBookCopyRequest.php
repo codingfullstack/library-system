@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\BookCopy;
 use App\Models\Branch;
 use App\Models\Location;
 use Illuminate\Foundation\Http\FormRequest;
@@ -11,14 +12,26 @@ class ManageBookCopyRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        $user = $this->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        $bookCopy = $this->route('bookCopy') ?? $this->route('book_copy');
+
+        if ($bookCopy instanceof BookCopy) {
+            return $user->can('update', $bookCopy);
+        }
+
+        return $user->can('create', BookCopy::class);
     }
 
     public function rules(): array
     {
         $libraryId = $this->user()?->isSuperAdmin()
             ? $this->input('library_id')
-            : $this->user()?->library_id;
+            : $this->user()?->activeLibraryId();
         $bookCopyId = $this->currentBookCopyId();
 
         return [
@@ -55,8 +68,8 @@ class ManageBookCopyRequest extends FormRequest
                     ->where(fn ($query) => $query->where('library_id', $libraryId))
                     ->ignore($bookCopyId),
             ],
-            'status' => ['required', Rule::in(['available', 'loaned', 'lost', 'damaged', 'maintenance', 'withdrawn'])],
-            'condition_status' => ['required', Rule::in(['new', 'good', 'worn', 'damaged'])],
+            'status' => ['required', Rule::in(['laisva', 'išduota', 'prarasta', 'sugadinta', 'tvarkoma', 'nurašyta'])],
+            'condition_status' => ['required', Rule::in(['nauja', 'gera', 'padėvėta', 'sugadinta'])],
             'acquired_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
         ];
@@ -88,9 +101,17 @@ class ManageBookCopyRequest extends FormRequest
                 $location = Location::query()->find($locationId);
 
                 if (! $branch || ! $location || $location->branch_id !== $branch->id) {
-                    $validator->errors()->add('location_id', 'Pasirinkta vieta nepriklauso siam filialui.');
+                    $validator->errors()->add('location_id', 'Pasirinkta vieta nepriklauso šiam filialui.');
                 }
             },
         ];
     }
 }
+
+
+
+
+
+
+
+

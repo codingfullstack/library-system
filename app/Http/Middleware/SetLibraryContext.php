@@ -16,13 +16,21 @@ class SetLibraryContext
      */
     public function handle(Request $request, Closure $next): Response
     {
+        app(LibraryContext::class)->clear();
+
         $user = $request->user();
 
         if ($user) {
-            app(LibraryContext::class)->set(
-                $user->library_id,
-                $user->role === 'super_admin'
-            );
+            $requestedLibraryId = $request->integer('library_id') ?: (int) $request->header('X-Library-Id');
+            $activeLibraryId = $requestedLibraryId && ($user->isSuperAdmin() || $user->belongsToLibrary($requestedLibraryId))
+                ? $requestedLibraryId
+                : $user->activeLibraryId();
+
+            if ($activeLibraryId && $request->hasSession() && (int) $request->session()->get('active_library_id') !== (int) $activeLibraryId) {
+                $request->session()->put('active_library_id', $activeLibraryId);
+            }
+
+            app(LibraryContext::class)->set($activeLibraryId, $user->isSuperAdmin());
         } else {
             app(LibraryContext::class)->clear();
         }
@@ -30,4 +38,11 @@ class SetLibraryContext
         return $next($request);
     }
 }
+
+
+
+
+
+
+
 

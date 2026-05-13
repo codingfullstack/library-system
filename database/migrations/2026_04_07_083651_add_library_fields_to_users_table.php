@@ -10,34 +10,28 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
 
-            // 🔑 Tenant ryšys
             $table->foreignId('library_id')
                 ->nullable()
                 ->after('id')
                 ->constrained()
                 ->nullOnDelete();
 
-            // 👤 Role sistema
             $table->enum('role', [
-                'super_admin',
-                'admin',
-                'staff',
-                'member'
-            ])->default('member')->after('password');
+                'superadministratorius',
+                'administratorius',
+                'darbuotojas',
+                'narys'
+            ])->default('narys')->after('password');
 
-            // 📞 Papildomi duomenys
             $table->string('phone')->nullable()->after('role');
             $table->string('membership_number')->nullable()->after('phone');
 
-            // 🔄 Status
             $table->boolean('is_active')->default(true)->after('membership_number');
 
-            // 📊 Indexai
             $table->index('role');
             $table->index('is_active');
             $table->index(['library_id', 'role']);
 
-            // 🔒 Unikalumas bibliotekoje
             $table->unique(['library_id', 'membership_number']);
         });
     }
@@ -62,3 +56,4 @@ return new class extends Migration
         });
     }
 };
+

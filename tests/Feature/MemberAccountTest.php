@@ -4,6 +4,7 @@ use App\Models\Book;
 use App\Models\BookCopy;
 use App\Models\Branch;
 use App\Models\Library;
+use App\Models\LibraryMembership;
 use App\Models\Loan;
 use App\Models\Location;
 use App\Models\Reservation;
@@ -32,7 +33,7 @@ it('shows member dashboard with own summary', function () {
         'library_id' => $library->id,
         'book_copy_id' => $copy->id,
         'user_id' => $member->id,
-        'status' => 'active',
+        'status' => 'aktyvi',
         'returned_at' => null,
         'due_at' => now()->addDays(7),
     ]);
@@ -41,14 +42,14 @@ it('shows member dashboard with own summary', function () {
         'library_id' => $library->id,
         'book_copy_id' => $copy->id,
         'user_id' => $otherMember->id,
-        'status' => 'overdue',
+        'status' => 'vėluoja',
         'returned_at' => null,
         'due_at' => now()->subDays(2),
     ]);
 
     $member->notifications()->create([
         'type' => 'loan_overdue',
-        'title' => 'Veluojate grazinti knyga',
+        'title' => 'Vėluojate grąžinti knygą',
         'message' => 'Primename apie termina.',
     ]);
 
@@ -56,7 +57,7 @@ it('shows member dashboard with own summary', function () {
         ->get(route('account.dashboard'))
         ->assertOk()
         ->assertSee('Mano paskyra')
-        ->assertSee('Aktyvios isduotos knygos')
+        ->assertSee('Aktyvios išduotos knygos')
         ->assertSee('Nario biblioteka');
 });
 
@@ -64,7 +65,7 @@ it('shows only active member loans in member account area', function () {
     $library = Library::factory()->create();
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $bookA = Book::factory()->create(['title' => 'Aktyvi knyga']);
-    $bookB = Book::factory()->create(['title' => 'Grazinta knyga']);
+    $bookB = Book::factory()->create(['title' => 'Grąžinta knyga']);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
 
@@ -88,7 +89,7 @@ it('shows only active member loans in member account area', function () {
         'library_id' => $library->id,
         'book_copy_id' => $activeCopy->id,
         'user_id' => $member->id,
-        'status' => 'active',
+        'status' => 'aktyvi',
         'returned_at' => null,
         'due_at' => now()->addDays(5),
     ]);
@@ -97,7 +98,7 @@ it('shows only active member loans in member account area', function () {
         'library_id' => $library->id,
         'book_copy_id' => $returnedCopy->id,
         'user_id' => $member->id,
-        'status' => 'returned',
+        'status' => 'grąžinta',
         'returned_at' => now()->subDay(),
         'due_at' => now()->subDays(2),
     ]);
@@ -105,9 +106,9 @@ it('shows only active member loans in member account area', function () {
     $this->actingAs($member)
         ->get(route('loans.index'))
         ->assertOk()
-        ->assertSee('Mano isduotos knygos')
+        ->assertSee('Mano išduotos knygos')
         ->assertSee('Aktyvi knyga')
-        ->assertDontSee('Grazinta knyga');
+        ->assertDontSee('Grąžinta knyga');
 });
 
 it('shows member book page without copy management details', function () {
@@ -115,7 +116,7 @@ it('shows member book page without copy management details', function () {
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create([
         'title' => 'Nario matoma knyga',
-        'description' => 'Pilnas aprasymas nariui.',
+        'description' => 'Pilnas aprašymas nariui.',
     ]);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
@@ -142,7 +143,66 @@ it('shows member book page without copy management details', function () {
     $this->actingAs($member)
         ->get(route('books.show', $book))
         ->assertOk()
-        ->assertSee('Pilnas aprasymas nariui.')
+        ->assertSee('Pilnas aprašymas nariui.')
         ->assertDontSee('Knygos kopijos')
         ->assertDontSee('Inventoriaus kodas');
 });
+
+it('shows books from all member libraries with library information', function () {
+    $firstLibrary = Library::factory()->create([
+        'name' => 'Pirma biblioteka',
+        'address' => 'Pirma g. 1',
+        'city' => 'Vilnius',
+    ]);
+    $secondLibrary = Library::factory()->create([
+        'name' => 'Antra biblioteka',
+        'address' => 'Antra g. 2',
+        'city' => 'Kaunas',
+    ]);
+    $otherLibrary = Library::factory()->create(['name' => 'Svetima biblioteka']);
+    $member = User::factory()->member()->create(['library_id' => $firstLibrary->id]);
+
+    LibraryMembership::factory()->member()->create([
+        'library_id' => $secondLibrary->id,
+        'user_id' => $member->id,
+        'membership_number' => 'SECOND-MEM-010',
+    ]);
+
+    $firstBook = Book::factory()->create(['title' => 'Pirmos bibliotekos knyga']);
+    $secondBook = Book::factory()->create(['title' => 'Antros bibliotekos knyga']);
+    $otherBook = Book::factory()->create(['title' => 'Svetima knyga']);
+
+    BookCopy::factory()->create([
+        'library_id' => $firstLibrary->id,
+        'book_id' => $firstBook->id,
+        'status' => BookCopy::STATUS_AVAILABLE,
+    ]);
+    BookCopy::factory()->create([
+        'library_id' => $secondLibrary->id,
+        'book_id' => $secondBook->id,
+        'status' => BookCopy::STATUS_AVAILABLE,
+    ]);
+    BookCopy::factory()->create([
+        'library_id' => $otherLibrary->id,
+        'book_id' => $otherBook->id,
+        'status' => BookCopy::STATUS_AVAILABLE,
+    ]);
+
+    $this->actingAs($member)
+        ->withSession(['active_library_id' => $firstLibrary->id])
+        ->get(route('books.index'))
+        ->assertOk()
+        ->assertSee('Pirmos bibliotekos knyga')
+        ->assertSee('Antros bibliotekos knyga')
+        ->assertSee('Pirma biblioteka')
+        ->assertSee('Pirma g. 1, Vilnius')
+        ->assertSee('Antra biblioteka')
+        ->assertSee('Antra g. 2, Kaunas')
+        ->assertDontSee('Svetima knyga')
+        ->assertDontSee('Svetima biblioteka');
+});
+
+
+
+
+

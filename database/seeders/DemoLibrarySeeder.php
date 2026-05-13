@@ -10,12 +10,14 @@ use App\Models\BookCopyStatusHistory;
 use App\Models\Branch;
 use App\Models\Category;
 use App\Models\Library;
+use App\Models\LibraryMembership;
 use App\Models\Loan;
 use App\Models\Location;
 use App\Models\Publisher;
 use App\Models\Reservation;
 use App\Models\ScanLog;
 use App\Models\User;
+use App\Support\UserManagement;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
@@ -54,11 +56,10 @@ class DemoLibrarySeeder extends Seeder
             ]);
 
             User::create([
-                'library_id' => null,
-                'name' => 'Super Admin',
+                'name' => 'Superadministratorius',
                 'email' => 'superadmin@test.com',
                 'password' => Hash::make('password'),
-                'role' => 'super_admin',
+                'role' => 'superadministratorius',
                 'phone' => '+37060000000',
                 'membership_number' => null,
                 'is_active' => true,
@@ -66,8 +67,8 @@ class DemoLibrarySeeder extends Seeder
             ]);
 
             [$adminX, $staffX, $membersX] = $this->seedLibraryUsers($libraryX, [
-                'admin' => ['name' => 'Rasa Klimiene', 'email' => 'adminx@test.com', 'phone' => '+37061110001'],
-                'staff' => ['name' => 'Paulius Mockus', 'email' => 'staffx@test.com', 'phone' => '+37062220001'],
+                'administratorius' => ['name' => 'Rasa Klimienė', 'email' => 'adminx@test.com', 'phone' => '+37061110001'],
+                'darbuotojas' => ['name' => 'Paulius Mockus', 'email' => 'staffx@test.com', 'phone' => '+37062220001'],
                 'members' => [
                     ['name' => 'Austeja Kazlauskaite', 'email' => 'austeja.kazlauskaite@example.com', 'phone' => '+37061234001'],
                     ['name' => 'Mantas Balsevicius', 'email' => 'mantas.balsevicius@example.com', 'phone' => '+37061234002'],
@@ -75,12 +76,12 @@ class DemoLibrarySeeder extends Seeder
                     ['name' => 'Lukas Vaitiekunas', 'email' => 'lukas.vaitiekunas@example.com', 'phone' => '+37061234004'],
                     ['name' => 'Saule Grigaityte', 'email' => 'saule.grigaityte@example.com', 'phone' => '+37061234005'],
                     ['name' => 'Rokas Jankauskas', 'email' => 'rokas.jankauskas@example.com', 'phone' => '+37061234006'],
-                    ['name' => 'Gabija Rimkute', 'email' => 'gabija.rimkute@example.com', 'phone' => '+37061234007'],
+                    ['name' => 'Gabija Rimkutė', 'email' => 'gabija.rimkute@example.com', 'phone' => '+37061234007'],
                     ['name' => 'Emilija Varnyte', 'email' => 'emilija.varnyte@example.com', 'phone' => '+37061234008'],
                     ['name' => 'Nojus Pocius', 'email' => 'nojus.pocius@example.com', 'phone' => '+37061234009'],
                     ['name' => 'Milda Janusauskaite', 'email' => 'milda.janusauskaite@example.com', 'phone' => '+37061234010'],
                     ['name' => 'Tadas Veverskis', 'email' => 'tadas.veverskis@example.com', 'phone' => '+37061234011'],
-                    ['name' => 'Karolina Butkeviciute', 'email' => 'karolina.butkeviciute@example.com', 'phone' => '+37061234012'],
+                    ['name' => 'Karolina Butkevičiūtė', 'email' => 'karolina.butkeviciute@example.com', 'phone' => '+37061234012'],
                     ['name' => 'Simona Petratyte', 'email' => 'simona.petratyte@example.com', 'phone' => '+37061234013'],
                     ['name' => 'Giedre Valentiene', 'email' => 'giedre.valentiene@example.com', 'phone' => '+37061234014'],
                     ['name' => 'Tomas Vaiktus', 'email' => 'tomas.vaiktus@example.com', 'phone' => '+37061234015'],
@@ -93,8 +94,8 @@ class DemoLibrarySeeder extends Seeder
             ]);
 
             [$adminY, $staffY, $membersY] = $this->seedLibraryUsers($libraryY, [
-                'admin' => ['name' => 'Dalia Varniene', 'email' => 'adminy@test.com', 'phone' => '+37061110002'],
-                'staff' => ['name' => 'Mantas Jasiunas', 'email' => 'staffy@test.com', 'phone' => '+37062220002'],
+                'administratorius' => ['name' => 'Dalia Varnienė', 'email' => 'adminy@test.com', 'phone' => '+37061110002'],
+                'darbuotojas' => ['name' => 'Mantas Jasiūnas', 'email' => 'staffy@test.com', 'phone' => '+37062220002'],
                 'members' => [
                     ['name' => 'Ieva Noreikaite', 'email' => 'ieva.noreikaite@example.com', 'phone' => '+37061235001'],
                     ['name' => 'Domas Vasiliauskas', 'email' => 'domas.vasiliauskas@example.com', 'phone' => '+37061235002'],
@@ -102,9 +103,9 @@ class DemoLibrarySeeder extends Seeder
                     ['name' => 'Ugnius Narbutas', 'email' => 'ugnius.narbutas@example.com', 'phone' => '+37061235004'],
                     ['name' => 'Vakare Simonaityte', 'email' => 'vakare.simonaityte@example.com', 'phone' => '+37061235005'],
                     ['name' => 'Jonas Petraitis', 'email' => 'jonas.petraitis@example.com', 'phone' => '+37061235006'],
-                    ['name' => 'Aiste Maciulyte', 'email' => 'aiste.maciulyte@example.com', 'phone' => '+37061235007'],
+                    ['name' => 'Aistė Maciulytė', 'email' => 'aiste.maciulyte@example.com', 'phone' => '+37061235007'],
                     ['name' => 'Pijus Zabiela', 'email' => 'pijus.zabiela@example.com', 'phone' => '+37061235008'],
-                    ['name' => 'Greta Simkute', 'email' => 'greta.simkute@example.com', 'phone' => '+37061235009'],
+                    ['name' => 'Greta Šimkutė', 'email' => 'greta.simkute@example.com', 'phone' => '+37061235009'],
                     ['name' => 'Nedas Petrauskas', 'email' => 'nedas.petrauskas@example.com', 'phone' => '+37061235010'],
                     ['name' => 'Paulina Stankute', 'email' => 'paulina.stankute@example.com', 'phone' => '+37061235011'],
                     ['name' => 'Rugile Plioplyte', 'email' => 'rugile.plioplyte@example.com', 'phone' => '+37061235012'],
@@ -135,7 +136,7 @@ class DemoLibrarySeeder extends Seeder
                 'Centras',
                 'Silainiai',
                 'Dainava',
-                'Kalnieciai',
+                'Kalniečiai',
             ]);
 
             $employeesX = collect([$adminX, $staffX]);
@@ -233,46 +234,64 @@ class DemoLibrarySeeder extends Seeder
     private function seedLibraryUsers(Library $library, array $profiles): array
     {
         $admin = User::create([
-            'library_id' => $library->id,
-            'name' => $profiles['admin']['name'],
-            'email' => $profiles['admin']['email'],
+            'name' => $profiles['administratorius']['name'],
+            'email' => $profiles['administratorius']['email'],
             'password' => Hash::make('password'),
-            'role' => 'admin',
-            'phone' => $profiles['admin']['phone'],
+            'role' => 'administratorius',
+            'phone' => $profiles['administratorius']['phone'],
             'membership_number' => null,
             'is_active' => true,
             'email_verified_at' => now(),
         ]);
+        $this->attachLibraryMembership($admin, $library);
 
         $staff = User::create([
-            'library_id' => $library->id,
-            'name' => $profiles['staff']['name'],
-            'email' => $profiles['staff']['email'],
+            'name' => $profiles['darbuotojas']['name'],
+            'email' => $profiles['darbuotojas']['email'],
             'password' => Hash::make('password'),
-            'role' => 'staff',
-            'phone' => $profiles['staff']['phone'],
+            'role' => 'darbuotojas',
+            'phone' => $profiles['darbuotojas']['phone'],
             'membership_number' => null,
             'is_active' => true,
             'email_verified_at' => now(),
         ]);
+        $this->attachLibraryMembership($staff, $library);
 
         $members = collect($profiles['members'])
             ->values()
             ->map(function (array $member, int $index) use ($library) {
-                return User::create([
-                    'library_id' => $library->id,
+                $user = User::create([
                     'name' => $member['name'],
                     'email' => $member['email'],
                     'password' => Hash::make('password'),
-                    'role' => 'member',
+                    'role' => 'narys',
                     'phone' => $member['phone'],
-                    'membership_number' => sprintf('%s-MEM-%03d', $library->code, $index + 1),
+                    'membership_number' => UserManagement::generateMembershipNumber(),
                     'is_active' => true,
                     'email_verified_at' => now(),
                 ]);
+
+                $this->attachLibraryMembership($user, $library);
+
+                return $user;
             });
 
         return [$admin, $staff, $members];
+    }
+
+    private function attachLibraryMembership(User $user, Library $library): void
+    {
+        LibraryMembership::query()->updateOrCreate(
+            [
+                'library_id' => $library->id,
+                'user_id' => $user->id,
+            ],
+            [
+                'membership_number' => $user->membership_number,
+                'is_active' => $user->is_active,
+                'joined_at' => $user->created_at,
+            ]
+        );
     }
 
     /**
@@ -340,25 +359,25 @@ class DemoLibrarySeeder extends Seeder
     private function seedAuthors(): Collection
     {
         $authors = [
-            ['name' => 'J. R. R. Tolkien', 'bio' => 'Britu rasytojas, sukures Vidurzemes pasauli.'],
-            ['name' => 'George Orwell', 'bio' => 'Anglu rasytojas ir eseistas, zinomas del distopiniu romanu.'],
-            ['name' => 'Antoine de Saint-Exupery', 'bio' => 'Prancuzu rasytojas ir lakunas, parases Mazaji princa.'],
-            ['name' => 'James Clear', 'bio' => 'Autorius, tyrinejantis iprociu formavima ir kasdienius pokycius.'],
-            ['name' => 'Daniel Kahneman', 'bio' => 'Psichologas ir Nobelio premijos laureatas, tyrinejes sprendimu priemima.'],
-            ['name' => 'Yuval Noah Harari', 'bio' => 'Izraelio istorikas, rasantis apie civilizacijos raida.'],
-            ['name' => 'Vincas Mykolaitis-Putinas', 'bio' => 'Lietuviu rasytojas, poetas ir literaturos istorikas.'],
+            ['name' => 'J. R. R. Tolkien', 'bio' => 'Britų rašytojas, sukūręs Viduržemės pasaulį.'],
+            ['name' => 'George Orwell', 'bio' => 'Anglų rašytojas ir eseistas, zinomas del distopiniu romanu.'],
+            ['name' => 'Antoine de Saint-Exupery', 'bio' => 'Prancūzų rašytojas ir lakūnas, parašęs Mažąjį princą.'],
+            ['name' => 'James Clear', 'bio' => 'Autorius, tyrinėjantis įpročių formavimą ir kasdienius pokyčius.'],
+            ['name' => 'Daniel Kahneman', 'bio' => 'Psichologas ir Nobelio premijos laureatas, tyrinėjęs sprendimų priėmimą.'],
+            ['name' => 'Yuval Noah Harari', 'bio' => 'Izraelio istorikas, rašantis apie civilizacijos raidą.'],
+            ['name' => 'Vincas Mykolaitis-Putinas', 'bio' => 'Lietuvių rašytojas, poetas ir literatūros istorikas.'],
             ['name' => 'Balys Sruoga', 'bio' => 'Lietuviu rasytojas ir dramaturgas.'],
-            ['name' => 'Kristina Sabaliauskaite', 'bio' => 'Lietuviu rasytoja, istorinio romano zanro atstove.'],
-            ['name' => 'Aldous Huxley', 'bio' => 'Anglu rasytojas, distopinio romano autorius.'],
-            ['name' => 'Delia Owens', 'bio' => 'Amerikieciu rasytoja ir gamtininke.'],
-            ['name' => 'Frank Herbert', 'bio' => 'Amerikieciu fantastas, parasess Kopa.'],
-            ['name' => 'J. K. Rowling', 'bio' => 'Britu rasytoja, Hario Poterio serijos autore.'],
-            ['name' => 'John Green', 'bio' => 'Amerikieciu jaunimo literaturos autorius.'],
-            ['name' => 'Andrzej Sapkowski', 'bio' => 'Lenku fantastikos rasytojas, Raganiaus ciklo kurejas.'],
-            ['name' => 'Sally Rooney', 'bio' => 'Airiu rasytoja, rasanti apie siuolaikinius santykius.'],
-            ['name' => 'Richard Osman', 'bio' => 'Britu autorius, zinomas del lengvu detektyvu.'],
-            ['name' => 'Tina Oziewicz', 'bio' => 'Lenku autore, kurianti vaiku literaturos knygas.'],
-            ['name' => 'Marius Marcinkevicius', 'bio' => 'Lietuviu autorius, rasantis vaikams ir jaunimui.'],
+            ['name' => 'Kristina Sabaliauskaitė', 'bio' => 'Lietuvių rašytoja, istorinio romano žanro atstovė.'],
+            ['name' => 'Aldous Huxley', 'bio' => 'Anglų rašytojas, distopinio romano autorius.'],
+            ['name' => 'Delia Owens', 'bio' => 'Amerikiečių rašytoja ir gamtininkė.'],
+            ['name' => 'Frank Herbert', 'bio' => 'Amerikiečių fantastas, parašęs „Kopą“.'],
+            ['name' => 'J. K. Rowling', 'bio' => 'Britų rašytoja, Hario Poterio serijos autorė.'],
+            ['name' => 'John Green', 'bio' => 'Amerikiečių jaunimo literatūros autorius.'],
+            ['name' => 'Andrzej Sapkowski', 'bio' => 'Lenkų fantastikos rašytojas, Raganiaus ciklo kūrėjas.'],
+            ['name' => 'Sally Rooney', 'bio' => 'Airių rašytoja, rašanti apie šiuolaikinius santykius.'],
+            ['name' => 'Richard Osman', 'bio' => 'Britų autorius, žinomas dėl lengvų detektyvų.'],
+            ['name' => 'Tina Oziewicz', 'bio' => 'Lenkų autorė, kurianti vaikų literatūros knygas.'],
+            ['name' => 'Marius Marcinkevičius', 'bio' => 'Lietuvių autorius, rašantis vaikams ir jaunimui.'],
         ];
 
         return collect($authors)->map(function (array $author) {
@@ -384,7 +403,7 @@ class DemoLibrarySeeder extends Seeder
             [
                 'title' => 'Hobitas',
                 'isbn' => '9786090135003',
-                'description' => 'Nuotykiu romanas apie Bilba Beginsa ir kelione i Vieniso kalno urvus.',
+                'description' => 'Nuotykių romanas apie Bilbą Begginsą ir kelionę į Vienišo kalno urvus.',
                 'publisher' => 'Alma littera',
                 'primary_category' => 'Fantastika',
                 'categories' => ['Fantastika', 'Klasika'],
@@ -397,7 +416,7 @@ class DemoLibrarySeeder extends Seeder
             [
                 'title' => '1984',
                 'isbn' => '9786090142324',
-                'description' => 'Distopinis romanas apie visuotine kontrole ir tiesos perrasinejima.',
+                'description' => 'Distopinis romanas apie visuotinę kontrolę ir tiesos perrašinėjimą.',
                 'publisher' => 'Alma littera',
                 'primary_category' => 'Klasika',
                 'categories' => ['Klasika', 'Romanai'],
@@ -408,9 +427,9 @@ class DemoLibrarySeeder extends Seeder
                 'edition' => '2',
             ],
             [
-                'title' => 'Gyvuliu ukis',
+                'title' => 'Gyvulių ūkis',
                 'isbn' => '9786090142331',
-                'description' => 'Trumpas politinis romanas apie valdzios, propagandos ir laisves tema.',
+                'description' => 'Trumpas politinis romanas apie valdžios, propagandos ir laisvės temą.',
                 'publisher' => 'Alma littera',
                 'primary_category' => 'Klasika',
                 'categories' => ['Klasika', 'Romanai'],
@@ -421,9 +440,9 @@ class DemoLibrarySeeder extends Seeder
                 'edition' => '2',
             ],
             [
-                'title' => 'Mazasis princas',
+                'title' => 'Mažasis princas',
                 'isbn' => '9786090143901',
-                'description' => 'Poetine istorija apie draugyste, atsakomybe ir vaizduote.',
+                'description' => 'Poetinė istorija apie draugystę, atsakomybę ir vaizduotę.',
                 'publisher' => 'Nieko rimto',
                 'primary_category' => 'Vaiku literatura',
                 'categories' => ['Vaiku literatura', 'Klasika'],
@@ -434,9 +453,9 @@ class DemoLibrarySeeder extends Seeder
                 'edition' => '5',
             ],
             [
-                'title' => 'Atominiai iprociai',
+                'title' => 'Atominiai įpročiai',
                 'isbn' => '9786090145110',
-                'description' => 'Praktiska knyga apie mazu kasdieniu iprociu itaka ilgalaikiams rezultatams.',
+                'description' => 'Praktiška knyga apie mažų kasdienių įpročių įtaką ilgalaikiams rezultatams.',
                 'publisher' => 'Sofoklis',
                 'primary_category' => 'Psichologija',
                 'categories' => ['Psichologija', 'Verslas'],
@@ -447,7 +466,7 @@ class DemoLibrarySeeder extends Seeder
                 'edition' => '1',
             ],
             [
-                'title' => 'Mastymas, greitas ir letas',
+                'title' => 'Mąstymas, greitas ir lėtas',
                 'isbn' => '9786090145455',
                 'description' => 'Knyga apie du mastymo budus ir ju itaka musu sprendimams.',
                 'publisher' => 'Baltos lankos',
@@ -473,7 +492,7 @@ class DemoLibrarySeeder extends Seeder
                 'edition' => '2',
             ],
             [
-                'title' => 'Altoriu sesely',
+                'title' => 'Altorių šešėly',
                 'isbn' => '9785415011237',
                 'description' => 'Vienas svarbiausiu lietuviu literaturos romanu apie pasaukimo ir tapatybes konflikta.',
                 'publisher' => 'Vaga',
@@ -486,9 +505,9 @@ class DemoLibrarySeeder extends Seeder
                 'edition' => '1',
             ],
             [
-                'title' => 'Dievu miskas',
+                'title' => 'Dievų miškas',
                 'isbn' => '9786094661550',
-                'description' => 'Atsiminimu knyga apie gyvenima koncentracijos stovykloje.',
+                'description' => 'Atsiminimų knyga apie gyvenimą koncentracijos stovykloje.',
                 'publisher' => 'Vaga',
                 'primary_category' => 'Klasika',
                 'categories' => ['Klasika', 'Istorija'],
@@ -505,7 +524,7 @@ class DemoLibrarySeeder extends Seeder
                 'publisher' => 'Baltos lankos',
                 'primary_category' => 'Istorija',
                 'categories' => ['Istorija', 'Romanai'],
-                'authors' => ['Kristina Sabaliauskaite'],
+                'authors' => ['Kristina Sabaliauskaitė'],
                 'publication_year' => 2008,
                 'language' => 'lt',
                 'page_count' => 432,
@@ -514,7 +533,7 @@ class DemoLibrarySeeder extends Seeder
             [
                 'title' => 'Puikus naujas pasaulis',
                 'isbn' => '9786090151904',
-                'description' => 'Distopinis romanas apie technologiskai valdoma visuomene.',
+                'description' => 'Distopinis romanas apie technologiškai valdomą visuomenę.',
                 'publisher' => 'Tyto alba',
                 'primary_category' => 'Fantastika',
                 'categories' => ['Fantastika', 'Klasika'],
@@ -551,9 +570,9 @@ class DemoLibrarySeeder extends Seeder
                 'edition' => '2',
             ],
             [
-                'title' => 'Haris Poteris ir Isminties akmuo',
+                'title' => 'Haris Poteris ir Išminties akmuo',
                 'isbn' => '9786090155339',
-                'description' => 'Pirmoji serijos dalis apie jauna burtininka Hari Poteri.',
+                'description' => 'Pirmoji serijos dalis apie jauną burtininką Harį Poterį.',
                 'publisher' => 'Alma littera',
                 'primary_category' => 'Fantastika',
                 'categories' => ['Fantastika', 'Jaunimo literatura'],
@@ -564,9 +583,9 @@ class DemoLibrarySeeder extends Seeder
                 'edition' => '4',
             ],
             [
-                'title' => 'Del musu likimo ir zvaigzdziu kaltos',
+                'title' => 'Dėl mūsų likimo ir žvaigždžių kaltos',
                 'isbn' => '9786094665800',
-                'description' => 'Jaunimo romanas apie draugyste, meile ir netektis.',
+                'description' => 'Jaunimo romanas apie draugystę, meilę ir netektis.',
                 'publisher' => 'Tyto alba',
                 'primary_category' => 'Jaunimo literatura',
                 'categories' => ['Jaunimo literatura', 'Romanai'],
@@ -579,7 +598,7 @@ class DemoLibrarySeeder extends Seeder
             [
                 'title' => 'Raganius. Paskutinis noras',
                 'isbn' => '9786094272211',
-                'description' => 'Apsakymu rinkinys apie Geralta is Rivijos.',
+                'description' => 'Apsakymų rinkinys apie Geraltą iš Rivijos.',
                 'publisher' => 'Eridanas',
                 'primary_category' => 'Fantastika',
                 'categories' => ['Fantastika', 'Jaunimo literatura'],
@@ -592,7 +611,7 @@ class DemoLibrarySeeder extends Seeder
             [
                 'title' => 'Normalus zmones',
                 'isbn' => '9786090139889',
-                'description' => 'Siuolaikinis romanas apie artuma, klase ir saviverte.',
+                'description' => 'Šiuolaikinis romanas apie artumą, klasę ir savivertę.',
                 'publisher' => 'Alma littera',
                 'primary_category' => 'Romanai',
                 'categories' => ['Romanai'],
@@ -618,7 +637,7 @@ class DemoLibrarySeeder extends Seeder
             [
                 'title' => 'Jausmai',
                 'isbn' => '9786098142379',
-                'description' => 'Vaikams skirta knyga apie tai, kaip pazinti ir ivardyti jausmus.',
+                'description' => 'Vaikams skirta knyga apie tai, kaip pažinti ir įvardyti jausmus.',
                 'publisher' => 'Nieko rimto',
                 'primary_category' => 'Vaiku literatura',
                 'categories' => ['Vaiku literatura', 'Psichologija'],
@@ -635,7 +654,7 @@ class DemoLibrarySeeder extends Seeder
                 'publisher' => 'Baltos lankos',
                 'primary_category' => 'Vaiku literatura',
                 'categories' => ['Vaiku literatura', 'Jaunimo literatura'],
-                'authors' => ['Marius Marcinkevicius'],
+                'authors' => ['Marius Marcinkevičius'],
                 'publication_year' => 2021,
                 'language' => 'lt',
                 'page_count' => 104,
@@ -756,10 +775,10 @@ class DemoLibrarySeeder extends Seeder
                 ])->random();
 
                 $condition = match ($targetStatus) {
-                    BookCopy::STATUS_DAMAGED => 'damaged',
-                    BookCopy::STATUS_MAINTENANCE => collect(['worn', 'damaged'])->random(),
-                    BookCopy::STATUS_LOST => collect(['good', 'worn'])->random(),
-                    default => collect(['new', 'good', 'good', 'worn'])->random(),
+                    BookCopy::STATUS_DAMAGED => 'sugadinta',
+                    BookCopy::STATUS_MAINTENANCE => collect(['padėvėta', 'sugadinta'])->random(),
+                    BookCopy::STATUS_LOST => collect(['gera', 'padėvėta'])->random(),
+                    default => collect(['nauja', 'gera', 'gera', 'padėvėta'])->random(),
                 };
 
                 $copy = BookCopy::create([
@@ -777,7 +796,7 @@ class DemoLibrarySeeder extends Seeder
                 ]);
 
                 $copies->push($copy);
-                $this->recordCopyHistory($copy, $employees->first(), 'created', BookCopy::STATUS_AVAILABLE, 'Egzempliorius itrauktas i bibliotekos fonda.');
+                $this->recordCopyHistory($copy, $employees->first(), 'created', BookCopy::STATUS_AVAILABLE, 'Egzempliorius įtrauktas į bibliotekos fondą.');
 
                 if ($targetStatus === BookCopy::STATUS_LOANED) {
                     $this->seedLoanForCopy($copy, $members->random(), $employees->random(), false);
@@ -792,9 +811,9 @@ class DemoLibrarySeeder extends Seeder
 
                 [$reasonCode, $notes] = match ($targetStatus) {
                     BookCopy::STATUS_MAINTENANCE => ['sent_to_maintenance', 'Egzempliorius laikinai perduotas tvarkymui.'],
-                    BookCopy::STATUS_DAMAGED => ['marked_damaged', 'Apziuros metu nustatyti fiziniai pazeidimai.'],
+                    BookCopy::STATUS_DAMAGED => ['marked_damaged', 'Apžiūros metu nustatyti fiziniai pažeidimai.'],
                     BookCopy::STATUS_LOST => ['marked_lost', 'Egzempliorius nerastas po inventorizacijos.'],
-                    BookCopy::STATUS_WITHDRAWN => ['withdrawn', 'Egzempliorius nurasytas del nusidevejimo.'],
+                    BookCopy::STATUS_WITHDRAWN => ['nurašyta', 'Egzempliorius nurašytas dėl nusidėvėjimo.'],
                     default => ['status_adjusted', 'Statusas atnaujintas demo duomenims.'],
                 };
 
@@ -813,12 +832,12 @@ class DemoLibrarySeeder extends Seeder
 
     private function seedLoanForCopy(BookCopy $copy, User $member, User $employee, bool $returned): void
     {
-        $borrowedAt = now()->subDays(rand(3, 40))->subHours(rand(1, 8));
-        $dueAt = (clone $borrowedAt)->addDays(14);
-        $returnedAt = $returned ? (clone $borrowedAt)->addDays(rand(4, 16)) : null;
+        $borrowedAt = $this->safeTimestamp(now()->subDays(rand(3, 40))->subHours(rand(1, 8)));
+        $dueAt = $this->safeTimestamp((clone $borrowedAt)->addDays(14));
+        $returnedAt = $returned ? $this->safeTimestamp((clone $borrowedAt)->addDays(rand(4, 16))) : null;
         $status = $returned
-            ? 'returned'
-            : (now()->gt($dueAt) ? 'overdue' : 'active');
+            ? 'grąžinta'
+            : (now()->gt($dueAt) ? 'vėluoja' : 'aktyvi');
 
         Loan::create([
             'library_id' => $copy->library_id,
@@ -832,16 +851,16 @@ class DemoLibrarySeeder extends Seeder
             'status' => $status,
             'renewal_count' => $returned ? rand(0, 1) : rand(0, 2),
             'notes' => $returned
-                ? 'Demonstracinis grazinimo irasas.'
-                : 'Skaitytojas siuo metu naudojasi sia kopija.',
+                ? 'Demonstracinis grąžinimo įrašas.'
+                : 'Skaitytojas šiuo metu naudojasi šia kopija.',
         ]);
 
         $copy->update(['status' => BookCopy::STATUS_LOANED]);
-        $this->recordCopyHistory($copy, $employee, 'issued', BookCopy::STATUS_LOANED, 'Egzempliorius isduotas skaitytojui.');
+        $this->recordCopyHistory($copy, $employee, 'issued', BookCopy::STATUS_LOANED, 'Egzempliorius išduotas skaitytojui.');
 
         if ($returned) {
             $copy->update(['status' => BookCopy::STATUS_AVAILABLE]);
-            $this->recordCopyHistory($copy, $employee, 'returned', BookCopy::STATUS_AVAILABLE, 'Egzempliorius grazintas laiku ir vel prieinamas fonde.');
+            $this->recordCopyHistory($copy, $employee, 'grąžinta', BookCopy::STATUS_AVAILABLE, 'Egzempliorius grąžintas laiku ir vėl prieinamas fonde.');
         }
     }
 
@@ -855,7 +874,7 @@ class DemoLibrarySeeder extends Seeder
 
         foreach ($books->shuffle()->take(min(16, $books->count())) as $book) {
             $queuedMembers = $members->shuffle()->take(rand(2, 4))->values();
-            $reservedAt = now()->subDays(rand(1, 10))->subHours(rand(1, 10));
+            $reservedAt = $this->safeTimestamp(now()->subDays(rand(1, 10))->subHours(rand(1, 10)));
 
             foreach ($queuedMembers as $position => $member) {
                 $this->seedReservationForBook(
@@ -865,7 +884,7 @@ class DemoLibrarySeeder extends Seeder
                     Reservation::STATUS_RESERVED,
                     (clone $reservedAt)->addMinutes($position * 20),
                     now()->addDays(rand(2, 6)),
-                    'Narys laukia, kol atsiras laisva sios knygos kopija.'
+                    'Narys laukia, kol atsiras laisva šios knygos kopija.'
                 );
             }
 
@@ -876,7 +895,7 @@ class DemoLibrarySeeder extends Seeder
                     Reservation::STATUS_EXPIRED,
                 ])->random();
 
-                $historicalReservedAt = now()->subDays(rand(12, 25))->subHours(rand(1, 12));
+                $historicalReservedAt = $this->safeTimestamp(now()->subDays(rand(12, 25))->subHours(rand(1, 12)));
 
                 $this->seedReservationForBook(
                     $library,
@@ -886,9 +905,9 @@ class DemoLibrarySeeder extends Seeder
                     $historicalReservedAt,
                     $historicalStatus === Reservation::STATUS_EXPIRED ? now()->subDays(rand(1, 4)) : null,
                     match ($historicalStatus) {
-                        Reservation::STATUS_FULFILLED => 'Rezervacija buvo sekmingai ivykdyta ir knyga atsiimta.',
-                        Reservation::STATUS_CANCELLED => 'Narys atsauke rezervacija telefonu.',
-                        Reservation::STATUS_EXPIRED => 'Narys laiku neatsieme knygos.',
+                        Reservation::STATUS_FULFILLED => 'Rezervacija buvo sėkmingai įvykdyta ir knyga atsiimta.',
+                        Reservation::STATUS_CANCELLED => 'Narys atšaukė rezervaciją telefonu.',
+                        Reservation::STATUS_EXPIRED => 'Narys laiku neatsiėmė knygos.',
                         default => null,
                     }
                 );
@@ -957,7 +976,7 @@ class DemoLibrarySeeder extends Seeder
         foreach ($bookSamples as $bookIndex => $book) {
             foreach (range(1, 12) as $step) {
                 $actor = $employees->random();
-                $createdAt = now()->subDays(40 - ($bookIndex * 8))->addHours($step);
+                $createdAt = $this->safeTimestamp(now()->subDays(40 - ($bookIndex * 8))->addHours($step));
 
                 $this->createAuditLog([
                     'user_id' => $actor->id,
@@ -980,7 +999,7 @@ class DemoLibrarySeeder extends Seeder
         foreach ($copies->take(5)->values() as $copyIndex => $copy) {
             foreach (range(1, 10) as $step) {
                 $actor = $employees->random();
-                $createdAt = now()->subDays(18 - $copyIndex)->addMinutes($step * 35);
+                $createdAt = $this->safeTimestamp(now()->subDays(18 - $copyIndex)->addMinutes($step * 35));
 
                 $this->createAuditLog([
                     'user_id' => $actor->id,
@@ -1002,7 +1021,7 @@ class DemoLibrarySeeder extends Seeder
         foreach ($members->take(4)->values() as $memberIndex => $member) {
             foreach (range(1, 6) as $step) {
                 $actor = $employees->random();
-                $createdAt = now()->subDays(12 - $memberIndex)->addMinutes($step * 50);
+                $createdAt = $this->safeTimestamp(now()->subDays(12 - $memberIndex)->addMinutes($step * 50));
 
                 $this->createAuditLog([
                     'user_id' => $actor->id,
@@ -1012,7 +1031,7 @@ class DemoLibrarySeeder extends Seeder
                     'auditable_id' => $member->id,
                     'description' => $step % 2 === 0
                         ? sprintf('Atnaujintas vartotojas "%s".', $member->name)
-                        : sprintf('Knyga isduota vartotojui "%s".', $member->name),
+                        : sprintf('Knyga išduota vartotojui "%s".', $member->name),
                     'metadata' => [
                         'target_member_id' => $member->id,
                         'target_member_name' => $member->name,
@@ -1037,12 +1056,12 @@ class DemoLibrarySeeder extends Seeder
             BookCopy::STATUS_AVAILABLE => collect([
                 null,
                 'Kopija tvarkinga ir prieinama skaitytojams.',
-                'Pastaruoju metu daznai ieskoma prie informacijos stalo.',
+                'Pastaruoju metu dažnai ieškoma prie informacijos stalo.',
             ])->random(),
-            BookCopy::STATUS_LOANED => 'Kopija siuo metu isduota skaitytojui.',
+            BookCopy::STATUS_LOANED => 'Kopija šiuo metu išduota skaitytojui.',
             BookCopy::STATUS_MAINTENANCE => 'Laukiama smulkaus taisymo arba perklijavimo.',
-            BookCopy::STATUS_DAMAGED => 'Matomi susidevejimo pozymiai, reikia ivertinti bukle.',
-            BookCopy::STATUS_LOST => 'Nepavyko rasti per paskutine inventorizacija.',
+            BookCopy::STATUS_DAMAGED => 'Matomi susidėvėjimo požymiai, reikia įvertinti būklę.',
+            BookCopy::STATUS_LOST => 'Nepavyko rasti per paskutinę inventorizaciją.',
             BookCopy::STATUS_WITHDRAWN => 'Kopija nebepriklauso aktyviam bibliotekos fondui.',
             default => null,
         };
@@ -1065,6 +1084,8 @@ class DemoLibrarySeeder extends Seeder
                 ? Carbon::parse($copy->acquired_at)->startOfDay()->addDays(rand(1, 20))->addHours(rand(8, 17))
                 : now()->subMonths(6)->addDays(rand(1, 15))->addHours(rand(8, 17)));
 
+        $changedAt = $this->safeTimestamp($changedAt);
+
         BookCopyStatusHistory::create([
             'book_copy_id' => $copy->id,
             'changed_by' => $user?->id,
@@ -1075,4 +1096,21 @@ class DemoLibrarySeeder extends Seeder
             'changed_at' => $changedAt,
         ]);
     }
+
+    private function safeTimestamp(CarbonInterface $timestamp): CarbonInterface
+    {
+        $safe = $timestamp instanceof Carbon
+            ? $timestamp->copy()
+            : Carbon::instance($timestamp);
+
+        if ((int) $safe->format('H') === 3) {
+            return $safe->setTime(4, 0);
+        }
+
+        return $safe;
+    }
 }
+
+
+
+

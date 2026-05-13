@@ -27,3 +27,11 @@ class DashboardExportController extends Controller
             : $dashboardReportExport->xlsResponse($sections, $filename, $report);
     }
 }
+
+
+
+
+
+
+
+

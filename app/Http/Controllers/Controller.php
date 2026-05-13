@@ -6,3 +6,11 @@ abstract class Controller
 {
     use AuthorizesRequests;
 }
+
+
+
+
+
+
+
+

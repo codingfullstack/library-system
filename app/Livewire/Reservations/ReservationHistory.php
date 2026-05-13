@@ -33,7 +33,7 @@ class ReservationHistory extends Component
     public function refreshList(): void
     {
         $this->resetPage(pageName: 'reservation-history-page');
-        $this->message = 'Rezervaciju sarasas atnaujintas.';
+        $this->message = 'Rezervacijų sąrašas atnaujintas.';
     }
 
     public function cancel(int $reservationId): void
@@ -52,13 +52,13 @@ class ReservationHistory extends Component
         try {
             app(CancelReservationAction::class)->handle($actor, $reservation);
         } catch (ValidationException $exception) {
-            $this->addError('reservation', $exception->errors()['reservation'][0] ?? 'Nepavyko atsaukti rezervacijos.');
+            $this->addError('reservation', $exception->errors()['reservation'][0] ?? 'Nepavyko atšaukti rezervacijos.');
 
             return;
         }
 
         $this->resetPage(pageName: 'reservation-history-page');
-        $this->message = 'Rezervacija atsaukta.';
+        $this->message = 'Rezervacija atšaukta.';
         $this->dispatch('reservation-updated', bookId: $this->bookId);
     }
 
@@ -74,7 +74,7 @@ class ReservationHistory extends Component
         $bookCopy = $this->firstAvailableCopy();
 
         if (! $reservation || ! $bookCopy) {
-            $this->addError('reservation', 'Nera rezervacijos, kuria butu galima isduoti.');
+            $this->addError('reservation', 'Nėra rezervacijos, kuria butu galima išduoti.');
 
             return null;
         }
@@ -86,17 +86,17 @@ class ReservationHistory extends Component
                 'user_id' => $reservation->user_id,
                 'due_at' => null,
                 'no_due_date' => false,
-                'notes' => 'Isduota pagal rezervacija.',
+                'notes' => 'Išduota pagal rezervaciją.',
             ]);
         } catch (ValidationException $exception) {
-            $this->addError('reservation', $exception->errors()['book_copy'][0] ?? $exception->errors()['user_id'][0] ?? 'Nepavyko isduoti rezervacijos.');
+            $this->addError('reservation', $exception->errors()['book_copy'][0] ?? $exception->errors()['user_id'][0] ?? 'Nepavyko išduoti rezervacijos.');
 
             return null;
         }
 
         return redirect()
             ->route('books.show', $this->bookId)
-            ->with('success', 'Kopija isduota pirmam eileje esanciam nariui.');
+            ->with('success', 'Kopija išduota pirmam eilėje esančiam nariui.');
     }
 
     public function render()
@@ -127,7 +127,7 @@ class ReservationHistory extends Component
         $reservations = Reservation::query()
             ->where('book_id', $this->bookId)
             ->when(! $actor->isSuperAdmin(), function ($query) use ($actor) {
-                $query->where('library_id', $actor->library_id);
+                $query->where('library_id', $actor->activeLibraryId());
             })
             ->with('user:id,name,email,membership_number')
             ->get()
@@ -186,7 +186,7 @@ class ReservationHistory extends Component
     {
         $actor = Auth::user();
 
-        return $actor && in_array($actor->role, ['admin', 'staff'], true);
+        return $actor && $actor->hasAnyEffectiveRole(['administratorius', 'darbuotojas']);
     }
 
     private function currentReservation(): ?Reservation
@@ -200,7 +200,7 @@ class ReservationHistory extends Component
         return Reservation::query()
             ->where('book_id', $this->bookId)
             ->when(! $actor->isSuperAdmin(), function ($query) use ($actor) {
-                $query->where('library_id', $actor->library_id);
+                $query->where('library_id', $actor->activeLibraryId());
             })
             ->with('user:id,name,email,membership_number')
             ->pending()
@@ -219,11 +219,19 @@ class ReservationHistory extends Component
         return BookCopy::query()
             ->where('book_id', $this->bookId)
             ->when(! $actor->isSuperAdmin(), function ($query) use ($actor) {
-                $query->where('library_id', $actor->library_id);
+                $query->where('library_id', $actor->activeLibraryId());
             })
-            ->where('status', 'available')
+            ->where('status', 'laisva')
             ->orderBy('inventory_code')
             ->orderBy('id')
             ->first();
     }
 }
+
+
+
+
+
+
+
+

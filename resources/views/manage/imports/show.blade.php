@@ -11,12 +11,12 @@
                     <div class="flex flex-wrap items-center gap-3">
                         <a href="{{ route('manage.imports.template', $resource) }}" class="inline-flex h-11 items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
                             <flux:icon.arrow-down-tray class="size-4" />
-                            Atsisiusti sablona
+                            Atsisiųsti šabloną
                         </a>
 
                         <a href="{{ route($config['index_route']) }}" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600">
                             <flux:icon.arrow-left class="size-4" />
-                            Grizti i sarasa
+                            Grįžti į sąrašą
                         </a>
                     </div>
                 </div>
@@ -29,7 +29,7 @@
                     <div class="border-b border-zinc-200/80 px-5 py-4 dark:border-zinc-800">
                         <h2 class="text-lg font-semibold text-zinc-950 dark:text-white">CSV ikelimas</h2>
                         <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                            Tinka `.csv` ir `.txt` failai. Skirtukas gali buti kablelis arba kabliataskis.
+                            Tinka `.csv` ir `.txt` failai. Skirtukas gali būti kablelis arba kabliataskis.
                         </p>
                     </div>
 
@@ -48,7 +48,7 @@
                                     @endforeach
                                 </select>
                                 <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                                    CSV faile bibliotekos nerasome. Ji paimama is cia pasirinktos bibliotekos.
+                                    CSV faile bibliotekos nerašome. Ji paimama iš čia pasirinktos bibliotekos.
                                 </p>
                                 @error('library_id')
                                     <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
@@ -80,7 +80,7 @@
 
                             @if(! empty($config['relation_fields']))
                                 <div class="mt-4">
-                                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">Pagalbiniai rysio laukai</div>
+                                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">Pagalbiniai ryšio laukai</div>
                                     <div class="mt-2 flex flex-wrap gap-2">
                                         @foreach($config['relation_fields'] as $header)
                                             <span class="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 shadow-sm dark:bg-emerald-950/40 dark:text-emerald-300">{{ $header }}</span>
@@ -110,3 +110,10 @@
         </div>
     </x-ui.page>
 </x-layouts::app>
+
+
+
+
+
+
+

@@ -1,7 +1,7 @@
 @props([
     'auditLogs' => collect(),
-    'emptyTitle' => 'Irasu nerasta',
-    'emptyDescription' => 'Siam irasui veiksmu istorijos dar nera.',
+    'emptyTitle' => 'Įrašų nerasta',
+    'emptyDescription' => 'Šiam įrašui veiksmų istorijos dar nėra.',
     'tab' => null,
 ])
 
@@ -16,6 +16,7 @@
         @foreach($auditLogs as $auditLog)
             @php
                 $tone = $auditLog->actionTone();
+                $requestContext = $auditLog->requestContext();
 
                 $toneClasses = match ($tone) {
                     'created' => [
@@ -34,7 +35,7 @@
                         'card' => 'border-red-200 bg-red-50/35 dark:border-red-900/40 dark:bg-red-950/10',
                         'badge' => 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300',
                         'dot' => 'bg-red-500',
-                        'label' => 'Pasalinta',
+                        'label' => 'Pašalinta',
                     ],
                     default => [
                         'card' => 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950/40',
@@ -47,7 +48,7 @@
 
             <div class="rounded-xl border p-5 {{ $toneClasses['card'] }}">
                 <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                    <div class="space-y-4">
+                    <div class="min-w-0 flex-1 space-y-4">
                         <div class="flex flex-wrap items-center gap-2">
                             <span class="inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold {{ $toneClasses['badge'] }}">
                                 <span class="h-2 w-2 rounded-full {{ $toneClasses['dot'] }}"></span>
@@ -69,58 +70,102 @@
                             {{ $auditLog->description }}
                         </div>
 
-                        <div class="grid gap-3 lg:grid-cols-2">
+                        <div class="grid gap-3 xl:grid-cols-3">
                             <div class="rounded-lg bg-white/70 p-3 ring-1 ring-zinc-200 dark:bg-zinc-900/50 dark:ring-zinc-800">
                                 <div class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                                     Atliko
                                 </div>
                                 <div class="mt-1 text-sm font-medium text-zinc-900 dark:text-white">
-                                    {{ $auditLog->actor?->name ?: 'Sistema' }}
+                                    {{ $auditLog->actorDisplayName() }}
                                 </div>
-                                @if ($auditLog->actor?->email)
+                                @if ($auditLog->actorDisplayEmail())
+                                    <div class="mt-1 truncate text-xs text-zinc-500 dark:text-zinc-400">
+                                        {{ $auditLog->actorDisplayEmail() }}
+                                    </div>
+                                @endif
+                                @if ($auditLog->actorRoleLabel())
                                     <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                                        {{ $auditLog->actor->email }}
+                                        Rolė veiksmo metu: {{ $auditLog->actorRoleLabel() }}
                                     </div>
                                 @endif
                             </div>
 
-                            @if (! empty($auditLog->metadata['target_member_name']) || ! empty($auditLog->metadata['target_status_label']) || ! empty($auditLog->metadata['inventory_code']))
+                            @if ($auditLog->auditableTypeLabel() || $auditLog->auditableDisplayLabel() || $auditLog->auditableDisplayId())
                                 <div class="rounded-lg bg-white/70 p-3 ring-1 ring-zinc-200 dark:bg-zinc-900/50 dark:ring-zinc-800">
                                     <div class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                        Papildoma informacija
+                                        Objektas
                                     </div>
-
-                                    @if (! empty($auditLog->metadata['target_member_name']))
-                                        <div class="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
-                                            Narys: <span class="font-medium text-zinc-950 dark:text-white">{{ $auditLog->metadata['target_member_name'] }}</span>
+                                    @if ($auditLog->auditableTypeLabel())
+                                        <div class="mt-1 text-sm font-medium text-zinc-900 dark:text-white">
+                                            {{ $auditLog->auditableTypeLabel() }}
                                         </div>
                                     @endif
-
-                                    @if (! empty($auditLog->metadata['target_status_label']))
-                                        <div class="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
-                                            Naujas statusas: <span class="font-medium text-zinc-950 dark:text-white">{{ $auditLog->metadata['target_status_label'] }}</span>
+                                    @if ($auditLog->auditableDisplayLabel())
+                                        <div class="mt-1 truncate text-xs text-zinc-500 dark:text-zinc-400">
+                                            {{ $auditLog->auditableDisplayLabel() }}
                                         </div>
                                     @endif
-
-                                    @if (! empty($auditLog->metadata['inventory_code']))
-                                        <div class="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
-                                            Kopija: <span class="font-medium text-zinc-950 dark:text-white">{{ $auditLog->metadata['inventory_code'] }}</span>
+                                    @if ($auditLog->auditableDisplayId())
+                                        <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                            ID: {{ $auditLog->auditableDisplayId() }}
                                         </div>
                                     @endif
                                 </div>
                             @endif
+
+                            @if ($requestContext !== [])
+                                <div class="rounded-lg bg-white/70 p-3 ring-1 ring-zinc-200 dark:bg-zinc-900/50 dark:ring-zinc-800">
+                                    <div class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                                        Šaltinis
+                                    </div>
+                                    @foreach ($requestContext as $label => $value)
+                                        <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                            {{ $label }}:
+                                            <span class="font-medium text-zinc-800 dark:text-zinc-200">{{ $value }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
                         </div>
+
+                        @if (! empty($auditLog->metadata['target_member_name']) || ! empty($auditLog->metadata['target_status_label']) || ! empty($auditLog->metadata['inventory_code']))
+                            <div class="rounded-lg bg-white/70 p-3 ring-1 ring-zinc-200 dark:bg-zinc-900/50 dark:ring-zinc-800">
+                                <div class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                                    Papildoma informacija
+                                </div>
+
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    @if (! empty($auditLog->metadata['target_member_name']))
+                                        <span class="inline-flex rounded-full bg-white/80 px-2.5 py-1 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200 dark:bg-zinc-900/70 dark:text-zinc-300 dark:ring-zinc-800">
+                                            Narys: {{ $auditLog->metadata['target_member_name'] }}
+                                        </span>
+                                    @endif
+
+                                    @if (! empty($auditLog->metadata['target_status_label']))
+                                        <span class="inline-flex rounded-full bg-white/80 px-2.5 py-1 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200 dark:bg-zinc-900/70 dark:text-zinc-300 dark:ring-zinc-800">
+                                            Naujas statusas: {{ $auditLog->metadata['target_status_label'] }}
+                                        </span>
+                                    @endif
+
+                                    @if (! empty($auditLog->metadata['inventory_code']))
+                                        <span class="inline-flex rounded-full bg-white/80 px-2.5 py-1 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200 dark:bg-zinc-900/70 dark:text-zinc-300 dark:ring-zinc-800">
+                                            Kopija: {{ $auditLog->metadata['inventory_code'] }}
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
 
                         @if (! empty($auditLog->metadata['snapshot']))
                             <div class="space-y-2">
                                 <div class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                    Issaugotas kontekstas
+                                    Išsaugotas kontekstas
                                 </div>
 
                                 <div class="grid gap-2 md:grid-cols-2">
                                     @foreach ($auditLog->metadata['snapshot'] as $field => $value)
                                         @php
-                                            $formattedValue = \App\Support\AuditLogChanges::stringify($value);
+                                            $formattedValue = AuditLogChanges::stringify($value);
                                         @endphp
 
                                         @if ($formattedValue !== '-')
@@ -141,7 +186,7 @@
                         @if (! empty($auditLog->metadata['changes']))
                             <div class="space-y-2">
                                 <div class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                    Kas pasikeite
+                                    Kas pasikeitė
                                 </div>
 
                                 <div class="grid gap-2">
@@ -155,7 +200,7 @@
                                                     {{ $change['from'] ?? '-' }}
                                                 </div>
                                                 <div class="text-center text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                                                    i
+                                                    į
                                                 </div>
                                                 <div class="rounded-md bg-white px-3 py-2 text-sm font-medium text-zinc-950 ring-1 ring-zinc-200 dark:bg-zinc-950 dark:text-white dark:ring-zinc-700">
                                                     {{ $change['to'] ?? '-' }}
@@ -180,7 +225,7 @@
                                 </div>
 
                                 <div class="text-xs text-zinc-500 dark:text-zinc-400">
-                                    Sio senesnio iraso pilnos reiksmiu istorijos dar neturime. Nauji atnaujinimai rodomi su pakeitimu is -> i.
+                                    Šio senesnio įrašo pilnos reikšmių istorijos dar neturime. Nauji atnaujinimai rodomi su pakeitimu iš -> į.
                                 </div>
                             </div>
                         @endif
@@ -204,3 +249,10 @@
         </div>
     @endif
 @endif
+
+
+
+
+
+
+

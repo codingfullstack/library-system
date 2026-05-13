@@ -20,3 +20,11 @@ class GetManageAuthorsQuery
             ->withQueryString();
     }
 }
+
+
+
+
+
+
+
+

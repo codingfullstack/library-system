@@ -9,7 +9,7 @@ class EnsureOverdueLoanNotificationsAction
 {
     public function handle(User $user): void
     {
-        if ($user->role !== 'member' || ! $user->is_active) {
+        if ($user->role !== 'narys' || ! $user->is_active) {
             return;
         }
 
@@ -26,10 +26,10 @@ class EnsureOverdueLoanNotificationsAction
                 $user,
                 null,
                 'loan_overdue',
-                'Veluojate grazinti knyga',
+                'Vėluojate grąžinti knygą',
                 sprintf(
-                    'Knyga "%s" veluoja jau %d d. Grazinimo terminas buvo %s.',
-                    $loan->bookCopy?->book?->title ?: 'nezinoma knyga',
+                    'Knyga "%s" vėluoja jau %d d. Grąžinimo terminas buvo %s.',
+                    $loan->bookCopy?->book?->title ?: 'nežinoma knyga',
                     $loan->overdue_days,
                     $loan->due_at?->format('Y-m-d') ?: '-'
                 ),
@@ -46,3 +46,11 @@ class EnsureOverdueLoanNotificationsAction
         }
     }
 }
+
+
+
+
+
+
+
+

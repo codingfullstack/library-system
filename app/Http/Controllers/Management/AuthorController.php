@@ -105,14 +105,14 @@ class AuthorController extends Controller
     public function destroy(Request $request, Author $author): RedirectResponse
     {
         if ($author->books()->exists()) {
-            return back()->with('error', 'Autoriaus istrinti negalima, nes jis naudojamas knygose.');
+            return back()->with('error', 'Autoriaus ištrinti negalima, nes jis naudojamas knygose.');
         }
 
         app(RecordAuditLogAction::class)->handle(
             $request->user(),
             'author_deleted',
             $author,
-            sprintf('Istrintas autorius "%s".', $author->name),
+            sprintf('Ištrintas autorius "%s".', $author->name),
             [
                 'author_name' => $author->name,
                 'snapshot' => [
@@ -127,6 +127,14 @@ class AuthorController extends Controller
 
         return redirect()
             ->route('manage.authors.index')
-            ->with('success', 'Autorius istrintas.');
+            ->with('success', 'Autorius ištrintas.');
     }
 }
+
+
+
+
+
+
+
+

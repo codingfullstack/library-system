@@ -20,3 +20,11 @@ class Logout
         return redirect('/');
     }
 }
+
+
+
+
+
+
+
+

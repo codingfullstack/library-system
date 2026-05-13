@@ -22,7 +22,7 @@ class UserForm extends Component
 
     public string $email = '';
 
-    public string $role = 'member';
+    public string $role = 'narys';
 
     public $libraryId = null;
 
@@ -48,7 +48,7 @@ class UserForm extends Component
             $this->name = $managedUser->name;
             $this->email = $managedUser->email;
             $this->role = $managedUser->role;
-            $this->libraryId = $managedUser->library_id;
+            $this->libraryId = $managedUser->defaultLibraryId();
             $this->phone = (string) ($managedUser->phone ?? '');
             $this->isActive = (bool) $managedUser->is_active;
 
@@ -56,7 +56,7 @@ class UserForm extends Component
         }
 
         $this->role = UserManagement::defaultRole($actor);
-        $this->libraryId = $actor->isSuperAdmin() ? null : $actor->library_id;
+        $this->libraryId = $actor->isSuperAdmin() ? null : $actor->activeLibraryId();
     }
 
     public function updatedRole(string $value): void
@@ -73,7 +73,7 @@ class UserForm extends Component
         }
 
         if (! $actor->isSuperAdmin()) {
-            $this->libraryId = $actor->library_id;
+            $this->libraryId = $actor->activeLibraryId();
         }
     }
 
@@ -89,17 +89,17 @@ class UserForm extends Component
 
         $this->validate($this->rules(), [], [
             'name' => 'vardas',
-            'email' => 'el. pastas',
+            'email' => 'el. paštas',
             'role' => 'role',
             'libraryId' => 'biblioteka',
             'phone' => 'telefonas',
             'isActive' => 'aktyvumas',
-            'password' => 'slaptazodis',
+            'password' => 'slaptažodis',
         ]);
 
         if (! UserManagement::canManageRole($actor, $this->role)) {
             throw ValidationException::withMessages([
-                'role' => 'Negalite priskirti sios roles.',
+                'role' => 'Negalite priskirti šios roles.',
             ]);
         }
 
@@ -108,14 +108,14 @@ class UserForm extends Component
                 $this->libraryId = null;
             }
         } else {
-            $this->libraryId = $actor->library_id;
+            $this->libraryId = $actor->activeLibraryId();
         }
 
         if ($actor->id === $this->managedUser?->id) {
             $this->guardSelfMutation($actor);
         }
 
-        if ($this->managedUser?->isSuperAdmin() && $this->role !== 'super_admin') {
+        if ($this->managedUser?->isSuperAdmin() && $this->role !== 'superadministratorius') {
             $this->ensureAnotherSuperAdminExists($this->managedUser);
         }
 
@@ -124,7 +124,6 @@ class UserForm extends Component
         }
 
         $payload = [
-            'library_id' => UserManagement::requiresLibrary($this->role) ? $this->libraryId : null,
             'name' => $this->name,
             'email' => $this->email,
             'role' => $this->role,
@@ -142,6 +141,7 @@ class UserForm extends Component
             $changedFields = array_keys($this->managedUser->getDirty());
             $changeSummary = AuditLogChanges::fromModel($this->managedUser, $changedFields);
             $this->managedUser->save();
+            $this->syncMembershipForSavedUser($this->managedUser);
 
             app(RecordAuditLogAction::class)->handle(
                 $actor,
@@ -153,7 +153,7 @@ class UserForm extends Component
                     'target_user_name' => $this->managedUser->name,
                     'target_user_role' => $this->managedUser->role,
                 ], $changeSummary),
-                $this->managedUser->library_id ?: $actor->library_id
+                $this->managedUser->defaultLibraryId() ?: $actor->activeLibraryId()
             );
 
             return redirect()
@@ -162,6 +162,7 @@ class UserForm extends Component
         }
 
         $managedUser = User::create($payload);
+        $this->syncMembershipForSavedUser($managedUser);
 
         app(RecordAuditLogAction::class)->handle(
             $actor,
@@ -173,7 +174,7 @@ class UserForm extends Component
                 'target_user_name' => $managedUser->name,
                 'target_user_role' => $managedUser->role,
             ],
-            $managedUser->library_id ?: $actor->library_id
+            $managedUser->defaultLibraryId() ?: $actor->activeLibraryId()
         );
 
         return redirect()
@@ -223,31 +224,28 @@ class UserForm extends Component
 
     private function resolveMembershipNumber(): ?string
     {
-        if ($this->role !== 'member' || ! $this->libraryId) {
+        if ($this->role !== 'narys') {
             return null;
         }
 
-        $libraryChanged = (int) ($this->managedUser?->library_id ?: 0) !== (int) $this->libraryId;
-        $roleChangedToMember = $this->managedUser?->exists && $this->managedUser->role !== 'member';
-
-        if (! $this->managedUser || ! $this->managedUser->membership_number || $libraryChanged || $roleChangedToMember) {
-            return UserManagement::generateMembershipNumber((int) $this->libraryId);
+        if ($this->managedUser?->membership_number) {
+            return $this->managedUser->membership_number;
         }
 
-        return $this->managedUser->membership_number;
+        return UserManagement::generateMembershipNumber();
     }
 
     private function previewMembershipNumber(): ?string
     {
-        if ($this->role !== 'member' || ! $this->libraryId) {
+        if ($this->role !== 'narys') {
             return null;
         }
 
-        if ($this->managedUser?->membership_number && (int) $this->managedUser->library_id === (int) $this->libraryId && $this->managedUser->role === 'member') {
+        if ($this->managedUser?->membership_number) {
             return $this->managedUser->membership_number;
         }
 
-        return UserManagement::generateMembershipNumber((int) $this->libraryId);
+        return UserManagement::generateMembershipNumber();
     }
 
     private function guardSelfMutation(User $actor): void
@@ -258,7 +256,7 @@ class UserForm extends Component
             ]);
         }
 
-        if ((int) ($this->libraryId ?: 0) !== (int) ($actor->library_id ?: 0)) {
+        if ((int) ($this->libraryId ?: 0) !== (int) ($actor->activeLibraryId() ?: 0)) {
             throw ValidationException::withMessages([
                 'libraryId' => 'Negalite keisti savo bibliotekos.',
             ]);
@@ -271,10 +269,19 @@ class UserForm extends Component
         }
     }
 
+    private function syncMembershipForSavedUser(User $user): void
+    {
+        if (! UserManagement::requiresLibrary($this->role) || ! $this->libraryId) {
+            return;
+        }
+
+        UserManagement::syncLibraryMembership($user, (int) $this->libraryId);
+    }
+
     private function ensureAnotherSuperAdminExists(User $user): void
     {
         $hasAnother = User::query()
-            ->where('role', 'super_admin')
+            ->where('role', 'superadministratorius')
             ->whereKeyNot($user->id)
             ->where('is_active', true)
             ->exists();
@@ -286,3 +293,12 @@ class UserForm extends Component
         }
     }
 }
+
+
+
+
+
+
+
+
+

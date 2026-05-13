@@ -8,8 +8,32 @@ use App\Models\Loan;
 use App\Models\Location;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Livewire\Manage\BookCopies\CreateBookCopyPage;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+
+test('book copy creation page selects a book through livewire drawer', function () {
+    $library = Library::factory()->create(['name' => 'Centrine biblioteka']);
+    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create(['title' => 'Livewire pasirinkta knyga']);
+
+    $this->actingAs($staff)
+        ->get(route('manage.book-copies.create'))
+        ->assertOk()
+        ->assertSee('Pridėti egzempliorių')
+        ->assertSee('Bendras katalogas')
+        ->assertSee('wire:click="selectBook', false);
+
+    Livewire::actingAs($staff)
+        ->test(CreateBookCopyPage::class)
+        ->call('selectBook', $book->id)
+        ->assertSet('selectedBookId', $book->id)
+        ->assertSee('Nauja kopija bus pridėta prie pasirinktos knygos.')
+        ->assertSee('Livewire pasirinkta knyga')
+        ->call('closeDrawer')
+        ->assertSet('selectedBookId', null);
+});
 
 test('staff can change book copy lifecycle and see status history', function () {
     $library = Library::factory()->create(['name' => 'Centrine biblioteka']);
@@ -27,7 +51,7 @@ test('staff can change book copy lifecycle and see status history', function () 
         'qr_code' => 'QR-LIFE-001',
         'barcode' => '12345678903',
         'status' => BookCopy::STATUS_AVAILABLE,
-        'condition_status' => 'good',
+        'condition_status' => 'gera',
         'acquired_at' => now()->toDateString(),
         'notes' => null,
     ]);
@@ -37,7 +61,7 @@ test('staff can change book copy lifecycle and see status history', function () 
         ->from(route('book-copies.show', $copy))
         ->patch(route('manage.book-copies.lifecycle.update', $copy), [
             'target_status' => BookCopy::STATUS_MAINTENANCE,
-            'reason_notes' => 'Siunciama tvarkyti del suluzusio virselio.',
+            'reason_notes' => 'Siunčiama tvarkyti del suluzušio virselio.',
         ]);
 
     $response->assertRedirect(route('book-copies.show', $copy));
@@ -56,9 +80,9 @@ test('staff can change book copy lifecycle and see status history', function () 
     $this->actingAs($staff)
         ->get(route('book-copies.show', $copy))
         ->assertOk()
-        ->assertSee('Busenos istorija')
-        ->assertSee('Issiustas tvarkymui')
-        ->assertSee('Siunciama tvarkyti del suluzusio virselio.');
+        ->assertSee('Būsenos istorija')
+        ->assertSee('Išsiųstas tvarkymui')
+        ->assertSee('Siunčiama tvarkyti del suluzušio virselio.');
 });
 
 test('book copy lifecycle can not be changed while copy has active loan', function () {
@@ -78,7 +102,7 @@ test('book copy lifecycle can not be changed while copy has active loan', functi
         'qr_code' => 'QR-LIFE-002',
         'barcode' => '12345678904',
         'status' => BookCopy::STATUS_LOANED,
-        'condition_status' => 'good',
+        'condition_status' => 'gera',
         'acquired_at' => now()->toDateString(),
         'notes' => null,
     ]);
@@ -87,7 +111,7 @@ test('book copy lifecycle can not be changed while copy has active loan', functi
         'library_id' => $library->id,
         'book_copy_id' => $copy->id,
         'user_id' => $member->id,
-        'status' => 'active',
+        'status' => 'aktyvi',
         'returned_at' => null,
     ]);
 
@@ -96,7 +120,7 @@ test('book copy lifecycle can not be changed while copy has active loan', functi
         ->from(route('book-copies.show', $copy))
         ->patch(route('manage.book-copies.lifecycle.update', $copy), [
             'target_status' => BookCopy::STATUS_LOST,
-            'reason_notes' => 'Bandymas pazymeti kaip prarasta.',
+            'reason_notes' => 'Bandymas pažymėti kaip prarasta.',
         ]);
 
     $response->assertRedirect(route('book-copies.show', $copy));
@@ -109,3 +133,52 @@ test('book copy lifecycle can not be changed while copy has active loan', functi
         'to_status' => BookCopy::STATUS_LOST,
     ]);
 });
+
+test('staff can delete book copy from own library', function () {
+    $library = Library::factory()->create();
+    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $book = Book::factory()->create();
+    $copy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+    ]);
+
+    $this->actingAs($staff)
+        ->delete(route('manage.book-copies.destroy', $copy))
+        ->assertRedirect(route('books.index'));
+
+    $this->assertDatabaseMissing('book_copies', [
+        'id' => $copy->id,
+    ]);
+});
+
+test('staff can not delete book copy from another library', function () {
+    $staffLibrary = Library::factory()->create();
+    $copyLibrary = Library::factory()->create();
+    $staff = User::factory()->staff()->create(['library_id' => $staffLibrary->id]);
+    $branch = Branch::factory()->create(['library_id' => $copyLibrary->id]);
+    $location = Location::factory()->create(['library_id' => $copyLibrary->id, 'branch_id' => $branch->id]);
+    $book = Book::factory()->create();
+    $copy = BookCopy::factory()->create([
+        'library_id' => $copyLibrary->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+    ]);
+
+    $this->actingAs($staff)
+        ->delete(route('manage.book-copies.destroy', $copy))
+        ->assertForbidden();
+
+    $this->assertDatabaseHas('book_copies', [
+        'id' => $copy->id,
+    ]);
+});
+
+
+
+

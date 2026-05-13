@@ -88,7 +88,7 @@ class PublisherController extends Controller
             $request->user(),
             'publisher_deleted',
             $publisher,
-            sprintf('Istrinta leidykla "%s".', $publisher->name),
+            sprintf('Ištrinta leidykla "%s".', $publisher->name),
             [
                 'publisher_name' => $publisher->name,
                 'snapshot' => [
@@ -105,3 +105,11 @@ class PublisherController extends Controller
             ->with('success', 'Leidykla ištrinta.');
     }
 }
+
+
+
+
+
+
+
+

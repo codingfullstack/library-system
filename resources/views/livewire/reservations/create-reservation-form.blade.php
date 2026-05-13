@@ -11,7 +11,7 @@
         </x-ui.alert>
     @endif
 
-    @if($actor && $actor->role === 'member' && $isReservable)
+    @if($actor && $actor->role === 'narys' && $isReservable)
         <div class="app-muted-card">
             <p class="app-label">Rezervuos</p>
             <p class="mt-2 text-sm font-semibold text-zinc-950 dark:text-white">{{ $actor->name }}</p>
@@ -54,7 +54,7 @@
                     type="search"
                     wire:model.live.debounce.300ms="memberSearch"
                     class="app-input"
-                    placeholder="Ieskoti pagal varda, el. pasta, nario numeri arba telefona"
+                    placeholder="Ieškoti pagal vardą, el. paštą, nario numeri arba telefona"
                     autocomplete="off"
                 >
 
@@ -81,7 +81,7 @@
                             </button>
                         @empty
                             <div class="px-4 py-5 text-sm text-zinc-500 dark:text-zinc-400">
-                                Nariu pagal sia paieska nerasta.
+                                Narių pagal šią paiešką nerasta.
                             </div>
                         @endforelse
                     </div>
@@ -95,7 +95,7 @@
 
         @if($isReservable && $hasQueueAhead)
             <x-ui.alert type="info" class="mb-0">
-                Siai knygai jau yra aktyvi rezervacija. Nauja rezervacija bus itraukta i eile, o galiojimo terminas bus priskirtas, kai ateis jos eile.
+                Šiai knygai jau yra aktyvi rezervacija. Nauja rezervacija bus įtraukta į eilę, o galiojimo terminas bus priskirtas, kai ateis jos eile.
             </x-ui.alert>
         @elseif($isReservable)
             <div>
@@ -121,7 +121,7 @@
     @elseif(! $actor)
         <x-ui.empty-state
             title="Prisijunkite"
-            description="Norint rezervuoti knyga, reikia prisijungti."
+            description="Norint rezervuoti knygą, reikia prisijungti."
         />
     @endif
 
@@ -146,7 +146,7 @@
 
         <button type="submit" class="app-button-primary w-full" wire:loading.attr="disabled">
             <span wire:loading.remove>
-                {{ $usesMemberSearch ? 'Sukurti rezervacija' : 'Rezervuoti sau' }}
+                {{ $usesMemberSearch ? 'Sukurti rezervaciją' : 'Rezervuoti sau' }}
             </span>
             <span wire:loading>
                 Kuriama...
@@ -154,3 +154,10 @@
         </button>
     @endif
 </form>
+
+
+
+
+
+
+

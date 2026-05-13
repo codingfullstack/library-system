@@ -3,17 +3,18 @@
 namespace App\Support;
 
 use App\Models\User;
-use App\Models\Library;
+use App\Models\LibraryMembership;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Str;
 
 class UserManagement
 {
     public static function manageableRoles(User $actor): array
     {
         return match ($actor->role) {
-            'super_admin' => ['super_admin', 'admin', 'staff', 'member'],
-            'admin' => ['admin', 'staff', 'member'],
-            'staff' => ['member'],
+            'superadministratorius' => ['superadministratorius', 'administratorius', 'darbuotojas', 'narys'],
+            'administratorius' => ['administratorius', 'darbuotojas', 'narys'],
+            'darbuotojas' => ['narys'],
             default => [],
         };
     }
@@ -26,9 +27,14 @@ class UserManagement
     public static function scopeVisibleUsers(Builder $query, User $actor): Builder
     {
         $roles = self::manageableRoles($actor);
+        $libraryIds = $actor->manageableLibraryIds();
 
         return $query
-            ->when(! $actor->isSuperAdmin(), fn (Builder $builder) => $builder->where('library_id', $actor->library_id))
+            ->when(! $actor->isSuperAdmin(), function (Builder $builder) use ($libraryIds) {
+                $builder->whereHas('libraryMemberships', fn (Builder $membershipQuery) => $membershipQuery
+                    ->whereIn('library_id', $libraryIds)
+                    ->where('is_active', true));
+            })
             ->whereIn('role', $roles);
     }
 
@@ -42,49 +48,67 @@ class UserManagement
             return true;
         }
 
-        return (int) $target->library_id === (int) $actor->library_id;
+        return collect($actor->manageableLibraryIds())
+            ->contains(fn (int $libraryId) => $target->belongsToLibrary($libraryId));
     }
 
     public static function requiresLibrary(string $role): bool
     {
-        return $role !== 'super_admin';
+        return $role !== 'superadministratorius';
     }
 
     public static function defaultRole(User $actor): string
     {
         return match ($actor->role) {
-            'super_admin', 'admin', 'staff' => 'member',
-            default => 'member',
+            'superadministratorius', 'administratorius', 'darbuotojas' => 'narys',
+            default => 'narys',
         };
     }
 
-    public static function generateMembershipNumber(int $libraryId): string
+    public static function generateMembershipNumber(): string
     {
-        $library = Library::query()->findOrFail($libraryId);
-        $prefix = strtoupper($library->code ?: ('LIB' . $library->id));
-        $base = $prefix . '-MEM-';
-
-        $lastNumber = User::query()
-            ->where('library_id', $libraryId)
-            ->where('role', 'member')
-            ->whereNotNull('membership_number')
-            ->where('membership_number', 'like', $base . '%')
-            ->get(['membership_number'])
-            ->map(function ($user) use ($base) {
-                return (int) str_replace($base, '', (string) $user->membership_number);
-            })
-            ->max() ?? 0;
-
         do {
-            $lastNumber++;
-            $candidate = $base . str_pad((string) $lastNumber, 3, '0', STR_PAD_LEFT);
-        } while (
-            User::query()
-                ->where('library_id', $libraryId)
-                ->where('membership_number', $candidate)
-                ->exists()
-        );
+            $candidate = 'MEM:' . (string) Str::ulid();
+        } while (User::query()->where('membership_number', $candidate)->exists());
 
         return $candidate;
     }
+
+    public static function syncLibraryMembership(User $user, int $libraryId): LibraryMembership
+    {
+        if ($user->isSuperAdmin()) {
+            throw new \InvalidArgumentException('Superadministratoriui bibliotekos narystė nepriskiriama.');
+        }
+
+        return LibraryMembership::query()->updateOrCreate(
+            [
+                'library_id' => $libraryId,
+                'user_id' => $user->id,
+            ],
+            [
+                'membership_number' => $user->membership_number,
+                'is_active' => $user->is_active,
+                'joined_at' => $user->created_at,
+            ]
+        );
+    }
+
+    public static function syncUserMembershipActivity(User $user): void
+    {
+        if ($user->isSuperAdmin()) {
+            return;
+        }
+
+        $user->libraryMemberships()->update([
+            'is_active' => $user->is_active,
+        ]);
+    }
 }
+
+
+
+
+
+
+
+

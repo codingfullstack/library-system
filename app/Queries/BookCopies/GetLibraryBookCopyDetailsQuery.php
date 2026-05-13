@@ -10,6 +10,8 @@ class GetLibraryBookCopyDetailsQuery
 {
     public function handle(User $user, BookCopy $bookCopy): BookCopy
     {
+        $libraryId = $user->activeLibraryId();
+
         $query = BookCopy::query()
             ->whereKey($bookCopy->id)
             ->with([
@@ -48,15 +50,15 @@ class GetLibraryBookCopyDetailsQuery
                         'receiver:id,name,email',
                     ]);
                 },
-                'book.reservations' => function ($reservationQuery) use ($user) {
-                    $reservationQuery->where('library_id', $user->library_id)
+                'book.reservations' => function ($reservationQuery) use ($libraryId) {
+                    $reservationQuery->where('library_id', $libraryId)
                         ->with('user:id,name,email,membership_number')
                         ->orderBy('reserved_at');
                 },
             ]);
 
         if (! $user->isSuperAdmin()) {
-            $query->where('library_id', $user->library_id);
+            $query->where('library_id', $libraryId);
         }
 
         $copy = $query->first();
@@ -68,3 +70,11 @@ class GetLibraryBookCopyDetailsQuery
         return $copy;
     }
 }
+
+
+
+
+
+
+
+

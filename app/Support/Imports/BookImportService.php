@@ -20,7 +20,7 @@ class BookImportService
 
     /**
      * @param  array<int, array<string, string|null>>  $rows
-     * @return array{created: int, updated: int, skipped: int, details: array<int, array<string, string|int|null>>}
+     * @return array{created: int, updated: int, skipped: int, failed: int, details: array<int, array<string, string|int|null>>}
      */
     public function import(User $user, array $rows): array
     {
@@ -29,95 +29,107 @@ class BookImportService
         $created = 0;
         $updated = 0;
         $skipped = 0;
+        $failed = 0;
         $details = [];
 
-        DB::transaction(function () use ($user, $rows, &$created, &$updated, &$skipped, &$details): void {
-            foreach ($rows as $index => $row) {
-                $line = $index + 2;
-                $title = trim((string) ($row['title'] ?? ''));
+        foreach ($rows as $index => $row) {
+            $line = $index + 2;
 
-                if ($title === '') {
-                    throw new \RuntimeException('Eilute ' . $line . ': privalomas laukelis title.');
-                }
+            try {
+                DB::transaction(function () use ($row, $line, &$created, &$skipped, &$details): void {
+                    $title = trim((string) ($row['title'] ?? ''));
 
-                $isbn = trim((string) ($row['isbn'] ?? '')) ?: null;
+                    if ($title === '') {
+                        throw new \RuntimeException('Privalomas laukelis title.');
+                    }
 
-                $book = $isbn
-                    ? Book::query()->where('isbn', $isbn)->first()
-                    : Book::query()->where('title', $title)->first();
+                    $isbn = trim((string) ($row['isbn'] ?? '')) ?: null;
 
-                if ($book) {
-                    $skipped++;
+                    $book = $isbn
+                        ? Book::query()->where('isbn', $isbn)->first()
+                        : Book::query()->where('title', $title)->first();
+
+                    if ($book) {
+                        $skipped++;
+                        $details[] = [
+                            'line' => $line,
+                            'status' => 'praleista',
+                            'label' => $title,
+                            'message' => $isbn
+                                ? 'Knyga jau yra kataloge pagal ISBN.'
+                                : 'Knyga jau yra kataloge pagal pavadinimą.',
+                        ];
+
+                        return;
+                    }
+
+                    $book = new Book();
+
+                    $publisher = $this->resolvePublisher(
+                        $row['publisher_name'] ?? $row['publisher'] ?? null,
+                        $row['publisher_country'] ?? null
+                    );
+                    $categories = collect($this->resolveCategories(
+                        $row['category_slugs'] ?? null,
+                        $row['category_names'] ?? $row['categories'] ?? null,
+                    ));
+                    $authors = collect($this->resolveAuthors(
+                        $row['author_slugs'] ?? null,
+                        $row['author_names'] ?? $row['authors'] ?? null,
+                    ));
+
+                    $book->fill([
+                        'title' => $title,
+                        'subtitle' => $row['subtitle'] ?? null,
+                        'isbn' => $isbn,
+                        'description' => $row['description'] ?? null,
+                        'publisher_id' => $publisher?->id,
+                        'category_id' => $categories->first()?->id,
+                        'publication_year' => $this->nullableInt($row['publication_year'] ?? null),
+                        'language' => $row['language'] ?? null,
+                        'page_count' => $this->nullableInt($row['page_count'] ?? null),
+                        'edition' => $row['edition'] ?? null,
+                        'cover_image' => $row['cover_image'] ?? null,
+                    ]);
+
+                    $book->save();
+                    $book->authors()->sync($authors->pluck('id')->all());
+                    $book->categories()->sync($categories->pluck('id')->all());
+
+                    $created++;
                     $details[] = [
                         'line' => $line,
-                        'status' => 'praleista',
-                        'label' => $title,
-                        'message' => $isbn
-                            ? 'Knyga jau yra kataloge pagal ISBN.'
-                            : 'Knyga jau yra kataloge pagal pavadinima.',
+                        'status' => 'sukurta',
+                        'label' => $book->title,
+                        'message' => $isbn ? 'Sukurta naują knygą (' . $isbn . ').' : 'Sukurta naują knygą.',
                     ];
-                    continue;
-                }
-
-                $book = new Book();
-
-                $publisher = $this->resolvePublisher(
-                    $row['publisher_name'] ?? $row['publisher'] ?? null,
-                    $row['publisher_country'] ?? null
-                );
-                $categories = collect($this->resolveCategories(
-                    $row['category_slugs'] ?? null,
-                    $row['category_names'] ?? $row['categories'] ?? null,
-                    $line
-                ));
-                $authors = collect($this->resolveAuthors(
-                    $row['author_slugs'] ?? null,
-                    $row['author_names'] ?? $row['authors'] ?? null,
-                    $line
-                ));
-
-                $book->fill([
-                    'title' => $title,
-                    'subtitle' => $row['subtitle'] ?? null,
-                    'isbn' => $isbn,
-                    'description' => $row['description'] ?? null,
-                    'publisher_id' => $publisher?->id,
-                    'category_id' => $categories->first()?->id,
-                    'publication_year' => $this->nullableInt($row['publication_year'] ?? null),
-                    'language' => $row['language'] ?? null,
-                    'page_count' => $this->nullableInt($row['page_count'] ?? null),
-                    'edition' => $row['edition'] ?? null,
-                    'cover_image' => $row['cover_image'] ?? null,
-                ]);
-
-                $book->save();
-                $book->authors()->sync($authors->pluck('id')->all());
-                $book->categories()->sync($categories->pluck('id')->all());
-
-                $created++;
+                });
+            } catch (\Throwable $exception) {
+                $failed++;
                 $details[] = [
                     'line' => $line,
-                    'status' => 'sukurta',
-                    'label' => $book->title,
-                    'message' => $isbn ? 'Sukurta nauja knyga (' . $isbn . ').' : 'Sukurta nauja knyga.',
+                    'status' => 'klaida',
+                    'label' => $this->rowLabel($row),
+                    'message' => $exception->getMessage(),
                 ];
             }
+        }
 
-            $this->recordAuditLogAction->handle(
-                $user,
-                'books_imported',
-                null,
-                sprintf('Importuotos knygos: sukurta %d, praleista %d.', $created, $skipped),
-                [
-                    'created' => $created,
-                    'updated' => $updated,
-                    'skipped' => $skipped,
-                    'rows' => count($rows),
-                ]
-            );
-        });
+        $this->recordAuditLogAction->handle(
+            $user,
+            'books_imported',
+            null,
+            sprintf('Importuotos knygos: sukurta %d, praleista %d, klaidų %d.', $created, $skipped, $failed),
+            [
+                'created' => $created,
+                'updated' => $updated,
+                'skipped' => $skipped,
+                'failed' => $failed,
+                'rows' => count($rows),
+            ]
+        );
 
-        return compact('created', 'updated', 'skipped', 'details');
+        return compact('created', 'updated', 'skipped', 'failed', 'details');
     }
 
     private function resolvePublisher(?string $name, ?string $country): ?Publisher
@@ -143,7 +155,7 @@ class BookImportService
     /**
      * @return array<int, Category>
      */
-    private function resolveCategories(?string $slugValue, ?string $legacyNameValue, int $line): array
+    private function resolveCategories(?string $slugValue, ?string $legacyVardasValue): array
     {
         $slugs = $this->splitPipeList($slugValue);
 
@@ -159,7 +171,7 @@ class BookImportService
                 ->all();
         }
 
-        return collect($this->splitPipeList($legacyNameValue))
+        return collect($this->splitPipeList($legacyVardasValue))
             ->map(function (string $name): Category {
                 return Category::query()->firstOrCreate(
                     ['name' => $name],
@@ -173,7 +185,7 @@ class BookImportService
     /**
      * @return array<int, Author>
      */
-    private function resolveAuthors(?string $slugValue, ?string $legacyNameValue, int $line): array
+    private function resolveAuthors(?string $slugValue, ?string $legacyVardasValue): array
     {
         $slugs = $this->splitPipeList($slugValue);
 
@@ -189,12 +201,12 @@ class BookImportService
                 ->all();
         }
 
-        return collect($this->splitPipeList($legacyNameValue))
-            ->map(function (string $name) use ($line): Author {
+        return collect($this->splitPipeList($legacyVardasValue))
+            ->map(function (string $name): Author {
                 $author = Author::query()->where('name', $name)->first();
 
                 if (! $author) {
-                    throw new \RuntimeException('Eilute ' . $line . ': autorius "' . $name . '" nerastas. Naudokite author_slugs.');
+                    throw new \RuntimeException('Autorius "' . $name . '" nerastas. Naudokite author_slugs.');
                 }
 
                 return $author;
@@ -245,4 +257,23 @@ class BookImportService
             ->title()
             ->value();
     }
+
+    /**
+     * @param  array<string, string|null>  $row
+     */
+    private function rowLabel(array $row): string
+    {
+        $title = trim((string) ($row['title'] ?? ''));
+        $isbn = trim((string) ($row['isbn'] ?? ''));
+
+        return $title !== '' ? $title : ($isbn !== '' ? $isbn : '-');
+    }
 }
+
+
+
+
+
+
+
+

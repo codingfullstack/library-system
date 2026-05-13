@@ -30,7 +30,7 @@ class ReservationController extends Controller
             'per_page' => $request->query('per_page', 1000),
         ];
 
-        $reservations = $user?->role === 'member'
+        $reservations = $user?->role === 'narys'
             ? $getMemberReservationsQuery->handle($user, $filters)
             : $getLibraryReservationsQuery->handle($user, $filters);
 
@@ -83,3 +83,11 @@ class ReservationController extends Controller
         ]);
     }
 }
+
+
+
+
+
+
+
+

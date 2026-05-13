@@ -25,7 +25,7 @@ class GetDashboardReportDataQuery
      */
     public function handle(User $user, array $filters = []): array
     {
-        $libraryId = $user->isSuperAdmin() ? null : $user->library_id;
+        $libraryId = $user->isSuperAdmin() ? null : $user->activeLibraryId();
         $dateFrom = $filters['date_from'] ?? null;
         $dateTo = $filters['date_to'] ?? null;
         $periodLabel = $filters['period_label'] ?? 'Visas laikotarpis';
@@ -43,16 +43,21 @@ class GetDashboardReportDataQuery
         $this->applyReservationPeriod($reservationsQuery, $dateFrom, $dateTo);
 
         $membersQuery = User::query()
-            ->where('role', 'member')
             ->where('is_active', true)
-            ->when($libraryId, fn (Builder $query) => $query->where('library_id', $libraryId));
+            ->when(
+                $libraryId,
+                fn (Builder $query) => $query->whereHas('libraryMemberships', fn (Builder $membershipQuery) => $membershipQuery
+                    ->where('library_id', $libraryId)
+                    ->where('is_active', true)),
+                fn (Builder $query) => $query->where('role', 'narys')
+            );
 
         $summary = [
             'book_copies_count' => (clone $copiesQuery)->count(),
             'available_book_copies_count' => (clone $copiesQuery)->where('status', BookCopy::STATUS_AVAILABLE)->count(),
             'active_loans_count' => (clone $loansQuery)
                 ->whereNull('returned_at')
-                ->whereIn('status', ['active', 'overdue'])
+                ->whereIn('status', ['aktyvi', 'vėluoja'])
                 ->count(),
             'returned_loans_count' => (clone $loansQuery)
                 ->whereNotNull('returned_at')
@@ -64,7 +69,7 @@ class GetDashboardReportDataQuery
             'overdue_loans_count' => (clone $loansQuery)
                 ->whereNull('returned_at')
                 ->where(function (Builder $query) {
-                    $query->where('status', 'overdue')
+                    $query->where('status', 'vėluoja')
                         ->orWhere(function (Builder $dateQuery) {
                             $dateQuery->whereNotNull('due_at')
                                 ->where('due_at', '<', now());
@@ -105,9 +110,9 @@ class GetDashboardReportDataQuery
             'activityTimeline' => $activityTimeline,
             'periodLabel' => $periodLabel,
             'scopeLabel' => $user->isSuperAdmin()
-                ? 'Visu biblioteku statistika - ' . $periodLabel
-                : ($user->library?->name
-                    ? $user->library->name . ' statistika - ' . $periodLabel
+                ? 'Visų bibliotekų statistika - ' . $periodLabel
+                : ($user->availableLibraries()->firstWhere('id', $libraryId)?->name
+                    ? $user->availableLibraries()->firstWhere('id', $libraryId)->name . ' statistika - ' . $periodLabel
                     : 'Bibliotekos statistika - ' . $periodLabel),
         ];
     }
@@ -121,7 +126,7 @@ class GetDashboardReportDataQuery
                     $libraryQuery->has('bookCopies')
                         ->orHas('loans')
                         ->orHas('reservations')
-                        ->orHas('users');
+                        ->orHas('memberships');
                 });
             })
             ->withCount([
@@ -156,14 +161,14 @@ class GetDashboardReportDataQuery
                     $this->applyLoanPeriod($query, $dateFrom, $dateTo);
 
                     $query->whereNull('returned_at')
-                        ->whereIn('status', ['active', 'overdue']);
+                        ->whereIn('status', ['aktyvi', 'vėluoja']);
                 },
                 'loans as overdue_loans_count' => function (Builder $query) use ($dateFrom, $dateTo) {
                     $this->applyLoanPeriod($query, $dateFrom, $dateTo);
 
                     $query->whereNull('returned_at')
                         ->where(function (Builder $overdueQuery) {
-                            $overdueQuery->where('status', 'overdue')
+                            $overdueQuery->where('status', 'vėluoja')
                                 ->orWhere(function (Builder $dateQuery) {
                                     $dateQuery->whereNotNull('due_at')
                                         ->where('due_at', '<', now());
@@ -182,8 +187,9 @@ class GetDashboardReportDataQuery
                     $query->where('status', Reservation::STATUS_FULFILLED);
                 },
                 'users as active_members_count' => function (Builder $query) {
-                    $query->where('role', 'member')
-                        ->where('is_active', true);
+                    $query->where('users.role', 'narys')
+                        ->where('users.is_active', true)
+                        ->where('library_memberships.is_active', true);
                 },
             ])
             ->orderBy('name')
@@ -350,10 +356,15 @@ class GetDashboardReportDataQuery
     protected function getActiveMembers(?int $libraryId, ?CarbonImmutable $dateFrom, ?CarbonImmutable $dateTo): Collection
     {
         return User::query()
-            ->select(['users.id', 'users.name', 'users.membership_number', 'users.library_id'])
-            ->where('role', 'member')
-            ->when($libraryId, fn (Builder $query) => $query->where('library_id', $libraryId))
-            ->with('library:id,name')
+            ->select(['users.id', 'users.name', 'users.membership_number'])
+            ->when(
+                $libraryId,
+                fn (Builder $query) => $query->whereHas('libraryMemberships', fn (Builder $membershipQuery) => $membershipQuery
+                    ->where('library_id', $libraryId)
+                    ->where('is_active', true)),
+                fn (Builder $query) => $query->where('role', 'narys')
+            )
+            ->with('libraryMemberships.library:id,name,code')
             ->withCount([
                 'loans as loans_count' => function (Builder $query) use ($libraryId, $dateFrom, $dateTo) {
                     $this->applyLoanPeriod($query, $dateFrom, $dateTo);
@@ -570,3 +581,11 @@ class GetDashboardReportDataQuery
         return $query->whereBetween('reserved_at', [$dateFrom, $dateTo]);
     }
 }
+
+
+
+
+
+
+
+

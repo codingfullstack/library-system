@@ -22,7 +22,7 @@ class BookController extends Controller
     ): View
     {
         $actor = $request->user();
-        $books = $getLibraryBooksQuery->handle($request->user(), [
+        $filters = [
             'search' => $request->query('search'),
             'category_id' => $request->query('category_id'),
             'author_id' => $request->query('author_id'),
@@ -32,9 +32,10 @@ class BookController extends Controller
             'sort' => $request->query('sort', 'title'),
             'direction' => $request->query('direction', 'asc'),
             'per_page' => $request->query('per_page', 15),
-        ]);
+        ];
+        $books = $getLibraryBooksQuery->handle($request->user(), $filters);
 
-        return view($actor->role === 'member' ? 'account.books.index' : 'books.index', array_merge(
+        return view($actor->effectiveRole() === 'narys' ? 'account.books.index' : 'books.index', array_merge(
             ['books' => $books],
             $getBookIndexFiltersDataQuery->handle($request->user())
         ));
@@ -56,7 +57,7 @@ class BookController extends Controller
             'location_id' => $request->query('location_id'),
         ]);
 
-        if ($actor->role === 'member') {
+        if ($actor->effectiveRole() === 'narys') {
             $currentReservation = $book->reservations
                 ->filter(fn ($reservation) => $reservation->isPending())
                 ->sortBy('reserved_at')
@@ -98,3 +99,11 @@ class BookController extends Controller
         ));
     }
 }
+
+
+
+
+
+
+
+

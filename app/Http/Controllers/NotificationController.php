@@ -52,6 +52,14 @@ class NotificationController extends Controller
 
         return redirect()
             ->route('notifications.index', $request->only(['category', 'status', 'date', 'sort', 'per_page']))
-            ->with('status', 'Visi pranesimai pazymeti kaip perskaityti.');
+            ->with('status', 'Visi pranešimai pažymėti kaip perskaityti.');
     }
 }
+
+
+
+
+
+
+
+

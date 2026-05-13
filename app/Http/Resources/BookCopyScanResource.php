@@ -25,8 +25,16 @@ class BookCopyScanResource extends JsonResource
                 'isbn' => $this->book->isbn,
             ] : null,
             'status' => $this->status,
-            'can_borrow' => $this->status === 'available' && $this->canManageCopy && $this->activeLoan === null,
-            'can_return' => $this->status === 'loaned' && $this->canManageCopy,
+            'can_borrow' => $this->status === 'laisva' && $this->canManageCopy && $this->activeLoan === null,
+            'can_return' => $this->status === 'išduota' && $this->canManageCopy,
         ];
     }
 }
+
+
+
+
+
+
+
+

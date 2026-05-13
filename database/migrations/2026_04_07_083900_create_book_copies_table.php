@@ -21,20 +21,20 @@ return new class extends Migration
             $table->string('barcode')->nullable();
 
             $table->enum('status', [
-                'available',
-                'loaned',
-                'lost',
-                'damaged',
-                'maintenance',
-                'withdrawn',
-            ])->default('available');
+                'laisva',
+                'išduota',
+                'prarasta',
+                'sugadinta',
+                'tvarkoma',
+                'nurašyta',
+            ])->default('laisva');
 
             $table->enum('condition_status', [
-                'new',
-                'good',
-                'worn',
-                'damaged',
-            ])->default('good');
+                'nauja',
+                'gera',
+                'padėvėta',
+                'sugadinta',
+            ])->default('gera');
 
             $table->date('acquired_at')->nullable();
             $table->decimal('price', 10, 2)->nullable();
@@ -59,3 +59,5 @@ return new class extends Migration
         Schema::dropIfExists('book_copies');
     }
 };
+
+

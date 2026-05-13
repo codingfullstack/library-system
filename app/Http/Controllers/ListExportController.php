@@ -37,7 +37,7 @@ class ListExportController extends Controller
     ): Response {
         $user = $request->user();
 
-        abort_unless(in_array($user?->role, ['super_admin', 'admin', 'staff'], true), 403);
+        abort_unless($user?->hasAnyEffectiveRole(['superadministratorius', 'administratorius', 'darbuotojas']), 403);
 
         return match ($resource) {
             'books' => $this->booksExport($request, $getLibraryBooksQuery),
@@ -71,7 +71,7 @@ class ListExportController extends Controller
         $rows = $books->map(function ($book) {
             $status = $book->available_copies_count > 0
                 ? 'Aktyvi'
-                : ($book->loaned_copies_count > 0 ? 'Isduota' : 'Neprieinama');
+                : ($book->loaned_copies_count > 0 ? 'Išduota' : 'Neprieinama');
 
             return [
                 $book->title,
@@ -90,7 +90,7 @@ class ListExportController extends Controller
 
         return $this->csvResponse(
             'knygos',
-            ['Pavadinimas', 'Paantraste', 'ISBN', 'Autoriai', 'Kategorijos', 'Leidykla', 'Egzemplioriai', 'Laisvi', 'Rezervacijos', 'Busena', 'Atnaujinta'],
+            ['Pavadinimas', 'Paantraštė', 'ISBN', 'Autoriai', 'Kategorijos', 'Leidykla', 'Egzemplioriai', 'Laisvi', 'Rezervacijos', 'Būsena', 'Atnaujinta'],
             $rows
         );
     }
@@ -112,8 +112,8 @@ class ListExportController extends Controller
             $dueDate = $loan->due_at;
             $daysUntilDue = $dueDate ? now()->startOfDay()->diffInDays($dueDate->copy()->startOfDay(), false) : null;
             $status = $loan->is_overdue
-                ? 'Veluoja'
-                : (($daysUntilDue !== null && $daysUntilDue <= 2) ? 'Grazinti netrukus' : 'Aktyvi');
+                ? 'Vėluoja'
+                : (($daysUntilDue !== null && $daysUntilDue <= 2) ? 'Grąžinti netrukus' : 'Aktyvi');
 
             return [
                 $loan->bookCopy?->book?->title,
@@ -130,8 +130,8 @@ class ListExportController extends Controller
         })->all();
 
         return $this->csvResponse(
-            'isduotos-knygos',
-            ['Knyga', 'ISBN', 'Narys', 'Nario numeris', 'Kopija', 'Filialas', 'Isduota', 'Grazinti iki', 'Grazinta', 'Busena'],
+            'išduotos-knygos',
+            ['Knyga', 'ISBN', 'Narys', 'Nario numeris', 'Kopija', 'Filialas', 'Išduota', 'Grąžinti iki', 'Grąžinta', 'Būsena'],
             $rows
         );
     }
@@ -161,7 +161,7 @@ class ListExportController extends Controller
 
         return $this->csvResponse(
             'rezervacijos',
-            ['Knyga', 'ISBN', 'Narys', 'Nario numeris', 'Biblioteka', 'Rezervuota', 'Galioja iki', 'Busena', 'Eiles nr.'],
+            ['Knyga', 'ISBN', 'Narys', 'Nario numeris', 'Biblioteka', 'Rezervuota', 'Galioja iki', 'Būsena', 'Eilės nr.'],
             $rows
         );
     }
@@ -195,7 +195,7 @@ class ListExportController extends Controller
 
         return $this->csvResponse(
             'egzemplioriai',
-            ['Knyga', 'ISBN', 'Inventoriaus kodas', 'Bruksninis kodas', 'Filialas', 'Vieta', 'Busena', 'Bukle', 'Atnaujinta'],
+            ['Knyga', 'ISBN', 'Inventoriaus kodas', 'Brūkšninis kodas', 'Filialas', 'Vieta', 'Būsena', 'Būklė', 'Atnaujinta'],
             $rows
         );
     }
@@ -205,7 +205,7 @@ class ListExportController extends Controller
         $users = $query->handle($request->user(), [
             'search' => $request->query('search'),
             'role' => $request->query('role'),
-            'active' => $request->query('active'),
+            'aktyvi' => $request->query('aktyvi'),
             'per_page' => 5000,
         ])->getCollection();
 
@@ -216,12 +216,12 @@ class ListExportController extends Controller
             $user->phone,
             $this->userRoleLabel($user->role),
             $user->library?->name,
-            $user->is_active ? 'Aktyvus' : 'Neaktyvus',
+            $user->is_active ? 'Aktyvus' : 'Neaktyvūs',
         ])->all();
 
         return $this->csvResponse(
             'vartotojai',
-            ['Vardas', 'Korteles numeris', 'El. pastas', 'Telefonas', 'Tipas', 'Biblioteka', 'Statusas'],
+            ['Vardas', 'Kortelės numeris', 'El. paštas', 'Telefonas', 'Tipas', 'Biblioteka', 'Statusas'],
             $rows
         );
     }
@@ -264,12 +264,12 @@ class ListExportController extends Controller
             $category->slug,
             $category->description,
             $category->books_count,
-            $category->books_count > 0 ? 'Aktyvi' : 'Tuscia',
+            $category->books_count > 0 ? 'Aktyvi' : 'Tuščia',
         ])->all();
 
         return $this->csvResponse(
             'kategorijos',
-            ['Pavadinimas', 'Slug', 'Aprasas', 'Knygu skaicius', 'Busena'],
+            ['Pavadinimas', 'Slug', 'Aprašas', 'Knygų skaičius', 'Būsena'],
             $rows
         );
     }
@@ -287,12 +287,12 @@ class ListExportController extends Controller
             $publisher->name,
             $publisher->country,
             $publisher->books_count,
-            $publisher->books_count > 0 ? 'Aktyvi' : 'Be knygu',
+            $publisher->books_count > 0 ? 'Aktyvi' : 'Be knygų',
         ])->all();
 
         return $this->csvResponse(
             'leidyklos',
-            ['Pavadinimas', 'Salis', 'Knygu skaicius', 'Busena'],
+            ['Pavadinimas', 'Šalis', 'Knygų skaičius', 'Būsena'],
             $rows
         );
     }
@@ -347,7 +347,7 @@ class ListExportController extends Controller
 
         return $this->csvResponse(
             'audito-zurnalas',
-            ['Data', 'Veiksmas', 'Aprasas', 'Atliko', 'El. pastas', 'Biblioteka', 'Objekto tipas', 'Objekto ID'],
+            ['Data', 'Veiksmas', 'Aprašas', 'Atliko', 'El. paštas', 'Biblioteka', 'Objekto tipas', 'Objekto ID'],
             $rows
         );
     }
@@ -356,8 +356,8 @@ class ListExportController extends Controller
     {
         return match ($status) {
             Reservation::STATUS_RESERVED => 'Aktyvi',
-            Reservation::STATUS_FULFILLED => 'Ivykdyta',
-            Reservation::STATUS_CANCELLED => 'Atsaukta',
+            Reservation::STATUS_FULFILLED => 'Įvykdyta',
+            Reservation::STATUS_CANCELLED => 'Atšaukta',
             Reservation::STATUS_EXPIRED => 'Pasibaigusi',
             default => $status,
         };
@@ -366,9 +366,9 @@ class ListExportController extends Controller
     private function userRoleLabel(string $role): string
     {
         return match ($role) {
-            User::ROLE_SUPER_ADMIN => 'Superadmin',
-            User::ROLE_ADMIN => 'Admin',
-            User::ROLE_STAFF => 'Staff',
+            User::ROLE_SUPER_ADMIN => 'Superadministratorius',
+            User::ROLE_ADMIN => 'Administratorius',
+            User::ROLE_STAFF => 'Darbuotojas',
             User::ROLE_MEMBER => 'Skaitytojas',
             default => $role,
         };
@@ -396,3 +396,13 @@ class ListExportController extends Controller
         ]);
     }
 }
+
+
+
+
+
+
+
+
+
+

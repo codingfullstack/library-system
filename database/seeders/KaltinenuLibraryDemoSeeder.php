@@ -9,12 +9,14 @@ use App\Models\BookCopyStatusHistory;
 use App\Models\Branch;
 use App\Models\Category;
 use App\Models\Library;
+use App\Models\LibraryMembership;
 use App\Models\Loan;
 use App\Models\Location;
 use App\Models\Publisher;
 use App\Models\Reservation;
 use App\Models\ScanLog;
 use App\Models\User;
+use App\Support\UserManagement;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -79,7 +81,7 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 'code' => 'LOC-FAN-01',
                 'room' => '1',
                 'shelf' => 'A-1',
-                'description' => 'Fantastikos ir nuotykiu knygos',
+                'description' => 'Fantastikos ir nuotykių knygos',
             ]);
 
             $classicLocation = Location::create([
@@ -89,7 +91,7 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 'code' => 'LOC-KLAS-01',
                 'room' => '1',
                 'shelf' => 'B-2',
-                'description' => 'Lietuviu ir pasaulio klasika',
+                'description' => 'Lietuvių ir pasaulio klasika',
             ]);
 
             $childrenLocation = Location::create([
@@ -99,20 +101,20 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 'code' => 'LOC-YA-01',
                 'room' => '2',
                 'shelf' => 'C-3',
-                'description' => 'Paaugliu ir jaunimo literatura',
+                'description' => 'Paauglių ir jaunimo literatūra',
             ]);
 
             $fictionCategory = Category::query()->firstOrCreate(
                 ['slug' => 'grozine-literatura'],
-                ['name' => 'Grozine literatura', 'description' => 'Romanai, apsakymai ir kita grozine literatura.']
+                ['name' => 'Grožinė literatūra', 'description' => 'Romanai, apsakymai ir kita grožinė literatūra.']
             );
             $fantasyCategory = Category::query()->firstOrCreate(
                 ['slug' => 'fantastika'],
-                ['name' => 'Fantastika', 'description' => 'Fantastine, magine ir nuotykiu literatura.']
+                ['name' => 'Fantastika', 'description' => 'Fantastinė, maginė ir nuotykių literatūra.']
             );
             $classicCategory = Category::query()->firstOrCreate(
                 ['slug' => 'klasika'],
-                ['name' => 'Klasika', 'description' => 'Lietuviu ir pasaulio literaturos klasika.']
+                ['name' => 'Klasika', 'description' => 'Lietuvių ir pasaulio literatūros klasika.']
             );
             $youthCategory = Category::query()->firstOrCreate(
                 ['slug' => 'jaunimo-literatura'],
@@ -124,64 +126,64 @@ class KaltinenuLibraryDemoSeeder extends Seeder
             $vaga = Publisher::query()->firstOrCreate(['name' => 'Vaga'], ['country' => 'Lietuva']);
             $tytoAlba = Publisher::query()->firstOrCreate(['name' => 'Tyto alba'], ['country' => 'Lietuva']);
 
-            $rowling = Author::query()->firstOrCreate(['name' => 'J. K. Rowling'], ['bio' => 'Britu rasytoja, geriausiai zinoma del Hario Poterio serijos.']);
-            $sapkowski = Author::query()->firstOrCreate(['name' => 'Andrzej Sapkowski'], ['bio' => 'Lenku fantastikos rasytojas, isgarsines Raganiaus cikla.']);
-            $putinas = Author::query()->firstOrCreate(['name' => 'Vincas Mykolaitis-Putinas'], ['bio' => 'Lietuviu rasytojas, poetas ir literaturos istorikas.']);
-            $sruoga = Author::query()->firstOrCreate(['name' => 'Balys Sruoga'], ['bio' => 'Lietuviu rasytojas, dramaturgas ir literaturos kritikas.']);
-            $green = Author::query()->firstOrCreate(['name' => 'John Green'], ['bio' => 'Amerikieciu jaunimo literaturos autorius.']);
+            $rowling = Author::query()->firstOrCreate(['name' => 'J. K. Rowling'], ['bio' => 'Britų rašytoja, geriausiai žinoma dėl Hario Poterio serijos.']);
+            $sapkowski = Author::query()->firstOrCreate(['name' => 'Andrzej Sapkowski'], ['bio' => 'Lenkų fantastikos rašytojas, išgarsinęs Raganiaus ciklą.']);
+            $putinas = Author::query()->firstOrCreate(['name' => 'Vincas Mykolaitis-Putinas'], ['bio' => 'Lietuvių rašytojas, poetas ir literatūros istorikas.']);
+            $sruoga = Author::query()->firstOrCreate(['name' => 'Balys Sruoga'], ['bio' => 'Lietuvių rašytojas, dramaturgas ir literatūros kritikas.']);
+            $green = Author::query()->firstOrCreate(['name' => 'John Green'], ['bio' => 'Amerikiečių jaunimo literatūros autorius.']);
 
             $admin = User::query()->updateOrCreate(
                 ['email' => 'admin@kaltinenubiblioteka.lt'],
                 [
-                    'library_id' => $library->id,
                     'name' => 'Kaltinenu bibliotekos administratorius',
                     'email_verified_at' => now(),
                     'password' => Hash::make('password'),
-                    'role' => 'admin',
+                    'role' => 'administratorius',
                     'phone' => '+37061111111',
                     'membership_number' => null,
                     'is_active' => true,
                 ]
             );
+            $this->attachLibraryMembership($admin, $library);
 
             $staffA = User::query()->updateOrCreate(
                 ['email' => 'ieva@kaltinenubiblioteka.lt'],
                 [
-                    'library_id' => $library->id,
                     'name' => 'Ieva Jonaite',
                     'email_verified_at' => now(),
                     'password' => Hash::make('password'),
-                    'role' => 'staff',
+                    'role' => 'darbuotojas',
                     'phone' => '+37062222222',
                     'membership_number' => null,
                     'is_active' => true,
                 ]
             );
+            $this->attachLibraryMembership($staffA, $library);
 
             $staffB = User::query()->updateOrCreate(
                 ['email' => 'tomas@kaltinenubiblioteka.lt'],
                 [
-                    'library_id' => $library->id,
                     'name' => 'Tomas Petrauskas',
                     'email_verified_at' => now(),
                     'password' => Hash::make('password'),
-                    'role' => 'staff',
+                    'role' => 'darbuotojas',
                     'phone' => '+37063333333',
                     'membership_number' => null,
                     'is_active' => true,
                 ]
             );
+            $this->attachLibraryMembership($staffB, $library);
 
-            $member1 = $this->createMember($library, 'Lukas Petrauskas', 'lukas.skaitytojas@example.com', 'KAL-MEM-001', '+37064444444');
-            $member2 = $this->createMember($library, 'Emilija Jankauskaite', 'emilija.skaitytoja@example.com', 'KAL-MEM-002', '+37065555555');
-            $member3 = $this->createMember($library, 'Matas Vaitkus', 'matas.skaitytojas@example.com', 'KAL-MEM-003', '+37066666666');
-            $member4 = $this->createMember($library, 'Gabija Rimkute', 'gabija.skaitytoja@example.com', 'KAL-MEM-004', '+37067777777');
-            $member5 = $this->createMember($library, 'Saule Girdziute', 'saule.skaitytoja@example.com', 'KAL-MEM-005', '+37068888888');
-            $member6 = $this->createMember($library, 'Karolina Butkeviciute', 'karolina.skaitytoja@example.com', 'KAL-MEM-006', '+37069900001');
-            $member7 = $this->createMember($library, 'Tadas Veverskis', 'tadas.skaitytojas@example.com', 'KAL-MEM-007', '+37069900002');
-            $member8 = $this->createMember($library, 'Aiste Maciulyte', 'aiste.skaitytoja@example.com', 'KAL-MEM-008', '+37069900003');
-            $member9 = $this->createMember($library, 'Pijus Zabiela', 'pijus.skaitytojas@example.com', 'KAL-MEM-009', '+37069900004');
-            $member10 = $this->createMember($library, 'Greta Simkute', 'greta.skaitytoja@example.com', 'KAL-MEM-010', '+37069900005');
+            $member1 = $this->createMember($library, 'Lukas Petrauskas', 'lukas.skaitytojas@example.com', '+37064444444');
+            $member2 = $this->createMember($library, 'Emilija Jankauskaitė', 'emilija.skaitytoja@example.com', '+37065555555');
+            $member3 = $this->createMember($library, 'Matas Vaitkus', 'matas.skaitytojas@example.com', '+37066666666');
+            $member4 = $this->createMember($library, 'Gabija Rimkutė', 'gabija.skaitytoja@example.com', '+37067777777');
+            $member5 = $this->createMember($library, 'Saule Girdžiūtė', 'saule.skaitytoja@example.com', '+37068888888');
+            $member6 = $this->createMember($library, 'Karolina Butkevičiūtė', 'karolina.skaitytoja@example.com', '+37069900001');
+            $member7 = $this->createMember($library, 'Tadas Veverskis', 'tadas.skaitytojas@example.com', '+37069900002');
+            $member8 = $this->createMember($library, 'Aistė Maciulytė', 'aiste.skaitytoja@example.com', '+37069900003');
+            $member9 = $this->createMember($library, 'Pijus Zabiela', 'pijus.skaitytojas@example.com', '+37069900004');
+            $member10 = $this->createMember($library, 'Greta Šimkutė', 'greta.skaitytoja@example.com', '+37069900005');
 
             $allMembers = collect([
                 $member1,
@@ -198,9 +200,9 @@ class KaltinenuLibraryDemoSeeder extends Seeder
             $employees = collect([$admin, $staffA, $staffB]);
 
             $hp1 = $this->firstOrCreateBook([
-                'title' => 'Haris Poteris ir Isminties akmuo',
+                'title' => 'Haris Poteris ir Išminties akmuo',
                 'isbn' => '9786090155339',
-                'description' => 'Pirmoji serijos dalis apie jauna burtininka Hari Poteri.',
+                'description' => 'Pirmoji serijos dalis apie jauną burtininką Harį Poterį.',
                 'publisher_id' => $almaLittera->id,
                 'category_id' => $fantasyCategory->id,
                 'publication_year' => 1997,
@@ -212,7 +214,7 @@ class KaltinenuLibraryDemoSeeder extends Seeder
             $witcher = $this->firstOrCreateBook([
                 'title' => 'Raganius. Paskutinis noras',
                 'isbn' => '9786094272211',
-                'description' => 'Apsakymu rinkinys apie Geralta is Rivijos.',
+                'description' => 'Apsakymų rinkinys apie Geraltą iš Rivijos.',
                 'publisher_id' => $eridanas->id,
                 'category_id' => $fantasyCategory->id,
                 'publication_year' => 1993,
@@ -222,9 +224,9 @@ class KaltinenuLibraryDemoSeeder extends Seeder
             ], [$sapkowski], [$fantasyCategory]);
 
             $altoriu = $this->firstOrCreateBook([
-                'title' => 'Altoriu sesely',
+                'title' => 'Altorių šešėly',
                 'isbn' => '9785415011237',
-                'description' => 'Vienas zymiausiu lietuviu literaturos romanu.',
+                'description' => 'Vienas žymiausių lietuvių literatūros romanų.',
                 'publisher_id' => $vaga->id,
                 'category_id' => $classicCategory->id,
                 'publication_year' => 1933,
@@ -234,9 +236,9 @@ class KaltinenuLibraryDemoSeeder extends Seeder
             ], [$putinas], [$classicCategory, $fictionCategory]);
 
             $dievuMiskas = $this->firstOrCreateBook([
-                'title' => 'Dievu miskas',
+                'title' => 'Dievų miškas',
                 'isbn' => '9786094661550',
-                'description' => 'Atsiminimu knyga apie gyvenima koncentracijos stovykloje.',
+                'description' => 'Atsiminimų knyga apie gyvenimą koncentracijos stovykloje.',
                 'publisher_id' => $vaga->id,
                 'category_id' => $classicCategory->id,
                 'publication_year' => 1957,
@@ -246,9 +248,9 @@ class KaltinenuLibraryDemoSeeder extends Seeder
             ], [$sruoga], [$classicCategory, $fictionCategory]);
 
             $faultInOurStars = $this->firstOrCreateBook([
-                'title' => 'Del musu likimo ir zvaigzdziu kaltos',
+                'title' => 'Dėl mūsų likimo ir žvaigždžių kaltos',
                 'isbn' => '9786094665800',
-                'description' => 'Jaunimo romanas apie draugyste, meile ir netektis.',
+                'description' => 'Jaunimo romanas apie draugystę, meilę ir netektis.',
                 'publisher_id' => $tytoAlba->id,
                 'category_id' => $youthCategory->id,
                 'publication_year' => 2012,
@@ -257,11 +259,11 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 'edition' => '1',
             ], [$green], [$youthCategory, $fictionCategory]);
 
-            $orwell = Author::query()->firstOrCreate(['name' => 'George Orwell'], ['bio' => 'Anglu rasytojas, zinomas del distopiniu romanu.']);
-            $tolkien = Author::query()->firstOrCreate(['name' => 'J. R. R. Tolkien'], ['bio' => 'Britu fantastas, sukures Vidurzemes pasauli.']);
-            $clear = Author::query()->firstOrCreate(['name' => 'James Clear'], ['bio' => 'Autorius, rasantis apie iprocius ir kasdienius pokycius.']);
+            $orwell = Author::query()->firstOrCreate(['name' => 'George Orwell'], ['bio' => 'Anglų rašytojas, zinomas del distopiniu romanu.']);
+            $tolkien = Author::query()->firstOrCreate(['name' => 'J. R. R. Tolkien'], ['bio' => 'Britų fantastas, sukūręs Viduržemės pasaulį.']);
+            $clear = Author::query()->firstOrCreate(['name' => 'James Clear'], ['bio' => 'Autorius, rašantis apie įpročius ir kasdienius pokyčius.']);
             $kahneman = Author::query()->firstOrCreate(['name' => 'Daniel Kahneman'], ['bio' => 'Psichologas ir Nobelio premijos laureatas.']);
-            $saintExupery = Author::query()->firstOrCreate(['name' => 'Antoine de Saint-Exupery'], ['bio' => 'Prancuzu autorius, parases Mazaji princa.']);
+            $saintExupery = Author::query()->firstOrCreate(['name' => 'Antoine de Saint-Exupery'], ['bio' => 'Prancūzų autorius, parašęs Mažąjį princą.']);
 
             $psychologyCategory = Category::query()->firstOrCreate(
                 ['slug' => 'psichologija'],
@@ -269,13 +271,13 @@ class KaltinenuLibraryDemoSeeder extends Seeder
             );
             $romanCategory = Category::query()->firstOrCreate(
                 ['slug' => 'romanai'],
-                ['name' => 'Romanai', 'description' => 'Grozines literaturos romanai.']
+                ['name' => 'Romanai', 'description' => 'Grožinės literatūros romanai.']
             );
 
             $book1984 = $this->firstOrCreateBook([
                 'title' => '1984',
                 'isbn' => '9786090142324',
-                'description' => 'Distopinis romanas apie totalia kontrole ir tiesos perrasinejima.',
+                'description' => 'Distopinis romanas apie totalią kontrolę ir tiesos perrašinėjimą.',
                 'publisher_id' => $almaLittera->id,
                 'category_id' => $classicCategory->id,
                 'publication_year' => 1949,
@@ -287,7 +289,7 @@ class KaltinenuLibraryDemoSeeder extends Seeder
             $hobbit = $this->firstOrCreateBook([
                 'title' => 'Hobitas',
                 'isbn' => '9786090135003',
-                'description' => 'Bilbo Beggins nuotykiai kelyje i Vienisaji kalna.',
+                'description' => 'Bilbo Begginso nuotykiai kelyje į Vienišąjį kalną.',
                 'publisher_id' => $almaLittera->id,
                 'category_id' => $fantasyCategory->id,
                 'publication_year' => 1937,
@@ -297,9 +299,9 @@ class KaltinenuLibraryDemoSeeder extends Seeder
             ], [$tolkien], [$fantasyCategory, $classicCategory]);
 
             $atomicHabits = $this->firstOrCreateBook([
-                'title' => 'Atominiai iprociai',
+                'title' => 'Atominiai įpročiai',
                 'isbn' => '9786090145100',
-                'description' => 'Praktine knyga apie mazu kasdieniu iprociu itaka ilgalaikiams rezultatams.',
+                'description' => 'Praktinė knyga apie mažų kasdienių įpročių įtaką ilgalaikiams rezultatams.',
                 'publisher_id' => $almaLittera->id,
                 'category_id' => $psychologyCategory->id,
                 'publication_year' => 2018,
@@ -309,9 +311,9 @@ class KaltinenuLibraryDemoSeeder extends Seeder
             ], [$clear], [$psychologyCategory]);
 
             $thinking = $this->firstOrCreateBook([
-                'title' => 'Mastymas, greitas ir letas',
+                'title' => 'Mąstymas, greitas ir lėtas',
                 'isbn' => '9786090145455',
-                'description' => 'Knyga apie sprendimu priemima, intuicija ir mastyma.',
+                'description' => 'Knyga apie sprendimų priėmimą, intuiciją ir mąstymą.',
                 'publisher_id' => $almaLittera->id,
                 'category_id' => $psychologyCategory->id,
                 'publication_year' => 2011,
@@ -321,9 +323,9 @@ class KaltinenuLibraryDemoSeeder extends Seeder
             ], [$kahneman], [$psychologyCategory]);
 
             $littlePrince = $this->firstOrCreateBook([
-                'title' => 'Mazasis princas',
+                'title' => 'Mažasis princas',
                 'isbn' => '9786094270538',
-                'description' => 'Poetine pasaka apie draugyste, meile ir atsakomybe.',
+                'description' => 'Poetinė pasaka apie draugystę, meilę ir atsakomybę.',
                 'publisher_id' => $vaga->id,
                 'category_id' => $youthCategory->id,
                 'publication_year' => 1943,
@@ -333,23 +335,23 @@ class KaltinenuLibraryDemoSeeder extends Seeder
             ], [$saintExupery], [$youthCategory, $fictionCategory]);
 
             $copies = collect([
-                $this->createCopy($library, $hp1, $mainBranch, $fantasyLocation, 'KAL-HP1-001', 'QR-KAL-HP1-001', '9786090155331', BookCopy::STATUS_LOANED, 'good', '2023-09-01', 'Daznai skolinama knyga.'),
-                $this->createCopy($library, $hp1, $mainBranch, $fantasyLocation, 'KAL-HP1-002', 'QR-KAL-HP1-002', '9786090155332', BookCopy::STATUS_AVAILABLE, 'good', '2023-09-01', null),
-                $this->createCopy($library, $witcher, $mainBranch, $fantasyLocation, 'KAL-RAG-001', 'QR-KAL-RAG-001', '9786094272211', BookCopy::STATUS_MAINTENANCE, 'damaged', '2024-01-15', 'Lauzia nugarinele, issiusta tvarkymui.'),
-                $this->createCopy($library, $witcher, $mainBranch, $fantasyLocation, 'KAL-RAG-002', 'QR-KAL-RAG-002', '9786094272212', BookCopy::STATUS_AVAILABLE, 'good', '2024-01-15', null),
-                $this->createCopy($library, $altoriu, $mainBranch, $classicLocation, 'KAL-ALT-001', 'QR-KAL-ALT-001', '9785415011231', BookCopy::STATUS_DAMAGED, 'damaged', '2021-11-20', 'Apiplyses virselis.'),
-                $this->createCopy($library, $altoriu, $mainBranch, $classicLocation, 'KAL-ALT-002', 'QR-KAL-ALT-002', '9785415011232', BookCopy::STATUS_AVAILABLE, 'worn', '2019-03-14', 'Senesnis egzempliorius.'),
-                $this->createCopy($library, $dievuMiskas, $mainBranch, $classicLocation, 'KAL-DM-001', 'QR-KAL-DM-001', '9786094661551', BookCopy::STATUS_LOST, 'good', '2020-10-01', 'Nerastas po inventorizacijos.'),
-                $this->createCopy($library, $faultInOurStars, $childrenBranch, $childrenLocation, 'KAL-YA-001', 'QR-KAL-YA-001', '9786094665801', BookCopy::STATUS_WITHDRAWN, 'worn', '2018-04-04', 'Per daug susidevejes, nurasytas.'),
-                $this->createCopy($library, $faultInOurStars, $childrenBranch, $childrenLocation, 'KAL-YA-002', 'QR-KAL-YA-002', '9786094665802', BookCopy::STATUS_AVAILABLE, 'good', '2024-02-10', 'Laisva kopija, skirta greitam isdavimui rezervacijos eileje.'),
-                $this->createCopy($library, $book1984, $mainBranch, $classicLocation, 'KAL-1984-001', 'QR-KAL-1984-001', '9786090142321', BookCopy::STATUS_AVAILABLE, 'good', '2023-01-15', null),
-                $this->createCopy($library, $book1984, $mainBranch, $classicLocation, 'KAL-1984-002', 'QR-KAL-1984-002', '9786090142322', BookCopy::STATUS_AVAILABLE, 'good', '2023-01-15', null),
-                $this->createCopy($library, $hobbit, $mainBranch, $fantasyLocation, 'KAL-HOB-001', 'QR-KAL-HOB-001', '9786090135001', BookCopy::STATUS_AVAILABLE, 'good', '2022-08-20', null),
-                $this->createCopy($library, $hobbit, $mainBranch, $fantasyLocation, 'KAL-HOB-002', 'QR-KAL-HOB-002', '9786090135002', BookCopy::STATUS_AVAILABLE, 'worn', '2022-08-20', null),
-                $this->createCopy($library, $atomicHabits, $mainBranch, $classicLocation, 'KAL-AH-001', 'QR-KAL-AH-001', '9786090145101', BookCopy::STATUS_AVAILABLE, 'good', '2024-06-10', null),
-                $this->createCopy($library, $thinking, $mainBranch, $classicLocation, 'KAL-TF-001', 'QR-KAL-TF-001', '9786090145451', BookCopy::STATUS_AVAILABLE, 'good', '2024-04-08', null),
-                $this->createCopy($library, $littlePrince, $childrenBranch, $childrenLocation, 'KAL-MP-001', 'QR-KAL-MP-001', '9786094270531', BookCopy::STATUS_AVAILABLE, 'good', '2023-11-09', null),
-                $this->createCopy($library, $littlePrince, $childrenBranch, $childrenLocation, 'KAL-MP-002', 'QR-KAL-MP-002', '9786094270532', BookCopy::STATUS_AVAILABLE, 'worn', '2023-11-09', null),
+                $this->createCopy($library, $hp1, $mainBranch, $fantasyLocation, 'KAL-HP1-001', 'QR-KAL-HP1-001', '9786090155331', BookCopy::STATUS_LOANED, 'gera', '2023-09-01', 'Dažnai skolinama knyga.'),
+                $this->createCopy($library, $hp1, $mainBranch, $fantasyLocation, 'KAL-HP1-002', 'QR-KAL-HP1-002', '9786090155332', BookCopy::STATUS_AVAILABLE, 'gera', '2023-09-01', null),
+                $this->createCopy($library, $witcher, $mainBranch, $fantasyLocation, 'KAL-RAG-001', 'QR-KAL-RAG-001', '9786094272211', BookCopy::STATUS_MAINTENANCE, 'sugadinta', '2024-01-15', 'Lūžta nugarėlė, išsiųsta tvarkymui.'),
+                $this->createCopy($library, $witcher, $mainBranch, $fantasyLocation, 'KAL-RAG-002', 'QR-KAL-RAG-002', '9786094272212', BookCopy::STATUS_AVAILABLE, 'gera', '2024-01-15', null),
+                $this->createCopy($library, $altoriu, $mainBranch, $classicLocation, 'KAL-ALT-001', 'QR-KAL-ALT-001', '9785415011231', BookCopy::STATUS_DAMAGED, 'sugadinta', '2021-11-20', 'Apiplyšęs viršelis.'),
+                $this->createCopy($library, $altoriu, $mainBranch, $classicLocation, 'KAL-ALT-002', 'QR-KAL-ALT-002', '9785415011232', BookCopy::STATUS_AVAILABLE, 'padėvėta', '2019-03-14', 'Senesnis egzempliorius.'),
+                $this->createCopy($library, $dievuMiskas, $mainBranch, $classicLocation, 'KAL-DM-001', 'QR-KAL-DM-001', '9786094661551', BookCopy::STATUS_LOST, 'gera', '2020-10-01', 'Nerastas po inventorizacijos.'),
+                $this->createCopy($library, $faultInOurStars, $childrenBranch, $childrenLocation, 'KAL-YA-001', 'QR-KAL-YA-001', '9786094665801', BookCopy::STATUS_WITHDRAWN, 'padėvėta', '2018-04-04', 'Per daug susidėvėjęs, nurašytas.'),
+                $this->createCopy($library, $faultInOurStars, $childrenBranch, $childrenLocation, 'KAL-YA-002', 'QR-KAL-YA-002', '9786094665802', BookCopy::STATUS_AVAILABLE, 'gera', '2024-02-10', 'Laisva kopija, skirta greitam išdavimui rezervacijos eilėje.'),
+                $this->createCopy($library, $book1984, $mainBranch, $classicLocation, 'KAL-1984-001', 'QR-KAL-1984-001', '9786090142321', BookCopy::STATUS_AVAILABLE, 'gera', '2023-01-15', null),
+                $this->createCopy($library, $book1984, $mainBranch, $classicLocation, 'KAL-1984-002', 'QR-KAL-1984-002', '9786090142322', BookCopy::STATUS_AVAILABLE, 'gera', '2023-01-15', null),
+                $this->createCopy($library, $hobbit, $mainBranch, $fantasyLocation, 'KAL-HOB-001', 'QR-KAL-HOB-001', '9786090135001', BookCopy::STATUS_AVAILABLE, 'gera', '2022-08-20', null),
+                $this->createCopy($library, $hobbit, $mainBranch, $fantasyLocation, 'KAL-HOB-002', 'QR-KAL-HOB-002', '9786090135002', BookCopy::STATUS_AVAILABLE, 'padėvėta', '2022-08-20', null),
+                $this->createCopy($library, $atomicHabits, $mainBranch, $classicLocation, 'KAL-AH-001', 'QR-KAL-AH-001', '9786090145101', BookCopy::STATUS_AVAILABLE, 'gera', '2024-06-10', null),
+                $this->createCopy($library, $thinking, $mainBranch, $classicLocation, 'KAL-TF-001', 'QR-KAL-TF-001', '9786090145451', BookCopy::STATUS_AVAILABLE, 'gera', '2024-04-08', null),
+                $this->createCopy($library, $littlePrince, $childrenBranch, $childrenLocation, 'KAL-MP-001', 'QR-KAL-MP-001', '9786094270531', BookCopy::STATUS_AVAILABLE, 'gera', '2023-11-09', null),
+                $this->createCopy($library, $littlePrince, $childrenBranch, $childrenLocation, 'KAL-MP-002', 'QR-KAL-MP-002', '9786094270532', BookCopy::STATUS_AVAILABLE, 'padėvėta', '2023-11-09', null),
             ]);
 
             $loanA = Loan::create([
@@ -361,9 +363,9 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 'borrowed_at' => $now->subHours(2),
                 'due_at' => $now->addDays(14),
                 'returned_at' => null,
-                'status' => 'active',
+                'status' => 'aktyvi',
                 'renewal_count' => 0,
-                'notes' => 'Skolinimas testavimui per mobili programele.',
+                'notes' => 'Skolinimas testavimui per mobilią programėlę.',
             ]);
 
             $loanB = Loan::create([
@@ -375,9 +377,9 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 'borrowed_at' => $now->subDays(20),
                 'due_at' => $now->subDays(6),
                 'returned_at' => $now->subDays(5),
-                'status' => 'returned',
+                'status' => 'grąžinta',
                 'renewal_count' => 1,
-                'notes' => 'Jau grazinta demonstracine paskola.',
+                'notes' => 'Jau grąžinta demonstracinė paskola.',
             ]);
 
             Reservation::create([
@@ -401,19 +403,19 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 'expires_at' => null,
                 'fulfilled_at' => null,
                 'cancelled_at' => $now,
-                'notes' => 'Atsaukta demonstracine rezervacija.',
+                'notes' => 'Atšaukta demonstracinė rezervacija.',
             ]);
 
             $this->recordHistory($copies[0], $staffA, null, BookCopy::STATUS_AVAILABLE, 'created', 'Egzempliorius sukurtas sistemoje.', CarbonImmutable::parse('2025-05-12 09:00:00'));
-            $this->recordHistory($copies[0], $staffA, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_LOANED, 'issued', 'Egzempliorius siandien isduotas skaitytojui.', $now->subHours(2));
+            $this->recordHistory($copies[0], $staffA, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_LOANED, 'issued', 'Egzempliorius šiandien išduotas skaitytojui.', $now->subHours(2));
             $this->recordHistory($copies[2], $staffB, null, BookCopy::STATUS_AVAILABLE, 'created', 'Egzempliorius sukurtas sistemoje.', CarbonImmutable::parse('2025-08-14 10:00:00'));
-            $this->recordHistory($copies[2], $staffB, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_MAINTENANCE, 'sent_to_maintenance', 'Issiustas tvarkyti del pazeidimu.', $now->subDays(11));
+            $this->recordHistory($copies[2], $staffB, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_MAINTENANCE, 'sent_to_maintenance', 'Išsiųstas tvarkyti dėl pažeidimų.', $now->subDays(11));
             $this->recordHistory($copies[4], $staffA, null, BookCopy::STATUS_AVAILABLE, 'created', 'Egzempliorius sukurtas sistemoje.', CarbonImmutable::parse('2025-07-03 14:00:00'));
-            $this->recordHistory($copies[4], $staffA, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_DAMAGED, 'marked_damaged', 'Apziuros metu pazymeta kaip sugadinta.', $now->subMonths(2)->subDays(4));
+            $this->recordHistory($copies[4], $staffA, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_DAMAGED, 'marked_damaged', 'Apžiūros metu pažymėta kaip sugadinta.', $now->subMonths(2)->subDays(4));
             $this->recordHistory($copies[6], $admin, null, BookCopy::STATUS_AVAILABLE, 'created', 'Egzempliorius sukurtas sistemoje.', CarbonImmutable::parse('2025-06-06 11:00:00'));
             $this->recordHistory($copies[6], $admin, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_LOST, 'marked_lost', 'Inventorizacijos metu egzempliorius nerastas.', $now->subMonths(5));
             $this->recordHistory($copies[7], $admin, null, BookCopy::STATUS_AVAILABLE, 'created', 'Egzempliorius sukurtas sistemoje.', CarbonImmutable::parse('2025-05-28 12:30:00'));
-            $this->recordHistory($copies[7], $admin, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_WITHDRAWN, 'withdrawn', 'Nurasyta del susidevejimo.', $now->subMonths(7));
+            $this->recordHistory($copies[7], $admin, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_WITHDRAWN, 'nurašyta', 'Nurašyta dėl susidėvėjimo.', $now->subMonths(7));
             $this->recordHistory($copies[8], $staffA, null, BookCopy::STATUS_AVAILABLE, 'created', 'Egzempliorius sukurtas sistemoje.', CarbonImmutable::parse('2025-09-01 09:15:00'));
 
             $this->seedHistoricalLoans($library, $copies->slice(9)->values(), $allMembers, $employees, $now);
@@ -468,19 +470,43 @@ class KaltinenuLibraryDemoSeeder extends Seeder
         });
     }
 
-    private function createMember(Library $library, string $name, string $email, string $membershipNumber, string $phone): User
+    private function createMember(Library $library, string $name, string $email, string $phone): User
     {
-        return User::query()->updateOrCreate(
+        $existingMembershipNumber = User::query()
+            ->where('email', $email)
+            ->value('membership_number');
+
+        $user = User::query()->updateOrCreate(
             ['email' => $email],
             [
-                'library_id' => $library->id,
                 'name' => $name,
                 'email_verified_at' => now(),
                 'password' => Hash::make('password'),
-                'role' => 'member',
+                'role' => 'narys',
                 'phone' => $phone,
-                'membership_number' => $membershipNumber,
+                'membership_number' => str_starts_with((string) $existingMembershipNumber, 'MEM:')
+                    ? $existingMembershipNumber
+                    : UserManagement::generateMembershipNumber(),
                 'is_active' => true,
+            ]
+        );
+
+        $this->attachLibraryMembership($user, $library);
+
+        return $user;
+    }
+
+    private function attachLibraryMembership(User $user, Library $library): void
+    {
+        LibraryMembership::query()->updateOrCreate(
+            [
+                'library_id' => $library->id,
+                'user_id' => $user->id,
+            ],
+            [
+                'membership_number' => $user->membership_number,
+                'is_active' => $user->is_active,
+                'joined_at' => $user->created_at,
             ]
         );
     }
@@ -584,13 +610,13 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 'borrowed_at' => $borrowedAt,
                 'due_at' => $dueAt,
                 'returned_at' => $returnedAt,
-                'status' => 'returned',
+                'status' => 'grąžinta',
                 'renewal_count' => $monthOffset % 2,
-                'notes' => 'Istorinis demonstracinis isdavimas testavimui.',
+                'notes' => 'Istorinis demonstracinis išdavimas testavimui.',
             ]);
 
-            $this->recordHistory($copy, $employee, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_LOANED, 'issued', 'Istorinis isdavimas demonstraciniams duomenims.', $borrowedAt);
-            $this->recordHistory($copy, $employee, BookCopy::STATUS_LOANED, BookCopy::STATUS_AVAILABLE, 'returned', 'Istorinis grazinimas demonstraciniams duomenims.', $returnedAt);
+            $this->recordHistory($copy, $employee, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_LOANED, 'issued', 'Istorinis išdavimas demonstraciniams duomenims.', $borrowedAt);
+            $this->recordHistory($copy, $employee, BookCopy::STATUS_LOANED, BookCopy::STATUS_AVAILABLE, 'grąžinta', 'Istorinis grąžinimas demonstraciniams duomenims.', $returnedAt);
 
             $copy->forceFill([
                 'status' => BookCopy::STATUS_AVAILABLE,
@@ -624,8 +650,10 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                     : null,
                 'fulfilled_at' => $status === Reservation::STATUS_FULFILLED ? $reservedAt->addDays(2) : null,
                 'cancelled_at' => $status === Reservation::STATUS_CANCELLED ? $reservedAt->addDay() : null,
-                'notes' => 'Istorine rezervacija dashboard testavimui.',
+                'notes' => 'Istorinė rezervacija dashboard testavimui.',
             ]);
         }
     }
 }
+
+

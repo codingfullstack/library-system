@@ -17,9 +17,17 @@ class FindBookCopyByQrQuery
             ->where('qr_code', $qrCode);
 
         if (! $user->isSuperAdmin()) {
-            $query->where('library_id', $user->library_id);
+            $query->where('library_id', $user->activeLibraryId());
         }
 
         return $query->first();
     }
 }
+
+
+
+
+
+
+
+

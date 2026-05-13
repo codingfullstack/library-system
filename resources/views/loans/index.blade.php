@@ -1,12 +1,12 @@
-<x-layouts::app :title="__('Isduotos knygos')">
+<x-layouts::app :title="__('Išduotos knygos')">
     <x-ui.page class="max-w-none px-4 py-0 sm:px-6 lg:px-8">
         <div class="bg-[#f7f8fa] py-8 dark:bg-zinc-950">
             <div class="mx-auto max-w-[1500px] space-y-6">
                 <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div>
-                        <h1 class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">Isduotos knygos</h1>
+                        <h1 class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">Išduotos knygos</h1>
                         <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                            Perziurekite visas siuo metu isduotas knygas
+                            Peržiūrėkite visas šiuo metu išduotas knygas
                         </p>
                     </div>
 
@@ -36,9 +36,9 @@
                                 <flux:icon.book-open-text class="size-5" />
                             </span>
                             <div>
-                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Isduota knygu</div>
+                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Išduota knygų</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['active_loans_count'] }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Siuo metu</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Šiuo metu</div>
                             </div>
                         </div>
                     </section>
@@ -49,9 +49,9 @@
                                 <flux:icon.users class="size-5" />
                             </span>
                             <div>
-                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Vartotoju</div>
+                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Vartotojų</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['unique_members_count'] }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Unikaliu vartotoju</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Unikaliu vartotojų</div>
                             </div>
                         </div>
                     </section>
@@ -62,7 +62,7 @@
                                 <flux:icon.calendar-days class="size-5" />
                             </span>
                             <div>
-                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Grazinimo siandien</div>
+                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Grąžinimo šiandien</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['due_today_count'] }}</div>
                                 <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Knygos</div>
                             </div>
@@ -75,9 +75,9 @@
                                 <flux:icon.clock class="size-5" />
                             </span>
                             <div>
-                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Veluojancios knygos</div>
+                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Vėluojančios knygos</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['overdue_loans_count'] }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Is viso</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Iš viso</div>
                             </div>
                         </div>
                     </section>
@@ -92,7 +92,7 @@
                                     type="text"
                                     name="search"
                                     value="{{ request('search') }}"
-                                    placeholder="Ieskoti pagal knygos pavadinima, autoriu ar ISBN..."
+                                    placeholder="Ieškoti pagal knygos pavadinimą, autorių ar ISBN..."
                                     class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 pl-11 shadow-none dark:border-zinc-700 dark:bg-zinc-950"
                                 >
                                 <div class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
@@ -113,10 +113,10 @@
 
                             <div class="xl:min-w-0">
                                 <select id="status" name="status" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
-                                    <option value="">Busena</option>
-                                    <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Aktyvios</option>
-                                    <option value="overdue" {{ request('status') === 'overdue' ? 'selected' : '' }}>Veluojancios</option>
-                                    <option value="returned" {{ request('status') === 'returned' ? 'selected' : '' }}>Grazintos</option>
+                                    <option value="">Būsena</option>
+                                    <option value="aktyvi" {{ request('status') === 'aktyvi' ? 'selected' : '' }}>Aktyvios</option>
+                                    <option value="vėluoja" {{ request('status') === 'vėluoja' ? 'selected' : '' }}>Vėluojančios</option>
+                                    <option value="grąžinta" {{ request('status') === 'grąžinta' ? 'selected' : '' }}>Grąžintos</option>
                                 </select>
                             </div>
 
@@ -131,7 +131,7 @@
                                 </button>
 
                                 <a href="{{ route('loans.index') }}" class="app-button-secondary h-11 rounded-2xl px-4">
-                                    Isvalyti
+                                    Išvalyti
                                 </a>
                             </div>
 
@@ -154,9 +154,9 @@
                                         </th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Knyga</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Vartotojas</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Isdavimo data</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Grazinimo data</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Busena</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Išdavimo data</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Grąžinimo data</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Būsena</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Kopija</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Veiksmai</th>
                                     </tr>
@@ -167,9 +167,9 @@
                                             $dueDate = $loan->due_at;
                                             $daysUntilDue = $dueDate ? now()->startOfDay()->diffInDays($dueDate->copy()->startOfDay(), false) : null;
                                             $statusMeta = $loan->is_overdue
-                                                ? ['label' => 'Veluoja', 'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300']
+                                                ? ['label' => 'Vėluoja', 'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300']
                                                 : (($daysUntilDue !== null && $daysUntilDue <= 2)
-                                                    ? ['label' => 'Grazinti netrukus', 'classes' => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300']
+                                                    ? ['label' => 'Grąžinti netrukus', 'classes' => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300']
                                                     : ['label' => 'Aktyvi', 'classes' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300']);
                                         @endphp
                                         <tr class="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40">
@@ -204,7 +204,7 @@
                                                 <div>{{ $loan->due_at?->format('Y-m-d') ?? 'Be termino' }}</div>
                                                 @if($loan->is_overdue)
                                                     <div class="mt-1 text-xs font-semibold text-red-600 dark:text-red-300">
-                                                        ({{ $loan->overdue_days }} d. veluoja)
+                                                        ({{ $loan->overdue_days }} d. vėluoja)
                                                     </div>
                                                 @elseif($daysUntilDue !== null)
                                                     <div class="mt-1 text-xs font-semibold text-emerald-600 dark:text-emerald-300">
@@ -218,19 +218,18 @@
                                                 </span>
                                             </td>
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">
-                                                <div class="font-medium text-zinc-900 dark:text-zinc-100">Kopija #{{ $loan->bookCopy?->id ?? '-' }}</div>
-                                                <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{{ $loan->bookCopy?->inventory_code ?? '-' }}</div>
+                                                <div class="font-medium text-zinc-900 dark:text-zinc-100">{{ $loan->bookCopy?->inventory_code ?? '-' }}</div>
                                             </td>
                                             <td class="px-4 py-4 align-middle">
                                                 <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-                                                    <a href="{{ route('books.show', $loan->bookCopy->book) }}" title="Perziureti knyga" aria-label="Perziureti knyga" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
+                                                    <a href="{{ route('books.show', $loan->bookCopy->book) }}" title="Peržiūrėti knygą" aria-label="Peržiūrėti knygą" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
                                                         <flux:icon.eye class="size-4" />
                                                     </a>
 
-                                                    @if(in_array($loan->status, ['active', 'overdue'], true))
+                                                    @if(in_array($loan->status, ['aktyvi', 'vėluoja'], true))
                                                         <form method="POST" action="{{ route('loans.return', $loan->bookCopy) }}">
                                                             @csrf
-                                                            <button type="submit" title="Grazinti kopija" aria-label="Grazinti kopija" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
+                                                            <button type="submit" title="Grąžinti kopiją" aria-label="Grąžinti kopiją" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
                                                                 <flux:icon.arrow-uturn-left class="size-4" />
                                                             </button>
                                                         </form>
@@ -250,8 +249,8 @@
                     @else
                         <div class="p-6">
                             <x-ui.empty-state
-                                title="Isduotu knygu nerasta"
-                                description="Pabandyk pakeisti paieska arba filtrus."
+                                title="Išduotų knygų nerasta"
+                                description="Pabandyk pakeisti paiešką arba filtrus."
                             />
                         </div>
                     @endif
@@ -260,3 +259,10 @@
         </div>
     </x-ui.page>
 </x-layouts::app>
+
+
+
+
+
+
+

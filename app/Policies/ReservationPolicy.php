@@ -9,7 +9,7 @@ class ReservationPolicy
 {
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, ['super_admin', 'admin', 'staff', 'member'], true);
+        return $user->hasAnyEffectiveRole(['superadministratorius', 'administratorius', 'darbuotojas', 'narys']);
     }
 
     public function view(User $user, Reservation $reservation): bool
@@ -18,9 +18,9 @@ class ReservationPolicy
             return true;
         }
 
-        if ($user->role === 'member') {
+        if ($user->effectiveRole($reservation->library_id) === 'narys') {
             return $reservation->user_id === $user->id
-                && $reservation->library_id === $user->library_id;
+                && $user->belongsToLibrary($reservation->library_id);
         }
 
         return $user->belongsToLibrary($reservation->library_id);
@@ -28,7 +28,7 @@ class ReservationPolicy
 
     public function create(User $user): bool
     {
-        return in_array($user->role, ['super_admin', 'admin', 'staff', 'member'], true);
+        return $user->hasAnyEffectiveRole(['superadministratorius', 'administratorius', 'darbuotojas', 'narys']);
     }
 
     public function update(User $user, Reservation $reservation): bool
@@ -37,12 +37,12 @@ class ReservationPolicy
             return true;
         }
 
-        if ($user->role === 'member') {
+        if ($user->effectiveRole($reservation->library_id) === 'narys') {
             return $reservation->user_id === $user->id
-                && $reservation->library_id === $user->library_id;
+                && $user->belongsToLibrary($reservation->library_id);
         }
 
-        return in_array($user->role, ['admin', 'staff'], true)
+        return $user->hasAnyEffectiveRole(['administratorius', 'darbuotojas'], $reservation->library_id)
             && $user->belongsToLibrary($reservation->library_id);
     }
 
@@ -52,12 +52,20 @@ class ReservationPolicy
             return true;
         }
 
-        if ($user->role === 'member') {
+        if ($user->effectiveRole($reservation->library_id) === 'narys') {
             return $reservation->user_id === $user->id
-                && $reservation->library_id === $user->library_id;
+                && $user->belongsToLibrary($reservation->library_id);
         }
 
-        return $user->role === 'admin'
+        return $user->hasAnyEffectiveRole(['administratorius'], $reservation->library_id)
             && $user->belongsToLibrary($reservation->library_id);
     }
 }
+
+
+
+
+
+
+
+

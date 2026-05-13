@@ -16,11 +16,11 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
 
             $table->enum('status', [
-                'reserved',
-                'fulfilled',
-                'cancelled',
-                'expired',
-            ])->default('reserved');
+                'rezervuota',
+                'įvykdyta',
+                'atšaukta',
+                'pasibaigusi',
+            ])->default('rezervuota');
 
             $table->timestamp('reserved_at');
             $table->timestamp('expires_at')->nullable();
@@ -45,3 +45,5 @@ return new class extends Migration
         Schema::dropIfExists('reservations');
     }
 };
+
+

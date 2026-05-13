@@ -34,7 +34,7 @@ class SearchManagementEntitiesQuery
         }
 
         $results['users'] = UserManagement::scopeVisibleUsers(
-            User::query()->with('library:id,name'),
+            User::query()->with('libraryMemberships.library:id,name,code'),
             $actor
         )
             ->where(function (Builder $query) use ($search) {
@@ -53,7 +53,7 @@ class SearchManagementEntitiesQuery
             ->get(['id', 'name']);
 
         $results['branches'] = Branch::query()
-            ->when(! $actor->isSuperAdmin(), fn (Builder $query) => $query->where('library_id', $actor->library_id))
+            ->when(! $actor->isSuperAdmin(), fn (Builder $query) => $query->where('library_id', $actor->activeLibraryId()))
             ->where(function (Builder $query) use ($search) {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('code', 'like', "%{$search}%")
@@ -65,7 +65,7 @@ class SearchManagementEntitiesQuery
             ->get();
 
         $results['locations'] = Location::query()
-            ->when(! $actor->isSuperAdmin(), fn (Builder $query) => $query->where('library_id', $actor->library_id))
+            ->when(! $actor->isSuperAdmin(), fn (Builder $query) => $query->where('library_id', $actor->activeLibraryId()))
             ->where(function (Builder $query) use ($search) {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('code', 'like', "%{$search}%")
@@ -112,3 +112,11 @@ class SearchManagementEntitiesQuery
         return $results;
     }
 }
+
+
+
+
+
+
+
+

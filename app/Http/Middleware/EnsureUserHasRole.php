@@ -16,10 +16,18 @@ class EnsureUserHasRole
             abort(403, 'Unauthenticated.');
         }
 
-        if (! in_array($user->role, $roles, true)) {
+        if (! $user->hasAnyEffectiveRole($roles)) {
             abort(403, 'Neturite teisės pasiekti šį puslapį.');
         }
 
         return $next($request);
     }
 }
+
+
+
+
+
+
+
+

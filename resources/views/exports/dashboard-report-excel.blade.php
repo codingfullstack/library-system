@@ -36,7 +36,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ count($section['headers']) }}">Duomenu nera</td>
+                        <td colspan="{{ count($section['headers']) }}">Duomenų nėra</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -44,3 +44,10 @@
     @endforeach
 </body>
 </html>
+
+
+
+
+
+
+

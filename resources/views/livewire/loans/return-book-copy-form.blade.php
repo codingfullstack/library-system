@@ -2,14 +2,14 @@
     @if($canReturn)
         @if(! $confirming)
             <button type="button" wire:click="confirm" class="app-button-secondary w-full">
-                Grazinti kopija
+                Grąžinti kopiją
             </button>
         @else
             <div class="space-y-4 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-500/10">
                 <div>
-                    <h4 class="text-sm font-semibold text-zinc-950 dark:text-white">Patvirtinti grazinima</h4>
+                    <h4 class="text-sm font-semibold text-zinc-950 dark:text-white">Patvirtinti grąžinimą</h4>
                     <p class="mt-1 text-xs leading-5 text-zinc-600 dark:text-zinc-300">
-                        Kopija #{{ $bookCopy->id }} bus pazymeta kaip laisva, o aktyvus isdavimas bus uzdarytas.
+                        {{ $bookCopy->inventory_code ?: ('Kopija #'.$bookCopy->id) }} bus pažymėta kaip laisva, o aktyvus išdavimas bus uždarytas.
                     </p>
                 </div>
 
@@ -19,15 +19,22 @@
 
                 <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <button type="button" wire:click="cancel" class="app-button-secondary w-full">
-                        Atsaukti
+                        Atšaukti
                     </button>
 
                     <button type="button" wire:click="save" class="app-button-primary w-full" wire:loading.attr="disabled">
                         <span wire:loading.remove>Patvirtinti</span>
-                        <span wire:loading>Grazinama...</span>
+                        <span wire:loading>Grąžinama...</span>
                     </button>
                 </div>
             </div>
         @endif
     @endif
 </div>
+
+
+
+
+
+
+

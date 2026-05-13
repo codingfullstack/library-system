@@ -18,104 +18,116 @@ class LocationImportService
 
     /**
      * @param  array<int, array<string, string|null>>  $rows
-     * @return array{created: int, updated: int, skipped: int, details: array<int, array<string, string|int|null>>}
+     * @return array{created: int, updated: int, skipped: int, failed: int, details: array<int, array<string, string|int|null>>}
      */
     public function import(User $user, array $rows, ?int $selectedLibraryId = null): array
     {
+        $this->ensureLibrarySelected($user, $selectedLibraryId);
+
         $created = 0;
         $updated = 0;
         $skipped = 0;
+        $failed = 0;
         $details = [];
 
-        DB::transaction(function () use ($user, $rows, $selectedLibraryId, &$created, &$updated, &$skipped, &$details): void {
-            foreach ($rows as $index => $row) {
-                $line = $index + 2;
-                $branch = $this->resolveBranch($user, $selectedLibraryId, $row, $line);
-                $name = trim((string) ($row['name'] ?? ''));
+        foreach ($rows as $index => $row) {
+            $line = $index + 2;
 
-                if ($name === '') {
-                    throw new \RuntimeException('Eilute ' . $line . ': privalomas laukelis name.');
-                }
+            try {
+                DB::transaction(function () use ($user, $row, $selectedLibraryId, $line, &$created, &$skipped, &$details): void {
+                    $branch = $this->resolveBranch($user, $selectedLibraryId, $row);
+                    $name = trim((string) ($row['name'] ?? ''));
 
-                $code = trim((string) ($row['code'] ?? ''));
+                    if ($name === '') {
+                        throw new \RuntimeException('Privalomas laukelis name.');
+                    }
 
-                $location = $code !== ''
-                    ? Location::query()->where('branch_id', $branch->id)->where('code', $code)->first()
-                    : Location::query()->where('branch_id', $branch->id)->where('name', $name)->first();
+                    $code = trim((string) ($row['code'] ?? ''));
 
-                if ($location) {
-                    $skipped++;
+                    $location = $code !== ''
+                        ? Location::query()->where('branch_id', $branch->id)->where('code', $code)->first()
+                        : Location::query()->where('branch_id', $branch->id)->where('name', $name)->first();
+
+                    if ($location) {
+                        $skipped++;
+                        $details[] = [
+                            'line' => $line,
+                            'status' => 'praleista',
+                            'label' => $name,
+                            'message' => $code !== ''
+                                ? 'Vieta su tokiu kodu jau yra šiame filiale.'
+                                : 'Vieta su tokiu pavadinimu jau yra šiame filiale.',
+                        ];
+
+                        return;
+                    }
+
+                    $location = new Location();
+
+                    $location->fill([
+                        'library_id' => $branch->library_id,
+                        'branch_id' => $branch->id,
+                        'name' => $name,
+                        'code' => $code !== '' ? $code : null,
+                        'room' => $row['room'] ?? null,
+                        'shelf' => $row['shelf'] ?? null,
+                        'description' => $row['description'] ?? null,
+                    ]);
+
+                    $location->save();
+
+                    $created++;
                     $details[] = [
                         'line' => $line,
-                        'status' => 'praleista',
+                        'status' => 'sukurta',
                         'label' => $name,
-                        'message' => $code !== ''
-                            ? 'Vieta su tokiu kodu jau yra siame filiale.'
-                            : 'Vieta su tokiu pavadinimu jau yra siame filiale.',
+                        'message' => 'Sukurta naują vietą.',
                     ];
-                    continue;
-                }
-
-                $location = new Location();
-
-                $location->fill([
-                    'library_id' => $branch->library_id,
-                    'branch_id' => $branch->id,
-                    'name' => $name,
-                    'code' => $code !== '' ? $code : null,
-                    'room' => $row['room'] ?? null,
-                    'shelf' => $row['shelf'] ?? null,
-                    'description' => $row['description'] ?? null,
-                ]);
-
-                $location->save();
-
-                $created++;
+                });
+            } catch (\Throwable $exception) {
+                $failed++;
                 $details[] = [
                     'line' => $line,
-                    'status' => 'sukurta',
-                    'label' => $name,
-                    'message' => 'Sukurta nauja vieta.',
+                    'status' => 'klaida',
+                    'label' => $this->rowLabel($row),
+                    'message' => $exception->getMessage(),
                 ];
             }
+        }
 
-            $this->recordAuditLogAction->handle(
-                $user,
-                'locations_imported',
-                null,
-                sprintf('Importuotos vietos: sukurta %d, praleista %d.', $created, $skipped),
-                [
-                    'created' => $created,
-                    'updated' => $updated,
-                    'skipped' => $skipped,
-                    'rows' => count($rows),
-                ],
-                $selectedLibraryId ?: $user->library_id
-            );
-        });
+        $this->recordAuditLogAction->handle(
+            $user,
+            'locations_imported',
+            null,
+            sprintf('Importuotos vietos: sukurta %d, praleista %d, klaidų %d.', $created, $skipped, $failed),
+            [
+                'created' => $created,
+                'updated' => $updated,
+                'skipped' => $skipped,
+                'failed' => $failed,
+                'rows' => count($rows),
+            ],
+            $selectedLibraryId ?: $user->activeLibraryId()
+        );
 
-        return compact('created', 'updated', 'skipped', 'details');
+        return compact('created', 'updated', 'skipped', 'failed', 'details');
     }
 
-    private function resolveBranch(User $user, ?int $selectedLibraryId, array $row, int $line): Branch
+    private function resolveBranch(User $user, ?int $selectedLibraryId, array $row): Branch
     {
         $branchCode = trim((string) ($row['branch_code'] ?? ''));
         $branchName = trim((string) ($row['branch_name'] ?? ''));
 
         if ($branchCode === '' && $branchName === '') {
-            throw new \RuntimeException('Eilute ' . $line . ': reikia branch_code arba branch_name.');
+            throw new \RuntimeException('Reikia branch_code arba branch_name.');
         }
 
         $query = Branch::query();
 
         if ($user->isSuperAdmin()) {
-            if (! $selectedLibraryId) {
-                throw new \RuntimeException('Superadmin importui reikia pasirinkti biblioteka.');
-            }
-
             $query->where('library_id', $selectedLibraryId);
         } else {
-            $query->where('library_id', $user->library_id);
+            $query->where('library_id', $user->activeLibraryId());
         }
 
         $branch = $branchCode !== ''
@@ -123,9 +135,36 @@ class LocationImportService
             : (clone $query)->where('name', $branchName)->first();
 
         if (! $branch) {
-            throw new \RuntimeException('Eilute ' . $line . ': nurodytas filialas nerastas.');
+            throw new \RuntimeException('Nurodytas filialas nerastas.');
         }
 
         return $branch;
     }
+
+    private function ensureLibrarySelected(User $user, ?int $selectedLibraryId): void
+    {
+        if ($user->isSuperAdmin() && ! $selectedLibraryId) {
+            throw new \RuntimeException('Superadmin importui reikia pasirinkti biblioteka.');
+        }
+    }
+
+    /**
+     * @param  array<string, string|null>  $row
+     */
+    private function rowLabel(array $row): string
+    {
+        $name = trim((string) ($row['name'] ?? ''));
+        $code = trim((string) ($row['code'] ?? ''));
+        $branch = trim((string) ($row['branch_code'] ?? $row['branch_name'] ?? ''));
+
+        return $name !== '' ? $name : ($code !== '' ? $code : ($branch !== '' ? $branch : '-'));
+    }
 }
+
+
+
+
+
+
+
+

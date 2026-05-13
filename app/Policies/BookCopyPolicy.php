@@ -9,7 +9,7 @@ class BookCopyPolicy
 {
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, ['super_admin', 'admin', 'staff'], true);
+        return $user->hasAnyEffectiveRole(['superadministratorius', 'administratorius', 'darbuotojas']);
     }
 
     public function view(User $user, BookCopy $bookCopy): bool
@@ -23,7 +23,7 @@ class BookCopyPolicy
 
     public function create(User $user): bool
     {
-        return in_array($user->role, ['super_admin', 'admin', 'staff'], true);
+        return $user->hasAnyEffectiveRole(['superadministratorius', 'administratorius', 'darbuotojas']);
     }
 
     public function update(User $user, BookCopy $bookCopy): bool
@@ -32,7 +32,7 @@ class BookCopyPolicy
             return true;
         }
 
-        return in_array($user->role, ['admin', 'staff'], true)
+        return $user->hasAnyEffectiveRole(['administratorius', 'darbuotojas'], $bookCopy->library_id)
             && $user->belongsToLibrary($bookCopy->library_id);
     }
 
@@ -42,7 +42,15 @@ class BookCopyPolicy
             return true;
         }
 
-        return $user->role === 'admin'
+        return $user->hasAnyEffectiveRole(['administratorius', 'darbuotojas'], $bookCopy->library_id)
             && $user->belongsToLibrary($bookCopy->library_id);
     }
 }
+
+
+
+
+
+
+
+

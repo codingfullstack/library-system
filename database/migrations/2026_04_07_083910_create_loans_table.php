@@ -21,11 +21,11 @@ return new class extends Migration {
             $table->dateTime('returned_at')->nullable();
 
             $table->enum('status', [
-                'active',
-                'returned',
-                'overdue',
-                'lost',
-            ])->default('active');
+                'aktyvi',
+                'grąžinta',
+                'vėluoja',
+                'prarasta',
+            ])->default('aktyvi');
 
             $table->unsignedInteger('renewal_count')->default(0);
             $table->text('notes')->nullable();
@@ -47,3 +47,4 @@ return new class extends Migration {
         Schema::dropIfExists('loans');
     }
 };
+

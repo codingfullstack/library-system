@@ -44,10 +44,16 @@ class CreateReservationForm extends Component
         }
 
         $member = User::query()
-            ->with('library:id,name')
+            ->with('libraryMemberships.library:id,name,code')
             ->whereKey($memberId)
-            ->when(! $actor->isSuperAdmin(), fn ($query) => $query->where('library_id', $actor->library_id))
-            ->where('role', 'member')
+            ->when(! $actor->isSuperAdmin(), function ($query) use ($actor) {
+                $libraryId = $actor->activeLibraryId();
+
+                $query->whereHas('libraryMemberships', fn ($membershipQuery) => $membershipQuery
+                    ->where('library_id', $libraryId)
+                    ->where('is_active', true));
+            })
+            ->where('role', 'narys')
             ->where('is_active', true)
             ->first();
 
@@ -85,8 +91,8 @@ class CreateReservationForm extends Component
         }
 
         $this->validate($this->rulesFor($actor), [
-            'selectedMemberId.required' => 'Pasirinkite nari.',
-            'expiresAt.after' => 'Galiojimo data turi buti ateityje.',
+            'selectedMemberId.required' => 'Pasirinkite narį.',
+            'expiresAt.after' => 'Galiojimo data turi būti ateityje.',
             'notes.max' => 'Pastabos negali virsyti 1000 simboliu.',
         ]);
 
@@ -108,7 +114,7 @@ class CreateReservationForm extends Component
         $this->clearMember();
         $this->expiresAt = null;
         $this->notes = '';
-        $this->successMessage = 'Rezervacija sekmingai sukurta.';
+        $this->successMessage = 'Rezervacija sėkmingai sukurta.';
 
         $this->dispatch('reservation-created', bookId: $this->bookId);
 
@@ -153,7 +159,7 @@ class CreateReservationForm extends Component
 
     private function usesMemberSearch(User $actor): bool
     {
-        return in_array($actor->role, ['super_admin', 'admin', 'staff'], true);
+        return $actor->hasAnyEffectiveRole(['superadministratorius', 'administratorius', 'darbuotojas']);
     }
 
     private function hasQueueAhead(): bool
@@ -179,12 +185,29 @@ class CreateReservationForm extends Component
                 return null;
             }
 
-            return User::query()
+            $activeLibraryId = $actor->activeLibraryId();
+
+            $member = User::query()
                 ->whereKey($this->selectedMemberId)
-                ->value('library_id');
+                ->when($activeLibraryId, function ($query) use ($activeLibraryId) {
+                    $query->whereHas('libraryMemberships', fn ($membershipQuery) => $membershipQuery
+                        ->where('library_id', $activeLibraryId)
+                        ->where('is_active', true));
+                })
+                ->first();
+
+            if (! $member) {
+                return $activeLibraryId;
+            }
+
+            return $member->activeLibraryMemberships()
+                ->when($activeLibraryId, fn ($query) => $query->where('library_id', $activeLibraryId))
+                ->orderBy('joined_at')
+                ->orderBy('id')
+                ->value('library_id') ?: $activeLibraryId;
         }
 
-        return $actor->library_id;
+        return $actor->activeLibraryId();
     }
 
     private function selectedLibraryName(?User $actor): ?string
@@ -197,7 +220,7 @@ class CreateReservationForm extends Component
             return $this->selectedMember['library_name'] ?? null;
         }
 
-        return $actor->library?->name;
+        return $actor->availableLibraries()->firstWhere('id', $actor->activeLibraryId())?->name;
     }
 
     private function mapActionField(string $field): string
@@ -230,12 +253,12 @@ class CreateReservationForm extends Component
             ->whereHas('bookCopies', function ($query) use ($libraryId) {
                 $query
                     ->where('library_id', $libraryId)
-                    ->where('status', '!=', 'available');
+                    ->where('status', '!=', 'laisva');
             })
             ->whereDoesntHave('bookCopies', function ($query) use ($libraryId) {
                 $query
                     ->where('library_id', $libraryId)
-                    ->where('status', 'available');
+                    ->where('status', 'laisva');
             })
             ->exists();
     }
@@ -271,7 +294,7 @@ class CreateReservationForm extends Component
             ->exists();
 
         if (! $hasCopies) {
-            return 'Sioje bibliotekoje si knyga neturi nei vienos kopijos.';
+            return 'Ši knyga tavo bibliotekose neprieinama.';
         }
 
         $hasAvailableCopy = Book::query()
@@ -279,14 +302,22 @@ class CreateReservationForm extends Component
             ->whereHas('bookCopies', function ($query) use ($libraryId) {
                 $query
                     ->where('library_id', $libraryId)
-                    ->where('status', 'available');
+                    ->where('status', 'laisva');
             })
             ->exists();
 
         if ($hasAvailableCopy) {
-            return 'Sioje bibliotekoje si knyga siuo metu turi laisva kopija, rezervacija nereikalinga.';
+            return 'Ši knyga šiuo metu prieinama tavo bibliotekose, rezervacija nereikalinga.';
         }
 
         return null;
     }
 }
+
+
+
+
+
+
+
+

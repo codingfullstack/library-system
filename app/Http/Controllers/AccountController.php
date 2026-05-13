@@ -28,31 +28,45 @@ class AccountController extends Controller
 
     public function reservations(Request $request, GetMemberReservationsQuery $getMemberReservationsQuery): View
     {
+        $filters = [
+            'search' => $request->query('search'),
+            'status' => $request->query('status'),
+            'reservation_date' => $request->query('reservation_date'),
+            'per_page' => $request->query('per_page', 15),
+        ];
+
         return view('account.reservations.index', [
-            'reservations' => $getMemberReservationsQuery->handle($request->user(), [
-                'search' => $request->query('search'),
-                'status' => $request->query('status'),
-                'per_page' => $request->query('per_page', 15),
-            ]),
+            'reservations' => $getMemberReservationsQuery->handle($request->user(), $filters),
+            'summary' => $getMemberReservationsQuery->summary($request->user(), $filters),
         ]);
     }
 
     public function profile(Request $request): View
     {
-        $user = $request->user()->load('library:id,name,email,phone,address,city');
+        $user = $request->user()->load([
+            'library:id,name,email,phone,address,city',
+            'activeLibraryMemberships.library:id,name,email,phone,address,city',
+        ]);
+
+        $libraries = collect([$user->library])
+            ->filter()
+            ->merge($user->activeLibraryMemberships->pluck('library')->filter())
+            ->unique('id')
+            ->values();
 
         return view('account.profile', [
             'member' => $user,
             'library' => $user->library,
-            'activeLoansCount' => $user->loans()
-                ->whereIn('status', ['active', 'overdue'])
-                ->whereNull('returned_at')
-                ->count(),
-            'activeReservationsCount' => $user->reservations()
-                ->where('status', 'reserved')
-                ->whereNull('fulfilled_at')
-                ->whereNull('cancelled_at')
-                ->count(),
+            'libraries' => $libraries,
         ]);
     }
 }
+
+
+
+
+
+
+
+
+

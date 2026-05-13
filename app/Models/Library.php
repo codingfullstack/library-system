@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Library extends Model
@@ -18,15 +19,31 @@ class Library extends Model
         'address',
         'city',
         'is_active',
+        'is_public',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_public' => 'boolean',
     ];
 
-    public function users(): HasMany
+    public function users(): BelongsToMany
     {
-        return $this->hasMany(User::class);
+        return $this->belongsToMany(User::class, 'library_memberships')
+            ->withPivot(['membership_number', 'is_active', 'joined_at'])
+            ->withTimestamps();
+    }
+
+    public function memberships(): HasMany
+    {
+        return $this->hasMany(LibraryMembership::class);
+    }
+
+    public function members(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'library_memberships')
+            ->withPivot(['membership_number', 'is_active', 'joined_at'])
+            ->withTimestamps();
     }
 
     public function branches(): HasMany
@@ -59,3 +76,11 @@ class Library extends Model
         return $this->hasMany(ScanLog::class);
     }
 }
+
+
+
+
+
+
+
+

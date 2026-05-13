@@ -15,7 +15,15 @@ class FindVisibleManagedBookQuery
 
         return Book::query()
             ->whereKey($book->id)
-            ->whereHas('bookCopies', fn ($copyQuery) => $copyQuery->where('library_id', $user->library_id))
+            ->whereHas('bookCopies', fn ($copyQuery) => $copyQuery->where('library_id', $user->activeLibraryId()))
             ->firstOrFail();
     }
 }
+
+
+
+
+
+
+
+

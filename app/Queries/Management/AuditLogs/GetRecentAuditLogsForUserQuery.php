@@ -60,3 +60,11 @@ class GetRecentAuditLogsForUserQuery
             ->withQueryString();
     }
 }
+
+
+
+
+
+
+
+

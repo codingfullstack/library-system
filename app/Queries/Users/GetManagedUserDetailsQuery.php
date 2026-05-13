@@ -9,7 +9,7 @@ class GetManagedUserDetailsQuery
     public function handle(User $user): User
     {
         $user->load([
-            'library:id,name,code',
+            'libraryMemberships.library:id,name,code',
             'loans' => function ($query) {
                 $query->with('bookCopy.book:id,title')
                     ->latest('borrowed_at')
@@ -32,3 +32,11 @@ class GetManagedUserDetailsQuery
         return $user;
     }
 }
+
+
+
+
+
+
+
+

@@ -45,3 +45,10 @@ trait BelongsToLibrary
         return $query->withoutGlobalScope('library');
     }
 }
+
+
+
+
+
+
+

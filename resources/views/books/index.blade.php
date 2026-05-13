@@ -1,6 +1,6 @@
 <x-layouts::app :title="__('Knygos')">
     @php
-        $canManageBooks = in_array(auth()->user()?->role, ['super_admin', 'admin', 'staff'], true);
+        $canManageBooks = in_array(auth()->user()?->role, ['superadministratorius', 'administratorius', 'darbuotojas'], true);
         $canEditBooks = auth()->user()?->isSuperAdmin();
     @endphp
 
@@ -11,7 +11,7 @@
                     <div>
                         <h1 class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">Knygos</h1>
                         <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                            Tvarkykite bibliotekos knygu kataloga
+                            Tvarkykite bibliotekos knygų kataloga
                         </p>
                     </div>
 
@@ -29,7 +29,7 @@
 
                             <a href="{{ route('manage.books.create') }}" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600">
                                 <flux:icon.plus class="size-4" />
-                                Prideti knyga
+                                Pridėti knygą
                                 <flux:icon.chevron-down class="size-4" />
                             </a>
                         @endif
@@ -59,7 +59,7 @@
                                     type="text"
                                     name="search"
                                     value="{{ request('search') }}"
-                                    placeholder="Ieskoti knygos pagal pavadinima, autoriu ar ISBN..."
+                                    placeholder="Ieškoti knygos pagal pavadinimą, autorių ar ISBN..."
                                     class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 pl-11 shadow-none dark:border-zinc-700 dark:bg-zinc-950"
                                 >
                                 <div class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
@@ -80,9 +80,9 @@
 
                             <div class="xl:min-w-0">
                                 <select id="availability" name="availability" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
-                                    <option value="">Busena</option>
-                                    <option value="available" {{ request('availability') === 'available' ? 'selected' : '' }}>Yra laisvu</option>
-                                    <option value="unavailable" {{ request('availability') === 'unavailable' ? 'selected' : '' }}>Laisvu nera</option>
+                                    <option value="">Būsena</option>
+                                    <option value="laisva" {{ request('availability') === 'laisva' ? 'selected' : '' }}>Yra laisvų</option>
+                                    <option value="unavailable" {{ request('availability') === 'unavailable' ? 'selected' : '' }}>Laisvų nėra</option>
                                 </select>
                             </div>
 
@@ -107,7 +107,7 @@
                             </button>
 
                             <a href="{{ route('books.index') }}" class="app-button-secondary h-11 rounded-2xl px-4 xl:w-auto">
-                                Isvalyti
+                                Išvalyti
                             </a>
 
                             <input type="hidden" name="sort" value="{{ request('sort', 'updated_at') }}">
@@ -132,7 +132,7 @@
                                         <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Egz.</th>
                                         <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Laisvi</th>
                                         <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Rezervacijos</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Busena</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Būsena</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Pask. atnaujinta</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Veiksmai</th>
                                     </tr>
@@ -146,7 +146,7 @@
                                             $statusMeta = $book->available_copies_count > 0
                                                 ? ['label' => 'Aktyvi', 'classes' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300']
                                                 : ($book->loaned_copies_count > 0
-                                                    ? ['label' => 'Isduota', 'classes' => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300']
+                                                    ? ['label' => 'Išduota', 'classes' => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300']
                                                     : ['label' => 'Neprieinama', 'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300']);
                                         @endphp
                                         <tr class="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40">
@@ -195,19 +195,19 @@
                                             </td>
                                             <td class="px-4 py-4 align-middle">
                                                 <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-                                                    <a href="{{ route('books.show', $book) }}" title="Perziureti knyga" aria-label="Perziureti knyga" class="transition hover:text-zinc-900 dark:hover:text-white">
+                                                    <a href="{{ route('books.show', $book) }}" title="Peržiūrėti knygą" aria-label="Peržiūrėti knygą" class="transition hover:text-zinc-900 dark:hover:text-white">
                                                         <flux:icon.eye class="size-4" />
                                                     </a>
 
                                                     @if($canEditBooks)
-                                                        <a href="{{ route('manage.books.edit', $book) }}" title="Redaguoti knyga" aria-label="Redaguoti knyga" class="transition hover:text-zinc-900 dark:hover:text-white">
+                                                        <a href="{{ route('manage.books.edit', $book) }}" title="Redaguoti knygą" aria-label="Redaguoti knygą" class="transition hover:text-zinc-900 dark:hover:text-white">
                                                             <flux:icon.pencil-square class="size-4" />
                                                         </a>
 
-                                                        <form method="POST" action="{{ route('manage.books.destroy', $book) }}" onsubmit="return confirm('Ar tikrai nori istrinti sia knyga?')">
+                                                        <form method="POST" action="{{ route('manage.books.destroy', $book) }}" onsubmit="return confirm('Ar tikrai nori ištrinti šią knygą?')">
                                                             @csrf
                                                             @method('DELETE')
-                                                            <button type="submit" class="transition hover:text-red-600 dark:hover:text-red-400" title="Istrinti knyga">
+                                                            <button type="submit" class="transition hover:text-red-600 dark:hover:text-red-400" title="Ištrinti knygą">
                                                                 <flux:icon.trash class="size-4" />
                                                             </button>
                                                         </form>
@@ -227,8 +227,8 @@
                     @else
                         <div class="p-6">
                             <x-ui.empty-state
-                                title="Knygu nerasta"
-                                description="Pabandyk pakeisti paieska arba filtrus."
+                                title="Knygų nerasta"
+                                description="Pabandyk pakeisti paiešką arba filtrus."
                             />
                         </div>
                     @endif
@@ -237,3 +237,10 @@
         </div>
     </x-ui.page>
 </x-layouts::app>
+
+
+
+
+
+
+

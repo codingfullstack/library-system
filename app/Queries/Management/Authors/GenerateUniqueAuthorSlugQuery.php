@@ -26,3 +26,11 @@ class GenerateUniqueAuthorSlugQuery
         return $candidate;
     }
 }
+
+
+
+
+
+
+
+

@@ -62,6 +62,7 @@ class ImportController extends Controller
                 'created' => $summary['created'] ?? 0,
                 'updated' => $summary['updated'] ?? 0,
                 'skipped' => $summary['skipped'] ?? 0,
+                'failed' => $summary['failed'] ?? 0,
                 'details' => $summary['details'] ?? [],
             ]);
     }
@@ -88,8 +89,8 @@ class ImportController extends Controller
 
         return match ($resource) {
             'books' => tap([
-                'title' => 'Knygu importas',
-                'description' => 'Ikelkite CSV faila su knygomis. Keli autoriu ir kategoriju slug skiriami simboliu |.',
+                'title' => 'Knygų importas',
+                'description' => 'Įkelkite CSV failą su knygomis. Keli autorių ir kategorijų slug skiriami simboliu |.',
                 'headers' => [
                     'title',
                     'subtitle',
@@ -138,34 +139,34 @@ class ImportController extends Controller
                     'category_slugs',
                 ],
                 'notes' => [
-                    'publisher_name sukuria arba suranda irasa publishers lenteleje.',
-                    'author_slugs yra pagalbinis rysio laukas. Jei autoriaus slug nerastas, autorius sukuriamas automatiskai.',
-                    'category_slugs yra pagalbinis rysio laukas. Jei kategorijos slug nerastas, kategorija sukuriama automatiskai.',
+                    'publisher_name sukuria arba suranda įrašą publishers lenteleje.',
+                    'author_slugs yra pagalbinis ryšio laukas. Jei autoriaus slug nerastas, autorius sukuriamas automatiškai.',
+                    'category_slugs yra pagalbinis ryšio laukas. Jei kategorijos slug nerastas, kategorija sukuriama automatiškai.',
                 ],
                 'index_route' => 'books.index',
             ], fn () => abort_unless($user && ($user->isSuperAdmin() || $user->isAdmin() || $user->isStaff()), 403)),
             'branches' => tap([
-                'title' => 'Filialu importas',
-                'description' => 'Ikelkite CSV faila su filialais. Biblioteka paimama is prisijungusio vartotojo arba pasirenkama formoje, jei importuoja superadmin.',
+                'title' => 'Filialų importas',
+                'description' => 'Įkelkite CSV failą su filialais. Biblioteka paimama iš prisijungusio vartotojo arba pasirenkama formoje, jei importuoja superadmin.',
                 'headers' => ['name', 'code', 'address', 'city'],
                 'sample' => ['Senamiescio filialas', 'SEN-01', 'Pilies g. 10', 'Vilnius'],
                 'schema_fields' => ['name', 'code', 'address', 'city'],
                 'relation_fields' => [],
                 'notes' => [
-                    'library_id i faila nerasomas. Jis paimamas is prisijungusio vartotojo arba superadmin pasirinktos bibliotekos.',
+                    'library_id į failą nerašomas. Jis paimamas iš prisijungusio vartotojo arba superadmin pasirinktos bibliotekos.',
                 ],
                 'index_route' => 'manage.branches.index',
             ], fn () => abort_unless($user && ($user->isSuperAdmin() || $user->isAdmin() || $user->isStaff()), 403)),
             'locations' => tap([
-                'title' => 'Vietu importas',
-                'description' => 'Ikelkite CSV faila su vietomis. Butina nurodyti branch_code arba branch_name. Biblioteka paimama is prisijungusio vartotojo arba pasirenkama formoje, jei importuoja superadmin.',
+                'title' => 'Vietų importas',
+                'description' => 'Įkelkite CSV failą su vietomis. Būtina nurodyti branch_code arba branch_name. Biblioteka paimama iš prisijungusio vartotojo arba pasirenkama formoje, jei importuoja superadmin.',
                 'headers' => ['branch_code', 'branch_name', 'name', 'code', 'room', 'shelf', 'description'],
                 'sample' => ['SEN-01', '', 'Grozines literaturos lentyna', 'V-001', '1', 'A-3', 'Prie lango'],
                 'schema_fields' => ['name', 'code', 'room', 'shelf', 'description'],
                 'relation_fields' => ['branch_code', 'branch_name'],
                 'notes' => [
                     'branch_code arba branch_name naudojami tik filialui surasti pasirinktoje bibliotekoje.',
-                    'library_id i faila nerasomas. Jis paimamas is prisijungusio vartotojo arba superadmin pasirinktos bibliotekos.',
+                    'library_id į failą nerašomas. Jis paimamas iš prisijungusio vartotojo arba superadmin pasirinktos bibliotekos.',
                 ],
                 'index_route' => 'manage.locations.index',
             ], fn () => abort_unless($user && ($user->isSuperAdmin() || $user->isAdmin() || $user->isStaff()), 403)),
@@ -174,7 +175,7 @@ class ImportController extends Controller
     }
 
     /**
-     * @param  array{created:int,updated:int,skipped:int,details?:array<int, array<string, string|int|null>>}  $summary
+     * @param  array{created:int,updated:int,skipped:int,failed?:int,details?:array<int, array<string, string|int|null>>}  $summary
      */
     private function successMessage(array $summary): string
     {
@@ -190,6 +191,18 @@ class ImportController extends Controller
             $parts[] = sprintf('praleista %d', $summary['skipped']);
         }
 
+        if (($summary['failed'] ?? 0) > 0) {
+            $parts[] = sprintf('klaidų %d', $summary['failed']);
+        }
+
         return 'Importas baigtas: ' . implode(', ', $parts) . '.';
     }
 }
+
+
+
+
+
+
+
+

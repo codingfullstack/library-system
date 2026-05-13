@@ -37,7 +37,7 @@ class ReservationSummary extends Component
         $currentReservations = Reservation::query()
             ->where('book_id', $this->bookId)
             ->when(! $actor->isSuperAdmin(), function ($query) use ($actor) {
-                $query->where('library_id', $actor->library_id);
+                $query->where('library_id', $actor->activeLibraryId());
             })
             ->with('user:id,name,email,membership_number')
             ->pending()
@@ -50,3 +50,11 @@ class ReservationSummary extends Component
         ]);
     }
 }
+
+
+
+
+
+
+
+

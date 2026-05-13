@@ -1,12 +1,12 @@
-<x-layouts::app :title="'Valdymo paieska'">
+<x-layouts::app :title="'Valdymo paieška'">
     <x-ui.page>
         <x-ui.page-header
             eyebrow="Valdymas"
-            title="Globali paieska"
-            description="Greitai rask vartotojus, autorius, filialus, vietas ir kitus valdymo irasus."
+            title="Globali paieška"
+            description="Greitai rask vartotojus, autorius, filialus, vietas ir kitus valdymo įrašus."
         />
 
-        <x-ui.panel class="mb-6" title="Paieska" description="Ivesk varda, koda, ISBN ar kita rakta, pagal kuri nori ieskoti.">
+        <x-ui.panel class="mb-6" title="Paieška" description="Įveskite vardą, kodą, ISBN ar kitą raktą, pagal kurį norite ieškoti.">
             <form method="GET" action="{{ route('manage.search.index') }}" class="grid gap-4 md:grid-cols-[1fr_auto_auto]">
                 <input
                     type="text"
@@ -16,30 +16,30 @@
                     placeholder="Pvz. vartotojas, knyga, filialas, vieta..."
                 >
 
-                <button type="submit" class="app-button-primary">Ieskoti</button>
-                <a href="{{ route('manage.search.index') }}" class="app-button-secondary">Isvalyti</a>
+                <button type="submit" class="app-button-primary">Ieškoti</button>
+                <a href="{{ route('manage.search.index') }}" class="app-button-secondary">Išvalyti</a>
             </form>
         </x-ui.panel>
 
         @if ($search === '')
             <x-ui.panel>
                 <x-ui.empty-state
-                    title="Ivesk paieskos fraze"
-                    description="Rezultatai atsiras cia, kai pradesi ieskoti valdymo irasu."
+                    title="Įveskite paieškos frazę"
+                    description="Rezultatai atsiras čia, kai pradėsi ieškoti valdymo įrašų."
                 />
             </x-ui.panel>
         @elseif ($totalResults === 0)
             <x-ui.panel>
                 <x-ui.empty-state
                     title="Nieko nerasta"
-                    description="Pabandyk trumpesne arba bendresne paieska."
+                    description="Pabandyk trumpesne arba bendresne paieška."
                 />
             </x-ui.panel>
         @else
             <div class="grid gap-6 xl:grid-cols-2">
                 <x-ui.panel title="Vartotojai" :description="'Rasta: '.$results['users']->count()">
                     @if ($results['users']->isEmpty())
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Atitikmenu nera.</p>
+                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Atitikmenu nėra.</p>
                     @else
                         <div class="space-y-3">
                             @foreach ($results['users'] as $user)
@@ -60,7 +60,7 @@
 
                 <x-ui.panel title="Autoriai" :description="'Rasta: '.$results['authors']->count()">
                     @if ($results['authors']->isEmpty())
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Atitikmenu nera.</p>
+                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Atitikmenu nėra.</p>
                     @else
                         <div class="space-y-3">
                             @foreach ($results['authors'] as $author)
@@ -74,7 +74,7 @@
 
                 <x-ui.panel title="Filialai" :description="'Rasta: '.$results['branches']->count()">
                     @if ($results['branches']->isEmpty())
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Atitikmenu nera.</p>
+                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Atitikmenu nėra.</p>
                     @else
                         <div class="space-y-3">
                             @foreach ($results['branches'] as $branch)
@@ -95,7 +95,7 @@
 
                 <x-ui.panel title="Vietos" :description="'Rasta: '.$results['locations']->count()">
                     @if ($results['locations']->isEmpty())
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Atitikmenu nera.</p>
+                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Atitikmenu nėra.</p>
                     @else
                         <div class="space-y-3">
                             @foreach ($results['locations'] as $location)
@@ -119,7 +119,7 @@
                 @if (auth()->user()?->isSuperAdmin())
                     <x-ui.panel title="Knygos" :description="'Rasta: '.$results['books']->count()">
                         @if ($results['books']->isEmpty())
-                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Atitikmenu nera.</p>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Atitikmenu nėra.</p>
                         @else
                             <div class="space-y-3">
                                 @foreach ($results['books'] as $book)
@@ -137,7 +137,7 @@
 
                     <x-ui.panel title="Kategorijos" :description="'Rasta: '.$results['categories']->count()">
                         @if ($results['categories']->isEmpty())
-                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Atitikmenu nera.</p>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Atitikmenu nėra.</p>
                         @else
                             <div class="space-y-3">
                                 @foreach ($results['categories'] as $category)
@@ -151,7 +151,7 @@
 
                     <x-ui.panel title="Leidyklos" :description="'Rasta: '.$results['publishers']->count()">
                         @if ($results['publishers']->isEmpty())
-                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Atitikmenu nera.</p>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Atitikmenu nėra.</p>
                         @else
                             <div class="space-y-3">
                                 @foreach ($results['publishers'] as $publisher)
@@ -168,3 +168,10 @@
         @endif
     </x-ui.page>
 </x-layouts::app>
+
+
+
+
+
+
+

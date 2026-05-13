@@ -10,10 +10,10 @@ class Reservation extends Model
 {
     use HasFactory;
 
-    public const STATUS_RESERVED = 'reserved';
-    public const STATUS_FULFILLED = 'fulfilled';
-    public const STATUS_CANCELLED = 'cancelled';
-    public const STATUS_EXPIRED = 'expired';
+    public const STATUS_RESERVED = 'rezervuota';
+    public const STATUS_FULFILLED = 'įvykdyta';
+    public const STATUS_CANCELLED = 'atšaukta';
+    public const STATUS_EXPIRED = 'pasibaigusi';
 
     protected $fillable = [
         'library_id',
@@ -98,4 +98,30 @@ class Reservation extends Model
     {
         return $this->isPending() && $this->expires_at !== null;
     }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function statusLabels(): array
+    {
+        return [
+            self::STATUS_RESERVED => 'Aktyvi',
+            self::STATUS_FULFILLED => 'Įvykdyta',
+            self::STATUS_CANCELLED => 'Atšaukta',
+            self::STATUS_EXPIRED => 'Pasibaigusi',
+        ];
+    }
+
+    public function statusLabel(): string
+    {
+        return self::statusLabels()[$this->status] ?? (string) $this->status;
+    }
 }
+
+
+
+
+
+
+
+

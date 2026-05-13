@@ -10,7 +10,6 @@ use App\Http\Requests\ManageBookCopyLifecycleRequest;
 use App\Models\BookCopy;
 use App\Queries\Management\AuditLogs\GetRecentAuditLogsForModelQuery;
 use App\Queries\Management\BookCopies\GetManageBookCopiesQuery;
-use App\Queries\Management\BookCopies\GetManageBookCopyCreateDataQuery;
 use App\Support\AuditLogChanges;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,20 +33,16 @@ class BookCopyController extends Controller
         ]);
     }
 
-    public function create(Request $request, GetManageBookCopyCreateDataQuery $getManageBookCopyCreateDataQuery): View
+    public function create(): View
     {
-        return view('manage.book-copies.create', $getManageBookCopyCreateDataQuery->handle($request->user(), [
-            'search' => $request->query('search'),
-            'book_id' => $request->query('book_id'),
-            'library_id' => $request->query('library_id'),
-        ]));
+        return view('manage.book-copies.create');
     }
 
     public function store(ManageBookCopyRequest $request, ChangeBookCopyStatusAction $changeBookCopyStatusAction): RedirectResponse
     {
         $libraryId = $request->user()->isSuperAdmin()
             ? $request->integer('library_id')
-            : $request->user()->library_id;
+            : $request->user()->activeLibraryId();
 
         $copy = BookCopy::create([
             'library_id' => $libraryId,
@@ -90,7 +85,7 @@ class BookCopyController extends Controller
 
         return redirect()
             ->route('book-copies.show', $copy->id)
-            ->with('success', 'Egzempliorius sekmingai pridetas prie esamos knygos.');
+            ->with('success', 'Egzempliorius sėkmingai pridėtas prie esamos knygos.');
     }
 
     public function edit(
@@ -99,7 +94,7 @@ class BookCopyController extends Controller
         GetRecentAuditLogsForModelQuery $getRecentAuditLogsForModelQuery
     ): View
     {
-        $this->ensureVisible($request, $bookCopy);
+        $this->authorize('update', $bookCopy);
 
         $bookCopy->loadMissing(['book.authors:id,name', 'book.publisher:id,name', 'book.categories:id,name']);
 
@@ -113,11 +108,11 @@ class BookCopyController extends Controller
 
     public function update(ManageBookCopyRequest $request, BookCopy $bookCopy): RedirectResponse
     {
-        $this->ensureVisible($request, $bookCopy);
+        $this->authorize('update', $bookCopy);
 
         $libraryId = $request->user()->isSuperAdmin()
             ? $request->integer('library_id')
-            : $request->user()->library_id;
+            : $request->user()->activeLibraryId();
 
         $bookCopy->fill([
             'library_id' => $libraryId,
@@ -153,18 +148,18 @@ class BookCopyController extends Controller
 
     public function destroy(Request $request, BookCopy $bookCopy): RedirectResponse
     {
-        $this->ensureVisible($request, $bookCopy);
+        $this->authorize('delete', $bookCopy);
 
         if ($bookCopy->activeLoan()->exists()) {
-            return back()->with('error', 'Egzemplioriaus istrinti negalima, nes jis siuo metu isduotas.');
+            return back()->with('error', 'Egzemplioriaus ištrinti negalima, nes jis šiuo metu išduotas.');
         }
 
         if ($bookCopy->loans()->exists()) {
-            return back()->with('error', 'Egzemplioriaus istrinti negalima, nes jis turi isduotu knygu istorija.');
+            return back()->with('error', 'Egzemplioriaus ištrinti negalima, nes jis turi išduotų knygų istorija.');
         }
 
         if ($bookCopy->scanLogs()->exists()) {
-            return back()->with('error', 'Egzemplioriaus istrinti negalima, nes jis turi skenavimo istorija.');
+            return back()->with('error', 'Egzemplioriaus ištrinti negalima, nes jis turi skenavimo istorija.');
         }
 
         $bookCopy->loadMissing([
@@ -177,7 +172,7 @@ class BookCopyController extends Controller
             $request->user(),
             'book_copy_deleted',
             $bookCopy,
-            sprintf('Istrintas egzempliorius %s.', $bookCopy->inventory_code),
+            sprintf('Ištrintas egzempliorius %s.', $bookCopy->inventory_code),
             [
                 'inventory_code' => $bookCopy->inventory_code,
                 'book_id' => $bookCopy->book_id,
@@ -201,7 +196,7 @@ class BookCopyController extends Controller
 
         return redirect()
             ->route('books.index')
-            ->with('success', 'Egzempliorius istrintas.');
+            ->with('success', 'Egzempliorius ištrintas.');
     }
 
     public function updateLifecycle(
@@ -209,10 +204,10 @@ class BookCopyController extends Controller
         BookCopy $bookCopy,
         ChangeBookCopyStatusAction $changeBookCopyStatusAction
     ): RedirectResponse {
-        $this->ensureVisible($request, $bookCopy);
+        $this->authorize('update', $bookCopy);
 
         if ($bookCopy->activeLoan()->exists()) {
-            return back()->with('error', 'Negalima keisti egzemplioriaus gyvavimo ciklo, kol jis yra aktyviai isduotas.');
+            return back()->with('error', 'Negalima keisti egzemplioriaus gyvavimo ciklo, kol jis yra aktyviai išduotas.');
         }
 
         $targetStatus = $request->validated('target_status');
@@ -222,18 +217,18 @@ class BookCopyController extends Controller
             BookCopy::STATUS_DAMAGED => 'marked_damaged',
             BookCopy::STATUS_MAINTENANCE => 'sent_to_maintenance',
             BookCopy::STATUS_AVAILABLE => 'restored_to_active',
-            BookCopy::STATUS_WITHDRAWN => 'withdrawn',
+            BookCopy::STATUS_WITHDRAWN => 'nurašyta',
             default => 'status_adjusted',
         };
 
         $attributes = [];
 
         if ($targetStatus === BookCopy::STATUS_DAMAGED) {
-            $attributes['condition_status'] = 'damaged';
+            $attributes['condition_status'] = 'sugadinta';
         }
 
-        if ($targetStatus === BookCopy::STATUS_AVAILABLE && $bookCopy->condition_status === 'damaged') {
-            $attributes['condition_status'] = 'good';
+        if ($targetStatus === BookCopy::STATUS_AVAILABLE && $bookCopy->condition_status === 'sugadinta') {
+            $attributes['condition_status'] = 'gera';
         }
 
         $changeBookCopyStatusAction->handle(
@@ -247,7 +242,7 @@ class BookCopyController extends Controller
 
         return redirect()
             ->route('book-copies.show', $bookCopy)
-            ->with('success', 'Egzemplioriaus busena atnaujinta.');
+            ->with('success', 'Egzemplioriaus būsena atnaujinta.');
     }
 
     private function ensureVisible(Request $request, BookCopy $bookCopy): void
@@ -256,7 +251,7 @@ class BookCopyController extends Controller
             return;
         }
 
-        abort_unless($bookCopy->library_id === $request->user()->library_id, 404);
+        abort_unless($bookCopy->library_id === $request->user()->activeLibraryId(), 404);
     }
 
     private function generateQrCode(int $libraryId): string
@@ -273,3 +268,11 @@ class BookCopyController extends Controller
         return $candidate;
     }
 }
+
+
+
+
+
+
+
+

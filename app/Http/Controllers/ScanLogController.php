@@ -8,3 +8,11 @@ class ScanLogController extends Controller
 {
     //
 }
+
+
+
+
+
+
+
+

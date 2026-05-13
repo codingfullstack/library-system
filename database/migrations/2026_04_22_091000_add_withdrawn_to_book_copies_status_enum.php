@@ -13,13 +13,13 @@ return new class extends Migration
             DB::statement("
                 ALTER TABLE book_copies
                 MODIFY status ENUM(
-                    'available',
-                    'loaned',
-                    'lost',
-                    'damaged',
-                    'maintenance',
-                    'withdrawn'
-                ) NOT NULL DEFAULT 'available'
+                    'laisva',
+                    'išduota',
+                    'prarasta',
+                    'sugadinta',
+                    'tvarkoma',
+                    'nurašyta'
+                ) NOT NULL DEFAULT 'laisva'
             ");
 
             return;
@@ -34,15 +34,17 @@ return new class extends Migration
             DB::statement("
                 ALTER TABLE book_copies
                 MODIFY status ENUM(
-                    'available',
-                    'loaned',
-                    'lost',
-                    'damaged',
-                    'maintenance'
-                ) NOT NULL DEFAULT 'available'
+                    'laisva',
+                    'išduota',
+                    'prarasta',
+                    'sugadinta',
+                    'tvarkoma'
+                ) NOT NULL DEFAULT 'laisva'
             ");
 
             return;
         }
     }
 };
+
+

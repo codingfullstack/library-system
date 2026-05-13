@@ -88,6 +88,7 @@ class GetAuditLogsQuery
         return $query->where(function (Builder $nested) use ($search) {
             $nested->where('description', 'like', "%{$search}%")
                 ->orWhere('action', 'like', "%{$search}%")
+                ->orWhere('metadata', 'like', "%{$search}%")
                 ->orWhereHas('actor', function (Builder $actorQuery) use ($search) {
                     $actorQuery->where('name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%");
@@ -99,3 +100,11 @@ class GetAuditLogsQuery
         });
     }
 }
+
+
+
+
+
+
+
+

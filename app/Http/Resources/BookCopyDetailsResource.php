@@ -108,8 +108,8 @@ class BookCopyDetailsResource extends JsonResource
             'current_reservation' => $currentReservation
                 ? (new ReservationResource($currentReservation))->resolve()
                 : null,
-            'can_borrow' => $this->status === 'available' && $this->canManageCopy && $this->activeLoan === null,
-            'can_return' => $this->status === 'loaned' && $this->canManageCopy,
+            'can_borrow' => $this->status === 'laisva' && $this->canManageCopy && $this->activeLoan === null,
+            'can_return' => $this->status === 'išduota' && $this->canManageCopy,
             'can_manage' => $this->canManageCopy,
             'available_lifecycle_transitions' => method_exists($this->resource, 'availableLifecycleTransitions')
                 ? $this->availableLifecycleTransitions()
@@ -117,3 +117,11 @@ class BookCopyDetailsResource extends JsonResource
         ];
     }
 }
+
+
+
+
+
+
+
+

@@ -110,7 +110,7 @@ class BranchController extends Controller
             $request->user(),
             'branch_deleted',
             $branch,
-            sprintf('Istrintas filialas "%s".', $branch->name),
+            sprintf('Ištrintas filialas "%s".', $branch->name),
             [
                 'branch_name' => $branch->name,
                 'snapshot' => [
@@ -136,7 +136,7 @@ class BranchController extends Controller
         return [
             'library_id' => $request->user()->isSuperAdmin()
                 ? $request->integer('library_id')
-                : $request->user()->library_id,
+                : $request->user()->activeLibraryId(),
             'name' => $request->validated('name'),
             'code' => $request->validated('code'),
             'address' => $request->validated('address'),
@@ -150,6 +150,14 @@ class BranchController extends Controller
             return;
         }
 
-        abort_unless($branch->library_id === $request->user()->library_id, 404);
+        abort_unless($branch->library_id === $request->user()->activeLibraryId(), 404);
     }
 }
+
+
+
+
+
+
+
+

@@ -3,3 +3,10 @@
         {{ $slot }}
     </flux:main>
 </x-layouts::app.sidebar>
+
+
+
+
+
+
+

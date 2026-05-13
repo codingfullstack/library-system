@@ -55,19 +55,27 @@ class ManageUserRequest extends FormRequest
                 }
 
                 if (! UserManagement::canManageRole($actor, $role)) {
-                    $validator->errors()->add('role', 'Negalite priskirti sios roles.');
+                    $validator->errors()->add('role', 'Negalite priskirti šios roles.');
                 }
 
                 if (! $actor->isSuperAdmin() && UserManagement::requiresLibrary($role)) {
-                    if ((int) $libraryId !== (int) $actor->library_id) {
+                    if ((int) $libraryId !== (int) $actor->activeLibraryId()) {
                         $validator->errors()->add('library_id', 'Galite priskirti tik savo biblioteka.');
                     }
                 }
 
-                if ($role === 'super_admin' && $libraryId) {
+                if ($role === 'superadministratorius' && $libraryId) {
                     $validator->errors()->add('library_id', 'Superadmin rolei biblioteka nepriskiriama.');
                 }
             },
         ];
     }
 }
+
+
+
+
+
+
+
+

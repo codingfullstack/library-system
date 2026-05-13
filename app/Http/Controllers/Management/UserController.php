@@ -23,7 +23,7 @@ class UserController extends Controller
         $users = $getManageUsersQuery->handle($actor, [
             'search' => $request->query('search'),
             'role' => $request->query('role'),
-            'active' => $request->query('active'),
+            'aktyvi' => $request->query('aktyvi'),
         ]);
 
         return view('manage.users.index', [
@@ -92,7 +92,7 @@ class UserController extends Controller
         $this->ensureVisible($actor, $user);
 
         if ($actor->id === $user->id) {
-            return back()->with('error', 'Negalite istrinti savo paskyros.');
+            return back()->with('error', 'Negalite ištrinti savo paskyros.');
         }
 
         if ($user->isSuperAdmin()) {
@@ -106,16 +106,16 @@ class UserController extends Controller
             || $user->receivedLoans()->exists()
             || $user->scanLogs()->exists()
         ) {
-            return back()->with('error', 'Vartotojo istrinti negalima, nes jis turi susijusios istorijos.');
+            return back()->with('error', 'Vartotojo ištrinti negalima, nes jis turi susijusios istorijos.');
         }
 
-        $user->loadMissing('library:id,name');
+        $user->loadMissing('libraryMemberships.library:id,name');
 
         app(RecordAuditLogAction::class)->handle(
             $actor,
             'user_deleted',
             $user,
-            sprintf('Istrintas vartotojas "%s".', $user->name),
+            sprintf('Ištrintas vartotojas "%s".', $user->name),
             [
                 'target_user_id' => $user->id,
                 'target_user_name' => $user->name,
@@ -130,14 +130,14 @@ class UserController extends Controller
                     'is_active' => $user->is_active,
                 ],
             ],
-            $user->library_id ?: $actor->library_id
+            $user->defaultLibraryId() ?: $actor->activeLibraryId()
         );
 
         $user->delete();
 
         return redirect()
             ->route('manage.users.index')
-            ->with('success', 'Vartotojas istrintas.');
+            ->with('success', 'Vartotojas ištrintas.');
     }
 
     public function toggleActive(
@@ -149,7 +149,7 @@ class UserController extends Controller
         $this->ensureVisible($actor, $user);
 
         if ($actor->id === $user->id) {
-            return back()->with('error', 'Negalite aktyvuoti arba deaktyvuoti savo paskyros is saraso.');
+            return back()->with('error', 'Negalite aktyvuoti arba deaktyvuoti savo paskyros iš sąrašo.');
         }
 
         if ($user->isSuperAdmin() && $user->is_active) {
@@ -159,6 +159,7 @@ class UserController extends Controller
         $user->update([
             'is_active' => ! $user->is_active,
         ]);
+        UserManagement::syncUserMembershipActivity($user);
 
         app(RecordAuditLogAction::class)->handle(
             $actor,
@@ -175,7 +176,7 @@ class UserController extends Controller
                 'target_user_role' => $user->role,
                 'is_active' => $user->is_active,
             ],
-            $user->library_id ?: $actor->library_id
+            $user->defaultLibraryId() ?: $actor->activeLibraryId()
         );
 
         return back()->with('success', $user->is_active ? 'Vartotojas aktyvuotas.' : 'Vartotojas deaktyvuotas.');
@@ -197,3 +198,11 @@ class UserController extends Controller
         }
     }
 }
+
+
+
+
+
+
+
+

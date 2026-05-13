@@ -21,3 +21,11 @@ class GetManageCategoriesQuery
             ->withQueryString();
     }
 }
+
+
+
+
+
+
+
+

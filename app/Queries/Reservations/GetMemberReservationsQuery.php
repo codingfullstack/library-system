@@ -13,7 +13,9 @@ class GetMemberReservationsQuery
     {
         $search = trim((string) ($filters['search'] ?? ''));
         $status = $filters['status'] ?? null;
+        $reservationDate = $filters['reservation_date'] ?? null;
         $perPage = (int) ($filters['per_page'] ?? 15);
+        $libraryId = $user->activeLibraryId();
 
         $queuePositionSubquery = DB::table('reservations as queue_reservations')
             ->selectRaw('COUNT(*)')
@@ -38,6 +40,7 @@ class GetMemberReservationsQuery
             ->select('reservations.*')
             ->selectSub($queuePositionSubquery, 'queue_position')
             ->where('user_id', $user->id)
+            ->when($libraryId, fn ($builder) => $builder->where('library_id', $libraryId))
             ->with([
                 'book:id,title,subtitle,isbn',
                 'library:id,name',
@@ -45,6 +48,10 @@ class GetMemberReservationsQuery
 
         if ($status !== null && $status !== '') {
             $query->where('status', $status);
+        }
+
+        if ($reservationDate !== null && $reservationDate !== '') {
+            $query->whereDate('reserved_at', $reservationDate);
         }
 
         if ($search !== '') {
@@ -59,4 +66,44 @@ class GetMemberReservationsQuery
             ->paginate($perPage)
             ->withQueryString();
     }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, int>
+     */
+    public function summary(User $user, array $filters = []): array
+    {
+        $search = trim((string) ($filters['search'] ?? ''));
+        $status = $filters['status'] ?? null;
+        $reservationDate = $filters['reservation_date'] ?? null;
+        $libraryId = $user->activeLibraryId();
+
+        $baseQuery = Reservation::query()
+            ->where('user_id', $user->id)
+            ->when($libraryId, fn ($query) => $query->where('library_id', $libraryId))
+            ->when($status, fn ($query) => $query->where('status', $status))
+            ->when($reservationDate, fn ($query) => $query->whereDate('reserved_at', $reservationDate))
+            ->when($search !== '', function ($query) use ($search) {
+                $query->whereHas('book', function ($bookQuery) use ($search) {
+                    $bookQuery->where('title', 'like', "%{$search}%")
+                        ->orWhere('isbn', 'like', "%{$search}%");
+                });
+            });
+
+        return [
+            'all_count' => (clone $baseQuery)->count(),
+            'active_count' => (clone $baseQuery)->where('status', Reservation::STATUS_RESERVED)->count(),
+            'fulfilled_count' => (clone $baseQuery)->where('status', Reservation::STATUS_FULFILLED)->count(),
+            'cancelled_count' => (clone $baseQuery)->where('status', Reservation::STATUS_CANCELLED)->count(),
+            'expired_count' => (clone $baseQuery)->where('status', Reservation::STATUS_EXPIRED)->count(),
+        ];
+    }
 }
+
+
+
+
+
+
+
+

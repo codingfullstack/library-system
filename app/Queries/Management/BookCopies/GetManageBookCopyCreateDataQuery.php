@@ -14,7 +14,7 @@ class GetManageBookCopyCreateDataQuery
         $selectedBookId = $filters['book_id'] ?? null;
         $selectedLibraryId = $user->isSuperAdmin()
             ? (($filters['library_id'] ?? null) ?: old('library_id'))
-            : $user->library_id;
+            : $user->activeLibraryId();
 
         $books = Book::query()
             ->with(['authors:id,name', 'publisher:id,name'])
@@ -43,3 +43,11 @@ class GetManageBookCopyCreateDataQuery
         ];
     }
 }
+
+
+
+
+
+
+
+

@@ -14,3 +14,4 @@ class PublisherFactory extends Factory
         ];
     }
 }
+

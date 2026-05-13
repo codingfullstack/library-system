@@ -49,7 +49,7 @@ it('filters books by author category publisher and availability', function () {
         'book_id' => $matchingBook->id,
         'branch_id' => $branch->id,
         'location_id' => $location->id,
-        'status' => 'available',
+        'status' => 'laisva',
     ]);
 
     BookCopy::factory()->create([
@@ -57,14 +57,14 @@ it('filters books by author category publisher and availability', function () {
         'book_id' => $otherBook->id,
         'branch_id' => $branch->id,
         'location_id' => $location->id,
-        'status' => 'loaned',
+        'status' => 'išduota',
     ]);
 
     $response = $this->actingAs($user)->get(route('books.index', [
         'author_id' => $matchingAuthor->id,
         'category_id' => $matchingCategory->id,
         'publisher_id' => $matchingPublisher->id,
-        'availability' => 'available',
+        'availability' => 'laisva',
     ]));
 
     $response->assertOk();
@@ -88,7 +88,7 @@ it('filters book copies on the book page by status branch and location', functio
         'branch_id' => $matchingBranch->id,
         'location_id' => $matchingLocation->id,
         'inventory_code' => 'INV-MATCH-001',
-        'status' => 'available',
+        'status' => 'laisva',
     ]);
 
     BookCopy::factory()->create([
@@ -97,12 +97,12 @@ it('filters book copies on the book page by status branch and location', functio
         'branch_id' => $otherBranch->id,
         'location_id' => $otherLocation->id,
         'inventory_code' => 'INV-OTHER-001',
-        'status' => 'loaned',
+        'status' => 'išduota',
     ]);
 
     $response = $this->actingAs($user)->get(route('books.show', [
         'book' => $book,
-        'copy_status' => 'available',
+        'copy_status' => 'laisva',
         'branch_id' => $matchingBranch->id,
         'location_id' => $matchingLocation->id,
     ]));
@@ -125,7 +125,7 @@ it('filters book copies on the book page by lifecycle group', function () {
         'branch_id' => $branch->id,
         'location_id' => $location->id,
         'inventory_code' => 'INV-ISSUE-001',
-        'status' => 'maintenance',
+        'status' => 'tvarkoma',
     ]);
 
     BookCopy::factory()->create([
@@ -134,7 +134,7 @@ it('filters book copies on the book page by lifecycle group', function () {
         'branch_id' => $branch->id,
         'location_id' => $location->id,
         'inventory_code' => 'INV-REMOVED-001',
-        'status' => 'withdrawn',
+        'status' => 'nurašyta',
     ]);
 
     BookCopy::factory()->create([
@@ -143,7 +143,7 @@ it('filters book copies on the book page by lifecycle group', function () {
         'branch_id' => $branch->id,
         'location_id' => $location->id,
         'inventory_code' => 'INV-ACTIVE-001',
-        'status' => 'available',
+        'status' => 'laisva',
     ]);
 
     $issuesResponse = $this->actingAs($user)->get(route('books.show', [
@@ -197,7 +197,7 @@ it('filters loans by member employee and overdue status', function () {
         'user_id' => $member->id,
         'issued_by' => $employee->id,
         'returned_at' => null,
-        'status' => 'overdue',
+        'status' => 'vėluoja',
         'borrowed_at' => now()->subDays(20),
         'due_at' => now()->subDays(5),
     ]);
@@ -208,7 +208,7 @@ it('filters loans by member employee and overdue status', function () {
         'user_id' => $otherMember->id,
         'issued_by' => $otherEmployee->id,
         'returned_at' => null,
-        'status' => 'active',
+        'status' => 'aktyvi',
         'borrowed_at' => now()->subDays(2),
         'due_at' => now()->addDays(10),
     ]);
@@ -279,19 +279,19 @@ it('filters reservations by queue and library', function () {
 });
 
 it('shows global management search results for visible entities', function () {
-    $library = Library::factory()->create(['name' => 'Paieskos biblioteka']);
+    $library = Library::factory()->create(['name' => 'Paieškos biblioteka']);
     $superAdmin = User::factory()->superAdmin()->create();
     $managedUser = User::factory()->member()->create([
         'library_id' => $library->id,
-        'name' => 'Paieskos vartotojas',
+        'name' => 'Paieškos vartotojas',
     ]);
-    $author = Author::factory()->create(['name' => 'Paieskos autorius']);
-    $branch = Branch::factory()->create(['library_id' => $library->id, 'name' => 'Paieskos filialas']);
-    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id, 'name' => 'Paieskos vieta']);
-    $category = Category::factory()->create(['name' => 'Paieskos kategorija']);
-    $publisher = Publisher::factory()->create(['name' => 'Paieskos leidykla']);
+    $author = Author::factory()->create(['name' => 'Paieškos autorius']);
+    $branch = Branch::factory()->create(['library_id' => $library->id, 'name' => 'Paieškos filialas']);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id, 'name' => 'Paieškos vieta']);
+    $category = Category::factory()->create(['name' => 'Paieškos kategorija']);
+    $publisher = Publisher::factory()->create(['name' => 'Paieškos leidykla']);
     $book = Book::factory()->create([
-        'title' => 'Paieskos knyga',
+        'title' => 'Paieškos knyga',
         'publisher_id' => $publisher->id,
         'category_id' => $category->id,
     ]);
@@ -299,15 +299,21 @@ it('shows global management search results for visible entities', function () {
     $book->categories()->sync([$category->id]);
 
     $response = $this->actingAs($superAdmin)->get(route('manage.search.index', [
-        'q' => 'Paieskos',
+        'q' => 'Paieškos',
     ]));
 
     $response->assertOk();
-    $response->assertSee('Paieskos vartotojas');
-    $response->assertSee('Paieskos autorius');
-    $response->assertSee('Paieskos filialas');
-    $response->assertSee('Paieskos vieta');
-    $response->assertSee('Paieskos kategorija');
-    $response->assertSee('Paieskos leidykla');
-    $response->assertSee('Paieskos knyga');
+    $response->assertSee('Paieškos vartotojas');
+    $response->assertSee('Paieškos autorius');
+    $response->assertSee('Paieškos filialas');
+    $response->assertSee('Paieškos vieta');
+    $response->assertSee('Paieškos kategorija');
+    $response->assertSee('Paieškos leidykla');
+    $response->assertSee('Paieškos knyga');
 });
+
+
+
+
+
+

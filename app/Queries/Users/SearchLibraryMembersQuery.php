@@ -12,9 +12,15 @@ class SearchLibraryMembersQuery
         $query = trim($query);
 
         return User::query()
-            ->with('library:id,name')
-            ->when(! $authUser->isSuperAdmin(), fn ($builder) => $builder->where('library_id', $authUser->library_id))
-            ->where('role', 'member')
+            ->with('libraryMemberships.library:id,name,code')
+            ->when(! $authUser->isSuperAdmin(), function ($builder) use ($authUser) {
+                $libraryId = $authUser->activeLibraryId();
+
+                $builder->whereHas('libraryMemberships', fn ($membershipQuery) => $membershipQuery
+                    ->where('library_id', $libraryId)
+                    ->where('is_active', true));
+            })
+            ->where('role', 'narys')
             ->where('is_active', true)
             ->when($query !== '', function ($q) use ($query) {
                 $q->where(function ($inner) use ($query) {
@@ -28,7 +34,6 @@ class SearchLibraryMembersQuery
             ->limit(20)
             ->get([
                 'id',
-                'library_id',
                 'name',
                 'email',
                 'membership_number',
@@ -36,3 +41,11 @@ class SearchLibraryMembersQuery
             ]);
     }
 }
+
+
+
+
+
+
+
+

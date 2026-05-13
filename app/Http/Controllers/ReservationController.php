@@ -22,13 +22,17 @@ class ReservationController extends Controller
         GetLibraryReservationsQuery $getLibraryReservationsQuery,
         GetReservationIndexFiltersDataQuery $getReservationIndexFiltersDataQuery
     ): View {
-        if ($request->user()->role === 'member') {
+        if ($request->user()->effectiveRole() === 'narys') {
+            $filters = [
+                'search' => $request->query('search'),
+                'status' => $request->query('status'),
+                'reservation_date' => $request->query('reservation_date'),
+                'per_page' => $request->query('per_page', 15),
+            ];
+
             return view('account.reservations.index', [
-                'reservations' => $getMemberReservationsQuery->handle($request->user(), [
-                    'search' => $request->query('search'),
-                    'status' => $request->query('status'),
-                    'per_page' => $request->query('per_page', 15),
-                ]),
+                'reservations' => $getMemberReservationsQuery->handle($request->user(), $filters),
+                'summary' => $getMemberReservationsQuery->summary($request->user(), $filters),
             ]);
         }
 
@@ -61,7 +65,7 @@ class ReservationController extends Controller
             $request->validated()
         );
 
-        return back()->with('success', 'Rezervacija sekmingai sukurta.');
+        return back()->with('success', 'Rezervacija sėkmingai sukurta.');
     }
 
     public function cancel(
@@ -75,6 +79,14 @@ class ReservationController extends Controller
             $request->validated('reason')
         );
 
-        return back()->with('success', 'Rezervacija atsaukta.');
+        return back()->with('success', 'Rezervacija atšaukta.');
     }
 }
+
+
+
+
+
+
+
+
