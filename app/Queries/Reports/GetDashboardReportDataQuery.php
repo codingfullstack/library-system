@@ -336,6 +336,13 @@ class GetDashboardReportDataQuery
                 'branch:id,name',
             ])
             ->when($libraryId, fn (Builder $query) => $query->where('book_copies.library_id', $libraryId))
+            ->whereHas('loans', function (Builder $query) use ($dateFrom, $dateTo, $libraryId) {
+                $this->applyLoanPeriod($query, $dateFrom, $dateTo);
+
+                if ($libraryId) {
+                    $query->where('library_id', $libraryId);
+                }
+            })
             ->withCount([
                 'loans as loans_count' => function (Builder $query) use ($dateFrom, $dateTo, $libraryId) {
                     $this->applyLoanPeriod($query, $dateFrom, $dateTo);
@@ -347,10 +354,8 @@ class GetDashboardReportDataQuery
             ])
             ->orderByDesc('loans_count')
             ->orderBy('inventory_code')
-            ->get()
-            ->filter(fn (BookCopy $copy) => (int) $copy->loans_count > 0)
-            ->take(7)
-            ->values();
+            ->limit(7)
+            ->get();
     }
 
     protected function getActiveMembers(?int $libraryId, ?CarbonImmutable $dateFrom, ?CarbonImmutable $dateTo): Collection
@@ -364,7 +369,29 @@ class GetDashboardReportDataQuery
                     ->where('is_active', true)),
                 fn (Builder $query) => $query->where('role', 'narys')
             )
-            ->with('libraryMemberships.library:id,name,code')
+            ->where(function (Builder $query) use ($libraryId, $dateFrom, $dateTo) {
+                $query
+                    ->whereHas('loans', function (Builder $loanQuery) use ($libraryId, $dateFrom, $dateTo) {
+                        $this->applyLoanPeriod($loanQuery, $dateFrom, $dateTo);
+
+                        if ($libraryId) {
+                            $loanQuery->where('library_id', $libraryId);
+                        }
+                    })
+                    ->orWhereHas('reservations', function (Builder $reservationQuery) use ($libraryId, $dateFrom, $dateTo) {
+                        $this->applyReservationPeriod($reservationQuery, $dateFrom, $dateTo);
+
+                        if ($libraryId) {
+                            $reservationQuery->where('library_id', $libraryId);
+                        }
+                    });
+            })
+            ->with([
+                'libraryMemberships' => fn ($query) => $query
+                    ->when($libraryId, fn ($membershipQuery) => $membershipQuery->where('library_id', $libraryId))
+                    ->when($libraryId, fn ($membershipQuery) => $membershipQuery->where('is_active', true))
+                    ->with('library:id,name,code'),
+            ])
             ->withCount([
                 'loans as loans_count' => function (Builder $query) use ($libraryId, $dateFrom, $dateTo) {
                     $this->applyLoanPeriod($query, $dateFrom, $dateTo);
@@ -381,17 +408,16 @@ class GetDashboardReportDataQuery
                     }
                 },
             ])
+            ->orderByRaw('(loans_count + reservations_count) desc')
+            ->orderByDesc('loans_count')
+            ->orderBy('users.name')
+            ->limit(7)
             ->get()
             ->map(function (User $member) {
                 $member->activity_points = (int) $member->loans_count + (int) $member->reservations_count;
 
                 return $member;
-            })
-            ->filter(fn (User $member) => $member->activity_points > 0)
-            ->sortByDesc('activity_points')
-            ->sortByDesc('loans_count')
-            ->take(7)
-            ->values();
+            });
     }
 
     protected function getCopiesByStatus(Builder $copiesQuery): Collection
@@ -480,24 +506,24 @@ class GetDashboardReportDataQuery
         $issued = Loan::query()
             ->when($libraryId, fn (Builder $query) => $query->where('library_id', $libraryId))
             ->whereBetween('borrowed_at', [$dateFrom, $dateTo])
-            ->pluck('borrowed_at')
-            ->map(fn ($value) => CarbonImmutable::parse($value))
-            ->countBy(fn ($date) => $groupByMonth ? $date->format('Y-m-01') : $date->format('Y-m-d'));
+            ->selectRaw($this->dateBucketSelect('borrowed_at', $groupByMonth) . ', COUNT(*) as aggregate')
+            ->groupBy('period_key')
+            ->pluck('aggregate', 'period_key');
 
         $returned = Loan::query()
             ->when($libraryId, fn (Builder $query) => $query->where('library_id', $libraryId))
             ->whereNotNull('returned_at')
             ->whereBetween('returned_at', [$dateFrom, $dateTo])
-            ->pluck('returned_at')
-            ->map(fn ($value) => CarbonImmutable::parse($value))
-            ->countBy(fn ($date) => $groupByMonth ? $date->format('Y-m-01') : $date->format('Y-m-d'));
+            ->selectRaw($this->dateBucketSelect('returned_at', $groupByMonth) . ', COUNT(*) as aggregate')
+            ->groupBy('period_key')
+            ->pluck('aggregate', 'period_key');
 
         $reserved = Reservation::query()
             ->when($libraryId, fn (Builder $query) => $query->where('library_id', $libraryId))
             ->whereBetween('reserved_at', [$dateFrom, $dateTo])
-            ->pluck('reserved_at')
-            ->map(fn ($value) => CarbonImmutable::parse($value))
-            ->countBy(fn ($date) => $groupByMonth ? $date->format('Y-m-01') : $date->format('Y-m-d'));
+            ->selectRaw($this->dateBucketSelect('reserved_at', $groupByMonth) . ', COUNT(*) as aggregate')
+            ->groupBy('period_key')
+            ->pluck('aggregate', 'period_key');
 
         return collect($period)
             ->map(function ($date) use ($groupByMonth, $issued, $returned, $reserved) {
@@ -512,6 +538,22 @@ class GetDashboardReportDataQuery
             })
             ->filter(fn (object $row) => $row->issued_loans_count > 0 || $row->returned_loans_count > 0 || $row->reservations_count > 0)
             ->values();
+    }
+
+    protected function dateBucketSelect(string $column, bool $groupByMonth): string
+    {
+        $qualifiedColumn = DB::connection()->getQueryGrammar()->wrap($column);
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            $format = $groupByMonth ? '%Y-%m-01' : '%Y-%m-%d';
+
+            return "strftime('{$format}', {$qualifiedColumn}) as period_key";
+        }
+
+        $format = $groupByMonth ? '%Y-%m-01' : '%Y-%m-%d';
+
+        return "DATE_FORMAT({$qualifiedColumn}, '{$format}') as period_key";
     }
 
     protected function loanActivityByBookSubquery(?int $libraryId, ?CarbonImmutable $dateFrom, ?CarbonImmutable $dateTo): Builder

@@ -21,7 +21,7 @@ class BorrowBookCopyRequest extends FormRequest
             'user_id' => ['required', 'integer', 'exists:users,id'],
             'due_at' => ['nullable', 'date_format:Y-m-d', 'after:today'],
             'no_due_date' => ['nullable', 'boolean'],
-            'notes' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string', 'max:2000'],
             'override_reservation' => ['nullable', 'boolean'],
             'override_reason' => ['nullable', 'string', 'max:2000'],
         ];

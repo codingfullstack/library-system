@@ -18,16 +18,19 @@ class BookCopyDetailsResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $user = $request->user();
+        $canViewOperationalDetails = $this->canManageCopy || $user?->isSuperAdmin();
+        $canViewOwnLoan = $this->activeLoan && $this->activeLoan->user_id === $user?->id;
         $currentReservation = null;
 
-        if ($this->relationLoaded('book') && $this->book && $this->book->relationLoaded('reservations')) {
+        if ($canViewOperationalDetails && $this->relationLoaded('book') && $this->book && $this->book->relationLoaded('reservations')) {
             $currentReservation = $this->book->reservations
                 ->filter(fn ($reservation) => $reservation->isPending())
                 ->sortBy('reserved_at')
                 ->first();
         }
 
-        if (! $currentReservation && $this->book_id && $this->library_id) {
+        if ($canViewOperationalDetails && ! $currentReservation && $this->book_id && $this->library_id) {
             $currentReservation = Reservation::query()
                 ->with('user:id,name,email,membership_number')
                 ->where('library_id', $this->library_id)
@@ -46,8 +49,8 @@ class BookCopyDetailsResource extends JsonResource
             'status' => $this->status,
             'condition_status' => $this->condition_status,
             'acquired_at' => $this->acquired_at,
-            'notes' => $this->notes,
-            'status_history' => $this->statusHistories
+            'notes' => $canViewOperationalDetails ? $this->notes : null,
+            'status_history' => $canViewOperationalDetails && $this->statusHistories
                 ? $this->statusHistories->map(fn ($history) => [
                     'id' => $history->id,
                     'from_status' => $history->from_status,
@@ -78,28 +81,28 @@ class BookCopyDetailsResource extends JsonResource
                 'room' => $this->location->room,
                 'shelf' => $this->location->shelf,
             ] : null,
-            'active_loan' => $this->activeLoan ? [
+            'active_loan' => ($canViewOperationalDetails || $canViewOwnLoan) && $this->activeLoan ? [
                 'id' => $this->activeLoan->id,
                 'status' => $this->activeLoan->status,
                 'borrowed_at' => $this->activeLoan->borrowed_at,
                 'due_at' => $this->activeLoan->due_at,
                 'returned_at' => $this->activeLoan->returned_at,
                 'renewal_count' => $this->activeLoan->renewal_count,
-                'notes' => $this->activeLoan->notes,
+                'notes' => $canViewOperationalDetails ? $this->activeLoan->notes : null,
                 'is_overdue' => $this->activeLoan->is_overdue,
                 'overdue_days' => $this->activeLoan->overdue_days,
-                'user' => $this->activeLoan->user ? [
+                'user' => $canViewOperationalDetails && $this->activeLoan->user ? [
                     'id' => $this->activeLoan->user->id,
                     'name' => $this->activeLoan->user->name,
                     'email' => $this->activeLoan->user->email,
                     'membership_number' => $this->activeLoan->user->membership_number,
                 ] : null,
-                'issued_by' => $this->activeLoan->issuer ? [
+                'issued_by' => $canViewOperationalDetails && $this->activeLoan->issuer ? [
                     'id' => $this->activeLoan->issuer->id,
                     'name' => $this->activeLoan->issuer->name,
                     'email' => $this->activeLoan->issuer->email,
                 ] : null,
-                'received_by' => $this->activeLoan->receiver ? [
+                'received_by' => $canViewOperationalDetails && $this->activeLoan->receiver ? [
                     'id' => $this->activeLoan->receiver->id,
                     'name' => $this->activeLoan->receiver->name,
                     'email' => $this->activeLoan->receiver->email,

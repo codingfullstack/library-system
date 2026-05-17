@@ -4,6 +4,7 @@ namespace App\Queries\Loans;
 
 use App\Models\Loan;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -11,7 +12,7 @@ class GetActiveLibraryLoansQuery
 {
     public function handle(User $user, array $filters = []): LengthAwarePaginator
     {
-        $perPage = (int) ($filters['per_page'] ?? 15);
+        $perPage = max(1, min((int) ($filters['per_page'] ?? 25), 100));
 
         $query = $this->baseQuery($user, $filters)
             ->with([
@@ -52,7 +53,7 @@ class GetActiveLibraryLoansQuery
             'unique_members_count' => (clone $base)->distinct('user_id')->count('user_id'),
             'due_today_count' => (clone $base)
                 ->whereNull('returned_at')
-                ->whereDate('due_at', today())
+                ->whereBetween('due_at', [today()->startOfDay(), today()->endOfDay()])
                 ->count(),
             'overdue_loans_count' => (clone $base)
                 ->whereNull('returned_at')
@@ -112,7 +113,9 @@ class GetActiveLibraryLoansQuery
         }
 
         if (! empty($dueDate)) {
-            $query->whereDate('due_at', $dueDate);
+            $date = CarbonImmutable::parse($dueDate);
+
+            $query->whereBetween('due_at', [$date->startOfDay(), $date->endOfDay()]);
         }
 
         if ($overdue === 'yes') {

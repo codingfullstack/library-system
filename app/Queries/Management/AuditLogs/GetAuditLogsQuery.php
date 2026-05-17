@@ -4,6 +4,7 @@ namespace App\Queries\Management\AuditLogs;
 
 use App\Models\AuditLog;
 use App\Models\Library;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -26,8 +27,8 @@ class GetAuditLogsQuery
             ->when($search !== '', fn (Builder $query) => $this->applySearch($query, $search))
             ->when($action, fn (Builder $query) => $query->where('action', $action))
             ->when($libraryId, fn (Builder $query) => $query->where('library_id', $libraryId))
-            ->when($dateFrom, fn (Builder $query) => $query->whereDate('created_at', '>=', $dateFrom))
-            ->when($dateTo, fn (Builder $query) => $query->whereDate('created_at', '<=', $dateTo))
+            ->when($dateFrom, fn (Builder $query) => $query->where('created_at', '>=', CarbonImmutable::parse($dateFrom)->startOfDay()))
+            ->when($dateTo, fn (Builder $query) => $query->where('created_at', '<=', CarbonImmutable::parse($dateTo)->endOfDay()))
             ->latest()
             ->paginate($perPage)
             ->withQueryString();
@@ -49,8 +50,8 @@ class GetAuditLogsQuery
             ->when($search !== '', fn (Builder $builder) => $this->applySearch($builder, $search))
             ->when($action, fn (Builder $builder) => $builder->where('action', $action))
             ->when($libraryId, fn (Builder $builder) => $builder->where('library_id', $libraryId))
-            ->when($dateFrom, fn (Builder $builder) => $builder->whereDate('created_at', '>=', $dateFrom))
-            ->when($dateTo, fn (Builder $builder) => $builder->whereDate('created_at', '<=', $dateTo));
+            ->when($dateFrom, fn (Builder $builder) => $builder->where('created_at', '>=', CarbonImmutable::parse($dateFrom)->startOfDay()))
+            ->when($dateTo, fn (Builder $builder) => $builder->where('created_at', '<=', CarbonImmutable::parse($dateTo)->endOfDay()));
 
         return [
             'total' => (clone $query)->count(),

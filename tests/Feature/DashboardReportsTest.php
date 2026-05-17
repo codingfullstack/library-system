@@ -140,12 +140,18 @@ it('shows extended dashboard reports scoped to the staff library', function () {
 
     $response->assertOk();
     $response->assertSee('Apžvalga');
-    $response->assertSee('Bibliotekų palyginimas');
+    $response->assertDontSee('Bibliotekų palyginimas');
     $response->assertSee('Išdavimų, grąžinimų ir rezervacijų dinamika');
-    $response->assertSee('Populiariaušios knygos');
+    $response->assertSee('Populiariausios knygos');
     $response->assertSee('Aktyviausi nariai');
     $response->assertSee('Veiklos suvestinė');
     $response->assertSee('Egzempliorių būsenos');
+    $response->assertDontSee('Populiariaušios knygos');
+    $response->assertDontSee('Peržiūrėti visą');
+    $response->assertDontSee('Peržiūrėti visus');
+    $response->assertDontSee('Ctrl + K');
+    $response->assertDontSee('Atnaujinti būsenas');
+    $response->assertSee(route('manage.book-copies.index', ['status' => BookCopy::STATUS_DAMAGED]), false);
     $response->assertSee('Populiari knyga');
     $response->assertSee('Rasa Autore');
     $response->assertSee('Aktyvus narys');
@@ -172,6 +178,7 @@ it('shows dashboard reports across libraries for super admin', function () {
 
     $response->assertOk();
     $response->assertSee('Apžvalga');
+    $response->assertSee('Bibliotekų palyginimas');
     $response->assertSee('Pirma biblioteka');
     $response->assertSee('Antra biblioteka');
 });

@@ -4,6 +4,7 @@ namespace App\Queries\Reservations;
 
 use App\Models\Reservation;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +16,7 @@ class GetLibraryReservationsQuery
      */
     public function handle(User $user, array $filters = []): LengthAwarePaginator
     {
-        $perPage = (int) ($filters['per_page'] ?? 20);
+        $perPage = max(1, min((int) ($filters['per_page'] ?? 25), 100));
 
         $queuePositionSubquery = DB::table('reservations as queue_reservations')
             ->selectRaw('COUNT(*)')
@@ -88,10 +89,12 @@ class GetLibraryReservationsQuery
         $libraryId = $user->isSuperAdmin() ? ($filters['library_id'] ?? null) : $user->activeLibraryId();
         $reservationDate = $filters['reservation_date'] ?? null;
 
+        $reservationDateRange = $this->dateRange($reservationDate);
+
         return Reservation::query()
             ->when(! empty($libraryId), fn ($builder) => $builder->where('library_id', $libraryId))
             ->when(! empty($status), fn ($builder) => $builder->where('status', $status))
-            ->when(! empty($reservationDate), fn ($builder) => $builder->whereDate('reserved_at', $reservationDate))
+            ->when($reservationDateRange, fn ($builder) => $builder->whereBetween('reserved_at', $reservationDateRange))
             ->when($search !== '', function (Builder $query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->whereHas('book', function ($bookQuery) use ($search) {
@@ -106,6 +109,17 @@ class GetLibraryReservationsQuery
                     });
                 });
             });
+    }
+
+    private function dateRange(mixed $date): ?array
+    {
+        if (empty($date)) {
+            return null;
+        }
+
+        $parsedDate = CarbonImmutable::parse($date);
+
+        return [$parsedDate->startOfDay(), $parsedDate->endOfDay()];
     }
 }
 

@@ -60,6 +60,17 @@
                                 </div>
 
                                 <div>
+                                    <label for="phone" class="block text-sm font-bold text-slate-700 dark:text-zinc-200">Telefono numeris</label>
+                                    <div class="mt-2 flex h-12 items-center gap-3 rounded-lg border border-slate-300 bg-white px-4 shadow-sm transition focus-within:border-emerald-600 focus-within:ring-4 focus-within:ring-emerald-600/10 dark:border-zinc-700 dark:bg-zinc-950">
+                                        <input id="phone" name="phone" value="{{ old('phone') }}" type="tel" required autocomplete="tel" placeholder="Įveskite telefono numerį" class="min-w-0 flex-1 border-0 bg-transparent text-base text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white dark:placeholder:text-zinc-500">
+                                        <flux:icon.phone class="size-5 shrink-0 text-slate-400 dark:text-zinc-500" />
+                                    </div>
+                                    @error('phone')
+                                        <p class="mt-2 text-sm font-medium text-red-600 dark:text-red-400">{{ $message }}</p>
+                                    @enderror
+                                </div>
+
+                                <div>
                                     <label for="password" class="block text-sm font-bold text-slate-700 dark:text-zinc-200">Slaptažodis</label>
                                     <div class="mt-2 flex h-12 items-center gap-3 rounded-lg border border-slate-300 bg-white px-4 shadow-sm transition focus-within:border-emerald-600 focus-within:ring-4 focus-within:ring-emerald-600/10 dark:border-zinc-700 dark:bg-zinc-950">
                                         <input id="password" name="password" x-bind:type="showPassword ? 'text' : 'password'" required autocomplete="new-password" placeholder="Įveskite slaptažodį" class="min-w-0 flex-1 border-0 bg-transparent text-base text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white dark:placeholder:text-zinc-500">

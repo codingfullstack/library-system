@@ -10,21 +10,34 @@ use App\Queries\Books\GetLibraryBooksQuery;
 use App\Models\Book;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class BookController extends Controller
 {
     public function index(Request $request, GetLibraryBooksQuery $getLibraryBooksQuery): JsonResponse
     {
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:120'],
+            'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+            'author_id' => ['nullable', 'integer', 'exists:authors,id'],
+            'publisher_id' => ['nullable', 'integer', 'exists:publishers,id'],
+            'library_id' => ['nullable', 'integer', 'exists:libraries,id'],
+            'availability' => ['nullable', Rule::in(['laisva', 'unavailable'])],
+            'sort' => ['nullable', Rule::in(['title', 'publication_year', 'copies_count', 'created_at', 'updated_at'])],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
         $books = $getLibraryBooksQuery->handle($request->user(), [
-            'search' => $request->query('search'),
-            'category_id' => $request->query('category_id'),
-            'author_id' => $request->query('author_id'),
-            'publisher_id' => $request->query('publisher_id'),
-            'library_id' => $request->query('library_id'),
-            'availability' => $request->query('availability'),
-            'sort' => $request->query('sort', 'title'),
-            'direction' => $request->query('direction', 'asc'),
-            'per_page' => $request->query('per_page', 1000),
+            'search' => $validated['search'] ?? null,
+            'category_id' => $validated['category_id'] ?? null,
+            'author_id' => $validated['author_id'] ?? null,
+            'publisher_id' => $validated['publisher_id'] ?? null,
+            'library_id' => $validated['library_id'] ?? null,
+            'availability' => $validated['availability'] ?? null,
+            'sort' => $validated['sort'] ?? 'title',
+            'direction' => $validated['direction'] ?? 'asc',
+            'per_page' => $validated['per_page'] ?? 25,
         ]);
 
         return response()->json(
@@ -37,10 +50,16 @@ class BookController extends Controller
         Book $book,
         GetLibraryBookDetailsQuery $getLibraryBookDetailsQuery
     ): JsonResponse {
+        $validated = $request->validate([
+            'copy_status' => ['nullable', Rule::in(['laisva', 'iÅ¡duota', 'prarasta', 'sugadinta', 'tvarkoma', 'nuraÅ¡yta'])],
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            'location_id' => ['nullable', 'integer', 'exists:locations,id'],
+        ]);
+
         $book = $getLibraryBookDetailsQuery->handle($request->user(), $book, [
-            'copy_status' => $request->query('copy_status'),
-            'branch_id' => $request->query('branch_id'),
-            'location_id' => $request->query('location_id'),
+            'copy_status' => $validated['copy_status'] ?? null,
+            'branch_id' => $validated['branch_id'] ?? null,
+            'location_id' => $validated['location_id'] ?? null,
         ]);
 
         return response()->json(
