@@ -5,7 +5,7 @@ namespace App\Actions\Reservations;
 use App\Actions\Notifications\CreateUserNotificationAction;
 use App\Models\BookCopy;
 use App\Models\Reservation;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Builder;
 
 class SyncReservationQueueAction
 {
@@ -15,23 +15,19 @@ class SyncReservationQueueAction
     {
         $this->expireElapsedReservations($libraryId, $bookId);
 
-        $pendingReservations = $this->pendingReservations($libraryId, $bookId);
+        $firstReservation = $this->firstPendingReservation($libraryId, $bookId);
 
-        if ($pendingReservations->isEmpty()) {
+        if (! $firstReservation) {
             return;
         }
 
-        if ($this->availableCopiesCount($libraryId, $bookId) < 1) {
-            $pendingReservations
-                ->filter(fn (Reservation $reservation) => $reservation->expires_at !== null)
-                ->each(fn (Reservation $reservation) => $reservation->update([
-                    'expires_at' => null,
-                ]));
+        if (! $this->hasAvailableCopies($libraryId, $bookId)) {
+            $this->pendingReservationsQuery($libraryId, $bookId)
+                ->whereNotNull('expires_at')
+                ->update(['expires_at' => null]);
 
             return;
         }
-
-        $firstReservation = $pendingReservations->shift();
 
         if ($firstReservation && ($firstReservation->expires_at === null || $firstReservation->expires_at->isPast())) {
             $firstReservation->update([
@@ -39,7 +35,7 @@ class SyncReservationQueueAction
             ]);
 
             app(CreateUserNotificationAction::class)->handle(
-                $firstReservation->user()->firstOrFail(),
+                $firstReservation->user,
                 null,
                 'reservation_ready',
                 'Rezervacija paruošta',
@@ -59,13 +55,10 @@ class SyncReservationQueueAction
             );
         }
 
-        foreach ($pendingReservations as $reservation) {
-            if ($reservation->expires_at !== null) {
-                $reservation->update([
-                    'expires_at' => null,
-                ]);
-            }
-        }
+        $this->pendingReservationsQuery($libraryId, $bookId)
+            ->whereKeyNot($firstReservation->id)
+            ->whereNotNull('expires_at')
+            ->update(['expires_at' => null]);
     }
 
     private function expireElapsedReservations(int $libraryId, int $bookId): void
@@ -78,36 +71,33 @@ class SyncReservationQueueAction
             ->whereNull('cancelled_at')
             ->whereNotNull('expires_at')
             ->where('expires_at', '<=', now())
-            ->get()
-            ->each(function (Reservation $reservation) {
-                $reservation->update([
-                    'status' => Reservation::STATUS_EXPIRED,
-                ]);
-            });
+            ->update(['status' => Reservation::STATUS_EXPIRED]);
     }
 
-    private function availableCopiesCount(int $libraryId, int $bookId): int
+    private function hasAvailableCopies(int $libraryId, int $bookId): bool
     {
         return BookCopy::query()
             ->withoutGlobalScope('library')
             ->where('library_id', $libraryId)
             ->where('book_id', $bookId)
             ->where('status', BookCopy::STATUS_AVAILABLE)
-            ->count();
+            ->exists();
     }
 
-    /**
-     * @return Collection<int, Reservation>
-     */
-    private function pendingReservations(int $libraryId, int $bookId): Collection
+    private function firstPendingReservation(int $libraryId, int $bookId): ?Reservation
+    {
+        return $this->pendingReservationsQuery($libraryId, $bookId)
+            ->with(['user:id,name,email', 'book:id,title'])
+            ->first();
+    }
+
+    private function pendingReservationsQuery(int $libraryId, int $bookId): Builder
     {
         return Reservation::query()
             ->where('library_id', $libraryId)
             ->where('book_id', $bookId)
             ->pending()
-            ->with(['user:id,name,email', 'book:id,title'])
-            ->orderBy('reserved_at')
-            ->get();
+            ->orderBy('reserved_at');
     }
 }
 

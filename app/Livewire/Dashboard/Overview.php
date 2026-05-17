@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Dashboard;
 
+use App\Models\BookCopy;
 use App\Models\Loan;
 use App\Queries\Reports\GetDashboardReportDataQuery;
 use App\Support\Reports\ResolveDashboardFilters;
@@ -256,8 +257,8 @@ class Overview extends Component
             [
                 'title' => $report['summary']['damaged_book_copies_count'] . ' sugadintos kopijos',
                 'description' => 'Peržiūrėk būkles ir nuspręsk, ką reikia tvarkyti ar nurašyti.',
-                'route' => route('manage.book-copies.create'),
-                'link' => 'Atnaujinti būsenas',
+                'route' => route('manage.book-copies.index', ['status' => BookCopy::STATUS_DAMAGED]),
+                'link' => 'Peržiūrėti',
                 'tone' => 'warning',
             ],
         ];

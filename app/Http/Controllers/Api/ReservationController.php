@@ -12,6 +12,7 @@ use App\Queries\Reservations\GetLibraryReservationsQuery;
 use App\Queries\Reservations\GetMemberReservationsQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ReservationController extends Controller
 {
@@ -22,12 +23,20 @@ class ReservationController extends Controller
     ): JsonResponse
     {
         $user = $request->user();
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:120'],
+            'status' => ['nullable', Rule::in(['rezervuota', 'Ä¯vykdyta', 'atÅ¡aukta', 'pasibaigusi'])],
+            'queue' => ['nullable', Rule::in(['first', 'waiting'])],
+            'library_id' => ['nullable', 'integer', 'exists:libraries,id'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
         $filters = [
-            'search' => $request->query('search'),
-            'status' => $request->query('status'),
-            'queue' => $request->query('queue'),
-            'library_id' => $request->query('library_id'),
-            'per_page' => $request->query('per_page', 1000),
+            'search' => $validated['search'] ?? null,
+            'status' => $validated['status'] ?? null,
+            'queue' => $validated['queue'] ?? null,
+            'library_id' => $validated['library_id'] ?? null,
+            'per_page' => $validated['per_page'] ?? 25,
         ];
 
         $reservations = $user?->role === 'narys'

@@ -19,6 +19,7 @@ class UserMembershipScanController extends Controller
     {
         $actor = $request->user();
         abort_if($actor?->role === 'narys', 403);
+        abort_if(strlen($membershipNumber) > 64, 404);
 
         $member = User::query()
             ->where('membership_number', $membershipNumber)

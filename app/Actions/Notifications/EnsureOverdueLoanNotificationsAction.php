@@ -14,11 +14,12 @@ class EnsureOverdueLoanNotificationsAction
         }
 
         $overdueLoans = Loan::query()
-            ->with(['bookCopy.book:id,title'])
+            ->select(['id', 'library_id', 'book_copy_id', 'user_id', 'due_at', 'returned_at', 'status'])
+            ->with(['bookCopy:id,book_id', 'bookCopy.book:id,title'])
             ->where('user_id', $user->id)
             ->whereNull('returned_at')
             ->whereNotNull('due_at')
-            ->whereDate('due_at', '<=', now()->subDay()->toDateString())
+            ->where('due_at', '<=', now()->subDay()->endOfDay())
             ->get();
 
         foreach ($overdueLoans as $loan) {

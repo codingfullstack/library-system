@@ -14,6 +14,7 @@ use App\Queries\Loans\GetMemberLoansQuery;
 use App\Queries\Users\SearchLibraryMembersQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class LoanController extends Controller
 {
@@ -24,14 +25,24 @@ class LoanController extends Controller
     ): JsonResponse
     {
         $user = $request->user();
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:120'],
+            'status' => ['nullable', Rule::in(['aktyvi', 'vÄ—luoja', 'grÄ…Å¾inta', 'prarasta'])],
+            'member_id' => ['nullable', 'integer', 'exists:users,id'],
+            'employee_id' => ['nullable', 'integer', 'exists:users,id'],
+            'overdue' => ['nullable', Rule::in(['yes', 'no'])],
+            'library_id' => ['nullable', 'integer', 'exists:libraries,id'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
         $filters = [
-            'search' => $request->query('search'),
-            'status' => $request->query('status'),
-            'member_id' => $request->query('member_id'),
-            'employee_id' => $request->query('employee_id'),
-            'overdue' => $request->query('overdue'),
-            'library_id' => $request->query('library_id'),
-            'per_page' => $request->query('per_page', 1000),
+            'search' => $validated['search'] ?? null,
+            'status' => $validated['status'] ?? null,
+            'member_id' => $validated['member_id'] ?? null,
+            'employee_id' => $validated['employee_id'] ?? null,
+            'overdue' => $validated['overdue'] ?? null,
+            'library_id' => $validated['library_id'] ?? null,
+            'per_page' => $validated['per_page'] ?? 25,
         ];
 
         $loans = $user?->role === 'narys'
@@ -46,10 +57,13 @@ class LoanController extends Controller
     public function searchMembers(Request $request, SearchLibraryMembersQuery $searchLibraryMembersQuery): JsonResponse
     {
         abort_if($request->user()?->role === 'narys', 403);
+        $validated = $request->validate([
+            'q' => ['nullable', 'string', 'max:120'],
+        ]);
 
         $members = $searchLibraryMembersQuery->handle(
             $request->user(),
-            (string) $request->query('q', '')
+            (string) ($validated['q'] ?? '')
         );
 
         return response()->json(

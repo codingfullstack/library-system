@@ -11,7 +11,7 @@ class GetLibraryBooksQuery
 {
     public function handle(User $user, array $filters = []): LengthAwarePaginator
     {
-        $perPage = (int) ($filters['per_page'] ?? 15);
+        $perPage = max(1, min((int) ($filters['per_page'] ?? 25), 100));
         $search = trim((string) ($filters['search'] ?? ''));
         $categoryId = $filters['category_id'] ?? null;
         $authorId = $filters['author_id'] ?? null;

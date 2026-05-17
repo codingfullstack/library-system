@@ -31,6 +31,8 @@ class BookCopyController extends Controller
         string $qrCode,
         FindBookCopyByQrQuery $findBookCopyByQrQuery
     ): JsonResponse {
+        abort_if(strlen($qrCode) > 128, 404);
+
         $copy = $findBookCopyByQrQuery->handle($request->user(), $qrCode, [
             'book:id,title,subtitle,isbn',
             'book.reservations.user:id,name,email,membership_number',
@@ -58,6 +60,8 @@ class BookCopyController extends Controller
         BookCopy $bookCopy,
         ChangeBookCopyStatusAction $changeBookCopyStatusAction
     ): JsonResponse {
+        $this->authorize('update', $bookCopy);
+
         if ($bookCopy->activeLoan()->exists()) {
             return response()->json([
                 'message' => 'Negalima keisti egzemplioriaus gyvavimo ciklo, kol jis yra aktyviai išduotas.',

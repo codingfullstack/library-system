@@ -4,6 +4,7 @@ namespace App\Queries\Reservations;
 
 use App\Models\Reservation;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
@@ -16,6 +17,7 @@ class GetMemberReservationsQuery
         $reservationDate = $filters['reservation_date'] ?? null;
         $perPage = (int) ($filters['per_page'] ?? 15);
         $libraryId = $user->activeLibraryId();
+        $reservationDateRange = $this->dateRange($reservationDate);
 
         $queuePositionSubquery = DB::table('reservations as queue_reservations')
             ->selectRaw('COUNT(*)')
@@ -50,8 +52,8 @@ class GetMemberReservationsQuery
             $query->where('status', $status);
         }
 
-        if ($reservationDate !== null && $reservationDate !== '') {
-            $query->whereDate('reserved_at', $reservationDate);
+        if ($reservationDateRange !== null) {
+            $query->whereBetween('reserved_at', $reservationDateRange);
         }
 
         if ($search !== '') {
@@ -77,12 +79,13 @@ class GetMemberReservationsQuery
         $status = $filters['status'] ?? null;
         $reservationDate = $filters['reservation_date'] ?? null;
         $libraryId = $user->activeLibraryId();
+        $reservationDateRange = $this->dateRange($reservationDate);
 
         $baseQuery = Reservation::query()
             ->where('user_id', $user->id)
             ->when($libraryId, fn ($query) => $query->where('library_id', $libraryId))
             ->when($status, fn ($query) => $query->where('status', $status))
-            ->when($reservationDate, fn ($query) => $query->whereDate('reserved_at', $reservationDate))
+            ->when($reservationDateRange, fn ($query) => $query->whereBetween('reserved_at', $reservationDateRange))
             ->when($search !== '', function ($query) use ($search) {
                 $query->whereHas('book', function ($bookQuery) use ($search) {
                     $bookQuery->where('title', 'like', "%{$search}%")
@@ -97,6 +100,17 @@ class GetMemberReservationsQuery
             'cancelled_count' => (clone $baseQuery)->where('status', Reservation::STATUS_CANCELLED)->count(),
             'expired_count' => (clone $baseQuery)->where('status', Reservation::STATUS_EXPIRED)->count(),
         ];
+    }
+
+    private function dateRange(mixed $date): ?array
+    {
+        if (empty($date)) {
+            return null;
+        }
+
+        $parsedDate = CarbonImmutable::parse($date);
+
+        return [$parsedDate->startOfDay(), $parsedDate->endOfDay()];
     }
 }
 

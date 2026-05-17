@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Concerns\BelongsToLibrary;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Reservation extends Model
 {
-    use HasFactory;
+    use BelongsToLibrary, HasFactory;
 
     public const STATUS_RESERVED = 'rezervuota';
     public const STATUS_FULFILLED = 'įvykdyta';

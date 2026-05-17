@@ -19,7 +19,7 @@ class ScanController extends Controller
     ): JsonResponse
     {
         $validated = $request->validate([
-            'qr_code' => ['required', 'string'],
+            'qr_code' => ['required', 'string', 'max:128'],
             'device_info' => ['nullable', 'string', 'max:255'],
         ]);
 

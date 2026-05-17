@@ -16,7 +16,7 @@ class ImportCsvRequest extends FormRequest
         $resource = (string) $this->route('resource');
 
         return [
-            'file' => ['required', 'file', 'mimes:csv,txt', 'max:10240'],
+            'file' => ['required', 'file', 'extensions:csv,txt', 'max:10240'],
             'library_id' => [
                 \Illuminate\Validation\Rule::requiredIf(
                     fn () => $this->user()?->isSuperAdmin() && in_array($resource, ['branches', 'locations'], true)

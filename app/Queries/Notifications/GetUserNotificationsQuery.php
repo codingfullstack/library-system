@@ -12,6 +12,8 @@ class GetUserNotificationsQuery
 {
     public function handle(User $user, int $perPage = 20, array $filters = []): LengthAwarePaginator
     {
+        $perPage = max(1, min($perPage, 100));
+
         $query = UserNotification::query()
             ->with('sender:id,name,email')
             ->where('user_id', $user->id)
@@ -41,7 +43,7 @@ class GetUserNotificationsQuery
             })
             ->when(! empty($filters['date']), function (Builder $builder) use ($filters) {
                 $date = Carbon::parse($filters['date']);
-                $builder->whereDate('created_at', $date);
+                $builder->whereBetween('created_at', [$date->copy()->startOfDay(), $date->copy()->endOfDay()]);
             });
 
         match ($filters['sort'] ?? 'latest') {

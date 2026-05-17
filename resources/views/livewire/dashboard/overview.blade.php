@@ -1,65 +1,7 @@
 <x-ui.page class="max-w-none px-4 py-0 sm:px-6 lg:px-8">
-    @php
-        $user = auth()->user();
-        $unreadNotificationsCount = $user?->notifications()->whereNull('read_at')->count() ?? 0;
-        $roleLabel = match ($user?->role) {
-            'superadministratorius' => 'Superadministratorius',
-            'administratorius' => 'Administratorius',
-            'darbuotojas' => 'Darbuotojas',
-            'narys' => 'Narys',
-            default => 'Darbuotojas',
-        };
-    @endphp
-
     <div class="min-h-screen bg-[#f7f8fa] dark:bg-zinc-950">
         <div class="mx-auto max-w-[1600px] py-5">
             <div class="rounded-[28px] border border-zinc-200/80 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-zinc-800 dark:bg-zinc-900">
-                <div class="border-b border-zinc-200/80 px-6 py-4 dark:border-zinc-800">
-                    <div class="flex items-center justify-between gap-4">
-                        <div class="flex min-w-0 flex-1 items-center gap-4">
-                            <button type="button" title="Atidaryti meniu" aria-label="Atidaryti meniu" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-zinc-200 bg-white text-zinc-600 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800">
-                                <flux:icon.bars-2 class="size-5" />
-                            </button>
-
-                            <form method="GET" action="{{ route('manage.search.index') }}" class="relative hidden min-w-0 flex-1 lg:block">
-                                <input
-                                    type="text"
-                                    name="q"
-                                    class="app-input h-12 rounded-2xl border-zinc-200 bg-zinc-50/80 pl-12 pr-20 shadow-none dark:border-zinc-700 dark:bg-zinc-950"
-                                    placeholder="Ieškoti knygų, vartotojų, inventoriaus..."
-                                >
-                                <div class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
-                                    <flux:icon.magnifying-glass class="size-5" />
-                                </div>
-                                <span class="absolute right-4 top-1/2 hidden -translate-y-1/2 items-center rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium text-zinc-400 xl:flex dark:border-zinc-700 dark:bg-zinc-900">
-                                    Ctrl + K
-                                </span>
-                            </form>
-                        </div>
-
-                        <div class="flex shrink-0 items-center gap-3">
-                            <a href="{{ route('notifications.index') }}" title="Atidaryti pranešimus" aria-label="Atidaryti pranešimus" class="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800" wire:navigate>
-                                <flux:icon.bell class="size-5" />
-                                @if($unreadNotificationsCount > 0)
-                                    <span class="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
-                                        {{ $unreadNotificationsCount }}
-                                    </span>
-                                @endif
-                            </a>
-
-                            <div class="inline-flex items-center gap-3 rounded-full border border-zinc-200 bg-white px-3 py-2 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
-                                <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-sm font-semibold text-violet-700 dark:bg-violet-500/15 dark:text-violet-200">
-                                    {{ $user?->initials() }}
-                                </span>
-                                <div class="hidden min-w-0 xl:block">
-                                    <div class="truncate text-sm font-semibold text-zinc-950 dark:text-white">{{ $roleLabel }}</div>
-                                </div>
-                                <flux:icon.chevron-down class="hidden size-4 text-zinc-400 xl:block" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <div class="space-y-6 px-6 py-6">
                     <script id="dashboard-chart-payload" type="application/json">
                         @json($chartPayload)
@@ -101,10 +43,6 @@
                                         <input id="dashboard-date-to" type="date" wire:model.live="dateTo" class="app-input h-11 rounded-2xl border-zinc-200 bg-white shadow-none dark:border-zinc-700 dark:bg-zinc-900 xl:w-[170px]">
                                     </div>
                                 @endif
-
-                                <button type="submit" class="app-button-primary h-11 rounded-2xl px-5">
-                                    Atnaujinti
-                                </button>
 
                                 <div class="inline-flex overflow-hidden rounded-2xl border border-emerald-700 shadow-sm">
                                     <a href="{{ route('dashboard.export', ['format' => 'xls'] + $exportQuery) }}" class="inline-flex h-11 items-center justify-center bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-600">
@@ -201,8 +139,7 @@
                     <div class="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,1.08fr)_minmax(320px,0.84fr)]">
                         <section class="overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                             <div class="flex items-center justify-between border-b border-zinc-200/80 px-5 py-4 dark:border-zinc-700">
-                                <h2 class="text-lg font-semibold text-zinc-950 dark:text-white">Populiariaušios knygos</h2>
-                                <a href="{{ route('books.index') }}" class="text-sm font-medium text-emerald-700 dark:text-emerald-300">Peržiūrėti visą</a>
+                                <h2 class="text-lg font-semibold text-zinc-950 dark:text-white">Populiariausios knygos</h2>
                             </div>
 
                             <div class="overflow-x-auto">
@@ -239,7 +176,6 @@
                         <section class="overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                             <div class="flex items-center justify-between border-b border-zinc-200/80 px-5 py-4 dark:border-zinc-700">
                                 <h2 class="text-lg font-semibold text-zinc-950 dark:text-white">Aktyviausi nariai</h2>
-                                <a href="{{ route('manage.users.index') }}" class="text-sm font-medium text-emerald-700 dark:text-emerald-300">Peržiūrėti visus</a>
                             </div>
 
                             <div class="overflow-x-auto">
@@ -276,7 +212,6 @@
                         <section class="overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                             <div class="flex items-center justify-between border-b border-zinc-200/80 px-5 py-4 dark:border-zinc-700">
                                 <h2 class="text-lg font-semibold text-zinc-950 dark:text-white">Veiklos suvestinė</h2>
-                                <span class="text-sm font-medium text-emerald-700 dark:text-emerald-300">Peržiūrėti visą</span>
                             </div>
 
                             <div class="space-y-4 px-5 py-5">
@@ -399,7 +334,7 @@
                         </section>
                     </div>
 
-                    @if($report['libraryComparison']->isNotEmpty())
+                    @if(auth()->user()?->isSuperAdmin() && $report['libraryComparison']->isNotEmpty())
                         <section class="overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                             <div class="border-b border-zinc-200/80 px-5 py-4 dark:border-zinc-700">
                                 <h2 class="text-lg font-semibold text-zinc-950 dark:text-white">Bibliotekų palyginimas</h2>

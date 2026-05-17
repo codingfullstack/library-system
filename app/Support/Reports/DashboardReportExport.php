@@ -64,7 +64,7 @@ class DashboardReportExport
                 ])->all(),
             ],
             [
-                'title' => 'Populiariaušios knygos',
+                'title' => 'Populiariausios knygos',
                 'headers' => ['Knyga', 'ISBN', 'Išdavimai', 'Rezervacijos'],
                 'rows' => collect($report['popularBooks'])->map(fn ($book) => [
                     $book->title,
