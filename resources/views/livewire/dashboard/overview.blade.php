@@ -308,8 +308,8 @@
                                         };
                                     @endphp
 
-                                    <a href="{{ $action['route'] }}" class="flex min-h-[92px] items-center gap-3 rounded-2xl border px-4 py-4 text-left transition {{ $actionPalette['wrapper'] }}">
-                                        <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl {{ $actionPalette['iconWrap'] }}">
+                                    <a href="{{ $action['route'] }}" class="flex min-h-[124px] min-w-0 flex-col items-center justify-center gap-3 rounded-2xl border px-3 py-4 text-center transition {{ $actionPalette['wrapper'] }}">
+                                        <span class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl {{ $actionPalette['iconWrap'] }}">
                                             @switch($actionPalette['icon'])
                                                 @case('plus')
                                                     <flux:icon.plus class="size-5" />
@@ -325,7 +325,7 @@
                                             @endswitch
                                         </span>
 
-                                        <span class="block text-sm font-semibold leading-snug text-zinc-800 dark:text-zinc-100">
+                                        <span class="block max-w-[9rem] text-balance text-sm font-semibold leading-snug text-zinc-800 dark:text-zinc-100">
                                             {{ $action['label'] }}
                                         </span>
                                     </a>
