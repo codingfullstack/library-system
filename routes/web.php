@@ -35,8 +35,6 @@ Route::get('/libraries', [PublicPageController::class, 'libraries'])->name('publ
 Route::redirect('/bibliotekos', '/libraries');
 Route::get('/libraries/{library}', [PublicPageController::class, 'library'])->name('public.libraries.show');
 Route::get('/contact', [PublicPageController::class, 'contact'])->name('contact');
-Route::get('/features', [PublicPageController::class, 'features'])->name('features');
-Route::get('/pricing', [PublicPageController::class, 'pricing'])->name('pricing');
 Route::middleware('overdue.notifications')->group(function () {
     Route::get('/books', [BookController::class, 'index'])->name('books.index');
     Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');

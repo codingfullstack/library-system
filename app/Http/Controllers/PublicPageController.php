@@ -74,26 +74,6 @@ class PublicPageController extends Controller
         ]);
     }
 
-    public function features(SeoService $seoService): View
-    {
-        return view('public.features', [
-            'seo' => $seoService->make(
-                title: 'Funkcijos',
-                description: 'Bibliotekos sistemos funkcijos: knygu katalogas, rezervacijos, nariu savitarna ir administravimas.'
-            ),
-        ]);
-    }
-
-    public function pricing(SeoService $seoService): View
-    {
-        return view('public.pricing', [
-            'seo' => $seoService->make(
-                title: 'Kainodara',
-                description: 'Bibliotekos sistemos kainodaros ir diegimo informacija organizacijoms.'
-            ),
-        ]);
-    }
-
     private function publicStats(): array
     {
         $publicLibraryIds = Library::query()

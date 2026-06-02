@@ -43,8 +43,6 @@ final class GenerateSitemapAction
             ['name' => 'public.libraries.index', 'frequency' => Url::CHANGE_FREQUENCY_DAILY, 'priority' => 0.9],
             ['name' => 'about', 'frequency' => Url::CHANGE_FREQUENCY_MONTHLY, 'priority' => 0.7],
             ['name' => 'contact', 'frequency' => Url::CHANGE_FREQUENCY_MONTHLY, 'priority' => 0.6],
-            ['name' => 'features', 'frequency' => Url::CHANGE_FREQUENCY_MONTHLY, 'priority' => 0.6],
-            ['name' => 'pricing', 'frequency' => Url::CHANGE_FREQUENCY_MONTHLY, 'priority' => 0.5],
             ['name' => 'books.index', 'frequency' => Url::CHANGE_FREQUENCY_DAILY, 'priority' => 0.9],
         ];
 
