@@ -10,14 +10,14 @@
             $canManageLibrary = $canSeeDashboard;
             $isMember = $user?->effectiveRole() === 'narys';
             $homeRoute = $canSeeDashboard ? route('dashboard') : ($isMember ? route('account.dashboard') : route('books.index'));
-            $unreadNotificationsCount = $user ? $user->notifications()->whereNull('read_at')->count() : 0;
+            $unreadNotificationsCount = $user ? $user->unreadNotifications()->count() : 0;
             $desktopSearchRoute = $canManageLibrary ? route('manage.search.index') : route('books.index');
             $desktopSearchName = $canManageLibrary ? 'q' : 'search';
         @endphp
 
         <flux:sidebar sticky collapsible="mobile" class="w-72 border-e border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
             <flux:sidebar.header class="border-b border-zinc-200 px-4 py-5 dark:border-zinc-800">
-                <a href="{{ $homeRoute }}" wire:navigate class="flex items-center gap-3 rounded-2xl">
+                <a href="{{ $homeRoute }}" wire:navigate class="flex min-w-0 flex-1 items-center gap-3 rounded-2xl">
                     <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-700 text-white shadow-sm">
                         <x-app-logo-icon class="size-5 fill-current" />
                     </span>
@@ -42,11 +42,9 @@
                     <flux:sidebar.item icon="bell" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('notifications.index')" :current="request()->routeIs('notifications.*')" wire:navigate>
                         <span class="flex items-center gap-2">
                             <span>{{ __('Pranešimai') }}</span>
-                            @if($unreadNotificationsCount > 0)
-                                <span class="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
-                                    {{ $unreadNotificationsCount }}
-                                </span>
-                            @endif
+                            <span class="{{ $unreadNotificationsCount > 0 ? '' : 'hidden' }} ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1.5 py-0.5 text-[11px] font-semibold text-white" data-notification-count="{{ $unreadNotificationsCount }}">
+                                {{ $unreadNotificationsCount }}
+                            </span>
                         </span>
                     </flux:sidebar.item>
 
@@ -135,6 +133,10 @@
         </flux:sidebar>
 
         {{ $slot }}
+
+        @auth
+            <div class="pointer-events-none fixed right-4 top-4 z-50 flex flex-col gap-3" data-notification-toasts></div>
+        @endauth
 
         @stack('scripts')
         @fluxScripts

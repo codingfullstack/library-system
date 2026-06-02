@@ -28,10 +28,16 @@ class BookCopyController extends Controller
 
     public function findByQr(
         Request $request,
-        string $qrCode,
-        FindBookCopyByQrQuery $findBookCopyByQrQuery
+        FindBookCopyByQrQuery $findBookCopyByQrQuery,
+        ?string $qrCode = null
     ): JsonResponse {
-        abort_if(strlen($qrCode) > 128, 404);
+        $qrCode = trim((string) ($qrCode ?: $request->query('qr_code', '')));
+
+        if ($qrCode === '' || strlen($qrCode) > 128 || ! str_starts_with($qrCode, 'QR-')) {
+            return response()->json([
+                'message' => 'Neatpažintas QR kodas. Nuskenuokite šios sistemos sugeneruotą knygos QR kodą.',
+            ], 422);
+        }
 
         $copy = $findBookCopyByQrQuery->handle($request->user(), $qrCode, [
             'book:id,title,subtitle,isbn',
@@ -104,9 +110,6 @@ class BookCopyController extends Controller
         ]);
     }
 }
-
-
-
 
 
 

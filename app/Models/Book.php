@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Support\Str;
 
 class Book extends Model
 {
@@ -26,6 +27,26 @@ class Book extends Model
         'edition',
         'cover_image',
     ];
+
+    public function getCoverImageUrlAttribute(): ?string
+    {
+        if (blank($this->cover_image)) {
+            return null;
+        }
+
+        if (Str::startsWith($this->cover_image, ['http://', 'https://', '//', 'data:'])) {
+            return $this->cover_image;
+        }
+
+        $path = ltrim($this->cover_image, '/');
+        $jpgPath = preg_replace('/\.[^.]+$/', '.jpg', $path);
+
+        if ($jpgPath && $jpgPath !== $path && file_exists(public_path($jpgPath))) {
+            return asset($jpgPath);
+        }
+
+        return asset($path);
+    }
 
     public function publisher(): BelongsTo
     {

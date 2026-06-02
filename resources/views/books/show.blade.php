@@ -122,8 +122,8 @@
                     <section class="overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                         <div class="grid gap-6 p-6 xl:grid-cols-[140px_minmax(0,1fr)]">
                             <div class="overflow-hidden rounded-[22px] border border-zinc-200 bg-zinc-100 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
-                                @if($book->cover_image)
-                                    <img src="{{ $book->cover_image }}" alt="{{ $book->title }}" class="h-full w-full object-cover">
+                                @if($book->cover_image_url)
+                                    <img src="{{ $book->cover_image_url }}" alt="{{ $book->title }}" class="h-full w-full object-cover">
                                 @else
                                     <div class="flex aspect-[3/4] w-full items-center justify-center text-4xl font-bold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
                                         {{ str($book->title)->substr(0, 2)->upper() }}

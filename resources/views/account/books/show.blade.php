@@ -92,8 +92,8 @@
 
                         <div class="grid gap-5 p-5 lg:grid-cols-[160px_1fr]">
                             <div class="flex h-56 w-40 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 text-lg font-bold uppercase text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
-                                @if($book->cover_image)
-                                    <img src="{{ $book->cover_image }}" alt="{{ $book->title }}" class="h-full w-full object-cover">
+                                @if($book->cover_image_url)
+                                    <img src="{{ $book->cover_image_url }}" alt="{{ $book->title }}" class="h-full w-full object-cover">
                                 @else
                                     {{ str($book->title)->words(1, '')->substr(0, 2)->upper() }}
                                 @endif

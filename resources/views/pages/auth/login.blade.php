@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
+        @php($seoTitle = 'Prisijungti')
         @include('partials.head')
-        <title>Prisijungti</title>
     </head>
     <body class="min-h-screen bg-white text-slate-950 antialiased dark:bg-zinc-950 dark:text-white">
         <div class="min-h-screen bg-white dark:bg-zinc-950">

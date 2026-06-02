@@ -3,10 +3,10 @@
 namespace App\Queries\Notifications;
 
 use App\Models\User;
-use App\Models\UserNotification;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Notifications\DatabaseNotification;
 
 class GetUserNotificationsQuery
 {
@@ -14,13 +14,13 @@ class GetUserNotificationsQuery
     {
         $perPage = max(1, min($perPage, 100));
 
-        $query = UserNotification::query()
-            ->with('sender:id,name,email')
-            ->where('user_id', $user->id)
+        $query = DatabaseNotification::query()
+            ->where('notifiable_type', $user->getMorphClass())
+            ->where('notifiable_id', $user->getKey())
             ->when(($filters['category'] ?? 'all') !== 'all', function (Builder $builder) use ($filters) {
                 $types = match ($filters['category']) {
                     'system' => ['system', 'new_user', 'qr_scan'],
-                    'reminder' => ['loan_overdue', 'reservation_ready'],
+                    'reminder' => ['loan_overdue', 'book_due_soon', 'reservation_ready'],
                     'reservation' => ['reservation_ready', 'reservation_cancelled', 'reservation_fulfilled'],
                     'warning' => ['loan_overdue', 'reservation_cancelled'],
                     'info' => ['book_returned'],
@@ -55,7 +55,6 @@ class GetUserNotificationsQuery
         return $query->paginate($perPage)->withQueryString();
     }
 }
-
 
 
 

@@ -41,6 +41,7 @@
                 </flux:tooltip>
             </flux:navbar>
 
+            <x-notification-bell />
             <x-desktop-user-menu />
         </flux:header>
 
@@ -72,6 +73,10 @@
         </flux:sidebar>
 
         {{ $slot }}
+
+        @auth
+            <div class="pointer-events-none fixed right-4 top-4 z-50 flex flex-col gap-3" data-notification-toasts></div>
+        @endauth
 
         @fluxScripts
     </body>

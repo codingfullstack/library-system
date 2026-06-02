@@ -8,6 +8,7 @@ use App\Actions\Notifications\CreateUserNotificationAction;
 use App\Actions\Reservations\SyncReservationQueueAction;
 use App\Models\BookCopy;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ReturnBookCopyAction
@@ -17,7 +18,24 @@ class ReturnBookCopyAction
      */
     public function handle(User $authUser, BookCopy $bookCopy): array
     {
-        $activeLoan = $bookCopy->activeLoan()->first();
+        return DB::transaction(function () use ($authUser, $bookCopy): array {
+            $bookCopy = BookCopy::query()
+                ->whereKey($bookCopy->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            return $this->returnLocked($authUser, $bookCopy);
+        });
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function returnLocked(User $authUser, BookCopy $bookCopy): array
+    {
+        $activeLoan = $bookCopy->activeLoan()
+            ->lockForUpdate()
+            ->first();
 
         if (! $activeLoan) {
             throw ValidationException::withMessages([

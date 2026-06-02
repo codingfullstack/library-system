@@ -199,7 +199,11 @@
                                             };
                                             $daysUntilExpiry = $reservation->expires_at ? now()->startOfDay()->diffInDays($reservation->expires_at->copy()->startOfDay(), false) : null;
                                         @endphp
-                                        <tr class="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40">
+                                        <tr
+                                            x-data="{ cancelled: false }"
+                                            @reservation-cancelled.window="if ($event.detail.reservationId === {{ $reservation->id }}) cancelled = true"
+                                            class="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40"
+                                        >
                                             <td class="px-4 py-4 align-middle">
                                                 <input type="checkbox" class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500">
                                             </td>
@@ -224,8 +228,11 @@
                                                 {{ $reservation->reserved_at?->format('Y-m-d H:i') ?? '-' }}
                                             </td>
                                             <td class="px-4 py-4 align-middle">
-                                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusMeta['classes'] }}">
+                                                <span x-show="! cancelled" class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusMeta['classes'] }}">
                                                     {{ $statusMeta['label'] }}
+                                                </span>
+                                                <span x-cloak x-show="cancelled" class="inline-flex rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-300">
+                                                    Atšaukta
                                                 </span>
                                             </td>
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">
@@ -243,11 +250,14 @@
                                                 @endif
                                             </td>
                                             <td class="px-4 py-4 align-middle text-center text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                                                @if($reservation->isPending() && $reservation->queue_position)
-                                                    {{ $reservation->queue_position }}
-                                                @else
-                                                    -
-                                                @endif
+                                                <span x-show="! cancelled">
+                                                    @if($reservation->isPending() && $reservation->queue_position)
+                                                        {{ $reservation->queue_position }}
+                                                    @else
+                                                        -
+                                                    @endif
+                                                </span>
+                                                <span x-cloak x-show="cancelled">-</span>
                                             </td>
                                             <td class="px-4 py-4 align-middle">
                                                 <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
@@ -255,13 +265,18 @@
                                                         <flux:icon.eye class="size-4" />
                                                     </a>
 
-                                                    @if($reservation->isActive())
-                                                        <livewire:reservations.cancel-reservation-form
-                                                            :reservation="$reservation"
-                                                            :compact="true"
-                                                            :key="'reservation-index-cancel-'.$reservation->id"
-                                                        />
-                                                    @endif
+                                                    <div x-show="! cancelled">
+                                                        @if($reservation->isActive())
+                                                            <livewire:reservations.cancel-reservation-form
+                                                                :reservation="$reservation"
+                                                                :compact="true"
+                                                                :key="'reservation-index-cancel-'.$reservation->id"
+                                                            />
+                                                        @endif
+                                                    </div>
+                                                    <span x-cloak x-show="cancelled" class="inline-flex rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-300">
+                                                        Atšaukta
+                                                    </span>
                                                 </div>
                                             </td>
                                         </tr>

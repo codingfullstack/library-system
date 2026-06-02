@@ -179,8 +179,8 @@
                                             <td class="px-4 py-4 align-middle">
                                                 <div class="flex items-start gap-3">
                                                     <div class="flex h-14 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-zinc-200 bg-zinc-100 text-[10px] font-semibold uppercase text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
-                                                        @if($loan->bookCopy?->book?->cover_image)
-                                                            <img src="{{ $loan->bookCopy->book->cover_image }}" alt="{{ $loan->bookCopy->book->title }}" class="h-full w-full object-cover">
+                                                        @if($loan->bookCopy?->book?->cover_image_url)
+                                                            <img src="{{ $loan->bookCopy->book->cover_image_url }}" alt="{{ $loan->bookCopy->book->title }}" class="h-full w-full object-cover">
                                                         @else
                                                             {{ str($loan->bookCopy?->book?->title ?? 'BK')->words(1, '')->substr(0, 2)->upper() }}
                                                         @endif

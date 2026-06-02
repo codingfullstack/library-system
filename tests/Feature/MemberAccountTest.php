@@ -10,6 +10,7 @@ use App\Models\Location;
 use App\Models\Reservation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -48,9 +49,15 @@ it('shows member dashboard with own summary', function () {
     ]);
 
     $member->notifications()->create([
+        'id' => (string) Str::uuid(),
         'type' => 'loan_overdue',
-        'title' => 'Vėluojate grąžinti knygą',
-        'message' => 'Primename apie termina.',
+        'data' => [
+            'kind' => 'loan_overdue',
+            'title' => 'Vėluojate grąžinti knygą',
+            'message' => 'Primename apie termina.',
+            'url' => route('notifications.index'),
+            'created_at' => now()->toIso8601String(),
+        ],
     ]);
 
     $this->actingAs($member)
@@ -58,7 +65,9 @@ it('shows member dashboard with own summary', function () {
         ->assertOk()
         ->assertSee('Mano paskyra')
         ->assertSee('Aktyvios išduotos knygos')
-        ->assertSee('Nario biblioteka');
+        ->assertSee('Nario biblioteka')
+        ->assertSee('Vėluojate grąžinti knygą')
+        ->assertSee('Primename apie termina.');
 });
 
 it('shows only active member loans in member account area', function () {

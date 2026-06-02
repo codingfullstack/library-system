@@ -190,11 +190,21 @@
                         @else
                             <div class="space-y-3">
                                 @foreach($recentNotifications as $notification)
+                                    @php
+                                        $data = $notification->data ?? [];
+                                        $title = $data['title'] ?? 'Naujas pranešimas';
+                                        $message = $data['body'] ?? $data['message'] ?? '';
+                                        $url = $data['url'] ?? route('notifications.index');
+                                    @endphp
                                     <div class="rounded-lg bg-zinc-50 p-3 ring-1 ring-zinc-200 dark:bg-zinc-950/50 dark:ring-zinc-800">
                                         <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                                             <div>
-                                                <div class="text-sm font-semibold text-zinc-950 dark:text-white">{{ $notification->title }}</div>
-                                                <div class="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{{ $notification->message }}</div>
+                                                <a href="{{ $url }}" class="text-sm font-semibold text-zinc-950 transition hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">
+                                                    {{ $title }}
+                                                </a>
+                                                @if($message !== '')
+                                                    <div class="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{{ $message }}</div>
+                                                @endif
                                             </div>
                                             <div class="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">{{ $notification->created_at?->format('Y-m-d H:i') }}</div>
                                         </div>

@@ -32,7 +32,7 @@ class GetMemberDashboardDataQuery
             ->get();
 
         $recentNotifications = $user->notifications()
-            ->with('sender:id,name,email')
+            ->latest()
             ->limit(5)
             ->get();
 
@@ -52,7 +52,7 @@ class GetMemberDashboardDataQuery
                 ->where('status', 'vėluoja')
                 ->whereNull('returned_at')
                 ->count(),
-            'unreadNotificationsCount' => $user->notifications()->whereNull('read_at')->count(),
+            'unreadNotificationsCount' => $user->unreadNotifications()->count(),
             'activeLoans' => $activeLoans,
             'activeReservations' => $activeReservations,
             'recentNotifications' => $recentNotifications,

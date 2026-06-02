@@ -298,6 +298,87 @@ test('member reservation and loan counts are visible on show page', function () 
     $response->assertSee('Testine knyga');
 });
 
+test('admin sees only active library member loans and reservations on user show page', function () {
+    $libraryA = Library::factory()->create(['name' => 'Library A']);
+    $libraryB = Library::factory()->create(['name' => 'Library B']);
+
+    $admin = User::factory()->for($libraryA)->admin()->create();
+    $member = User::factory()->for($libraryA)->member()->create([
+        'membership_number' => 'MULTI-MEM-001',
+    ]);
+
+    $member->libraryMemberships()->create([
+        'library_id' => $libraryB->id,
+        'membership_number' => $member->membership_number,
+        'is_active' => true,
+        'joined_at' => now(),
+    ]);
+
+    $branchA = Branch::factory()->for($libraryA)->create();
+    $locationA = Location::factory()->for($libraryA)->for($branchA)->create();
+    $branchB = Branch::factory()->for($libraryB)->create();
+    $locationB = Location::factory()->for($libraryB)->for($branchB)->create();
+
+    $bookA = Book::factory()->create(['title' => 'Visible library A book']);
+    $bookB = Book::factory()->create(['title' => 'Hidden library B book']);
+
+    $copyA = BookCopy::factory()->create([
+        'library_id' => $libraryA->id,
+        'book_id' => $bookA->id,
+        'branch_id' => $branchA->id,
+        'location_id' => $locationA->id,
+        'status' => BookCopy::STATUS_LOANED,
+    ]);
+
+    $copyB = BookCopy::factory()->create([
+        'library_id' => $libraryB->id,
+        'book_id' => $bookB->id,
+        'branch_id' => $branchB->id,
+        'location_id' => $locationB->id,
+        'status' => BookCopy::STATUS_LOANED,
+    ]);
+
+    Loan::factory()->create([
+        'library_id' => $libraryA->id,
+        'book_copy_id' => $copyA->id,
+        'user_id' => $member->id,
+        'returned_at' => null,
+        'status' => 'aktyvi',
+    ]);
+
+    Loan::factory()->create([
+        'library_id' => $libraryB->id,
+        'book_copy_id' => $copyB->id,
+        'user_id' => $member->id,
+        'returned_at' => null,
+        'status' => 'aktyvi',
+    ]);
+
+    Reservation::factory()->create([
+        'library_id' => $libraryB->id,
+        'book_id' => $bookB->id,
+        'user_id' => $member->id,
+        'status' => Reservation::STATUS_RESERVED,
+        'reserved_at' => now(),
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+        'expires_at' => now()->addDay(),
+    ]);
+
+    $response = $this
+        ->actingAs($admin)
+        ->withSession(['active_library_id' => $libraryA->id])
+        ->get(route('manage.users.show', $member));
+
+    $response->assertOk();
+    $response->assertSee('Visible library A book');
+    $response->assertDontSee('Hidden library B book');
+    $response->assertSee('Aktyviai išduotos knygos');
+    $response->assertSee('Visos išduotos knygos');
+    $response->assertSee('Laukiančios rezervacijos');
+    $response->assertDontSee('Library B');
+});
+
 
 
 

@@ -29,8 +29,18 @@ use App\Http\Controllers\Management\ImportController as ManageImportController;
 use App\Http\Controllers\UserQrController;
 
 Route::get('/', [PublicPageController::class, 'home'])->name('home');
-Route::get('/apie', [PublicPageController::class, 'about'])->name('about');
-Route::get('/bibliotekos', [PublicPageController::class, 'libraries'])->name('public.libraries.index');
+Route::get('/about', [PublicPageController::class, 'about'])->name('about');
+Route::redirect('/apie', '/about');
+Route::get('/libraries', [PublicPageController::class, 'libraries'])->name('public.libraries.index');
+Route::redirect('/bibliotekos', '/libraries');
+Route::get('/libraries/{library}', [PublicPageController::class, 'library'])->name('public.libraries.show');
+Route::get('/contact', [PublicPageController::class, 'contact'])->name('contact');
+Route::get('/features', [PublicPageController::class, 'features'])->name('features');
+Route::get('/pricing', [PublicPageController::class, 'pricing'])->name('pricing');
+Route::middleware('overdue.notifications')->group(function () {
+    Route::get('/books', [BookController::class, 'index'])->name('books.index');
+    Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
+});
 Route::view('/pagalba', 'help')->name('help');
 
 Route::middleware(['auth', 'overdue.notifications', 'verified', 'library.context', 'role:superadministratorius,administratorius,darbuotojas'])->group(function () {
@@ -53,13 +63,12 @@ Route::middleware(['auth', 'overdue.notifications'])->group(function () {
         });
 
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/notifications/recent', [NotificationController::class, 'recent'])->name('notifications.recent');
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead'])->name('notifications.mark-all-read');
-    // BOOKS
-    Route::get('/books', [BookController::class, 'index'])->name('books.index');
-    Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
+    Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.mark-read');
     Route::get('/book-copies/{id}', [BookCopyController::class, 'showPage'])->name('book-copies.show');
     Route::get('/book-copies/{id}/qr', [BookCopyQrController::class, 'show'])->name('book-copies.qr');
-    // BOOKS
     // LOANS
     Route::get('/loans', [LoanController::class, 'index'])->name('loans.index');
     Route::get('/loans/search-members', [LoanController::class, 'searchMembers'])->name('loans.search-members');

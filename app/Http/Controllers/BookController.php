@@ -11,6 +11,7 @@ use App\Queries\Books\GetLibraryBooksQuery;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use App\Queries\Books\GetLibraryBookDetailsQuery;
+use App\Services\SeoService;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class BookController extends Controller
@@ -18,7 +19,8 @@ class BookController extends Controller
     public function index(
         Request $request,
         GetLibraryBooksQuery $getLibraryBooksQuery,
-        GetBookIndexFiltersDataQuery $getBookIndexFiltersDataQuery
+        GetBookIndexFiltersDataQuery $getBookIndexFiltersDataQuery,
+        SeoService $seoService,
     ): View
     {
         $actor = $request->user();
@@ -33,11 +35,24 @@ class BookController extends Controller
             'direction' => $request->query('direction', 'asc'),
             'per_page' => $request->query('per_page', 15),
         ];
-        $books = $getLibraryBooksQuery->handle($request->user(), $filters);
+        $books = $getLibraryBooksQuery->handle($actor, $filters);
+
+        if ($actor === null) {
+            return view('public.books.index', array_merge(
+                [
+                    'books' => $books,
+                    'seo' => $seoService->make(
+                        title: 'Knygu katalogas',
+                        description: 'Viesas biblioteku knygu katalogas su paieska pagal pavadinima, autoriu, kategorija ir ISBN.'
+                    ),
+                ],
+                $getBookIndexFiltersDataQuery->handle(null)
+            ));
+        }
 
         return view($actor->effectiveRole() === 'narys' ? 'account.books.index' : 'books.index', array_merge(
             ['books' => $books],
-            $getBookIndexFiltersDataQuery->handle($request->user())
+            $getBookIndexFiltersDataQuery->handle($actor)
         ));
     }
 
@@ -46,16 +61,28 @@ class BookController extends Controller
         Book $book,
         GetLibraryBookDetailsQuery $getLibraryBookDetailsQuery,
         GetBookCopyFiltersDataQuery $getBookCopyFiltersDataQuery,
-        GetRecentAuditLogsForBookQuery $getRecentAuditLogsForBookQuery
+        GetRecentAuditLogsForBookQuery $getRecentAuditLogsForBookQuery,
+        SeoService $seoService,
     ): View
     {
         $actor = $request->user();
-        $book = $getLibraryBookDetailsQuery->handle($request->user(), $book, [
+        $book = $getLibraryBookDetailsQuery->handle($actor, $book, [
             'copy_lifecycle' => $request->query('copy_lifecycle'),
             'copy_status' => $request->query('copy_status'),
             'branch_id' => $request->query('branch_id'),
             'location_id' => $request->query('location_id'),
         ]);
+
+        if ($actor === null) {
+            return view('public.books.show', [
+                'book' => $book,
+                'seo' => $seoService->make(
+                    title: $book->title,
+                    description: $book->description ?: 'Knygos informacija, autoriai, kategorijos ir prieinamumas viesose bibliotekose.',
+                    type: 'article',
+                ),
+            ]);
+        }
 
         if ($actor->effectiveRole() === 'narys') {
             $currentReservation = $book->reservations

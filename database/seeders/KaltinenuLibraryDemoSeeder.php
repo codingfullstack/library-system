@@ -199,65 +199,11 @@ class KaltinenuLibraryDemoSeeder extends Seeder
             ]);
             $employees = collect([$admin, $staffA, $staffB]);
 
-            $hp1 = $this->firstOrCreateBook([
-                'title' => 'Haris Poteris ir Išminties akmuo',
-                'isbn' => '9786090155339',
-                'description' => 'Pirmoji serijos dalis apie jauną burtininką Harį Poterį.',
-                'publisher_id' => $almaLittera->id,
-                'category_id' => $fantasyCategory->id,
-                'publication_year' => 1997,
-                'language' => 'lt',
-                'page_count' => 352,
-                'edition' => '1',
-            ], [$rowling], [$fantasyCategory, $fictionCategory]);
-
-            $witcher = $this->firstOrCreateBook([
-                'title' => 'Raganius. Paskutinis noras',
-                'isbn' => '9786094272211',
-                'description' => 'Apsakymų rinkinys apie Geraltą iš Rivijos.',
-                'publisher_id' => $eridanas->id,
-                'category_id' => $fantasyCategory->id,
-                'publication_year' => 1993,
-                'language' => 'lt',
-                'page_count' => 320,
-                'edition' => '1',
-            ], [$sapkowski], [$fantasyCategory]);
-
-            $altoriu = $this->firstOrCreateBook([
-                'title' => 'Altorių šešėly',
-                'isbn' => '9785415011237',
-                'description' => 'Vienas žymiausių lietuvių literatūros romanų.',
-                'publisher_id' => $vaga->id,
-                'category_id' => $classicCategory->id,
-                'publication_year' => 1933,
-                'language' => 'lt',
-                'page_count' => 600,
-                'edition' => '1',
-            ], [$putinas], [$classicCategory, $fictionCategory]);
-
-            $dievuMiskas = $this->firstOrCreateBook([
-                'title' => 'Dievų miškas',
-                'isbn' => '9786094661550',
-                'description' => 'Atsiminimų knyga apie gyvenimą koncentracijos stovykloje.',
-                'publisher_id' => $vaga->id,
-                'category_id' => $classicCategory->id,
-                'publication_year' => 1957,
-                'language' => 'lt',
-                'page_count' => 480,
-                'edition' => '1',
-            ], [$sruoga], [$classicCategory, $fictionCategory]);
-
-            $faultInOurStars = $this->firstOrCreateBook([
-                'title' => 'Dėl mūsų likimo ir žvaigždžių kaltos',
-                'isbn' => '9786094665800',
-                'description' => 'Jaunimo romanas apie draugystę, meilę ir netektis.',
-                'publisher_id' => $tytoAlba->id,
-                'category_id' => $youthCategory->id,
-                'publication_year' => 2012,
-                'language' => 'lt',
-                'page_count' => 288,
-                'edition' => '1',
-            ], [$green], [$youthCategory, $fictionCategory]);
+            $hp1 = Book::query()->where('isbn', '9786090141601')->firstOrFail();
+            $witcher = Book::query()->where('isbn', '9786090404256')->firstOrFail();
+            $altoriu = Book::query()->where('isbn', '9799955000357')->firstOrFail();
+            $dievuMiskas = Book::query()->where('title', 'Priešaušrio vieškeliai')->firstOrFail();
+            $faultInOurStars = Book::query()->where('isbn', '9786094799716')->firstOrFail();
 
             $orwell = Author::query()->firstOrCreate(['name' => 'George Orwell'], ['bio' => 'Anglų rašytojas, zinomas del distopiniu romanu.']);
             $tolkien = Author::query()->firstOrCreate(['name' => 'J. R. R. Tolkien'], ['bio' => 'Britų fantastas, sukūręs Viduržemės pasaulį.']);
@@ -274,84 +220,30 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 ['name' => 'Romanai', 'description' => 'Grožinės literatūros romanai.']
             );
 
-            $book1984 = $this->firstOrCreateBook([
-                'title' => '1984',
-                'isbn' => '9786090142324',
-                'description' => 'Distopinis romanas apie totalią kontrolę ir tiesos perrašinėjimą.',
-                'publisher_id' => $almaLittera->id,
-                'category_id' => $classicCategory->id,
-                'publication_year' => 1949,
-                'language' => 'lt',
-                'page_count' => 352,
-                'edition' => '4',
-            ], [$orwell], [$classicCategory, $romanCategory]);
-
-            $hobbit = $this->firstOrCreateBook([
-                'title' => 'Hobitas',
-                'isbn' => '9786090135003',
-                'description' => 'Bilbo Begginso nuotykiai kelyje į Vienišąjį kalną.',
-                'publisher_id' => $almaLittera->id,
-                'category_id' => $fantasyCategory->id,
-                'publication_year' => 1937,
-                'language' => 'lt',
-                'page_count' => 304,
-                'edition' => '3',
-            ], [$tolkien], [$fantasyCategory, $classicCategory]);
-
-            $atomicHabits = $this->firstOrCreateBook([
-                'title' => 'Atominiai įpročiai',
-                'isbn' => '9786090145100',
-                'description' => 'Praktinė knyga apie mažų kasdienių įpročių įtaką ilgalaikiams rezultatams.',
-                'publisher_id' => $almaLittera->id,
-                'category_id' => $psychologyCategory->id,
-                'publication_year' => 2018,
-                'language' => 'lt',
-                'page_count' => 320,
-                'edition' => '1',
-            ], [$clear], [$psychologyCategory]);
-
-            $thinking = $this->firstOrCreateBook([
-                'title' => 'Mąstymas, greitas ir lėtas',
-                'isbn' => '9786090145455',
-                'description' => 'Knyga apie sprendimų priėmimą, intuiciją ir mąstymą.',
-                'publisher_id' => $almaLittera->id,
-                'category_id' => $psychologyCategory->id,
-                'publication_year' => 2011,
-                'language' => 'lt',
-                'page_count' => 512,
-                'edition' => '1',
-            ], [$kahneman], [$psychologyCategory]);
-
-            $littlePrince = $this->firstOrCreateBook([
-                'title' => 'Mažasis princas',
-                'isbn' => '9786094270538',
-                'description' => 'Poetinė pasaka apie draugystę, meilę ir atsakomybę.',
-                'publisher_id' => $vaga->id,
-                'category_id' => $youthCategory->id,
-                'publication_year' => 1943,
-                'language' => 'lt',
-                'page_count' => 112,
-                'edition' => '2',
-            ], [$saintExupery], [$youthCategory, $fictionCategory]);
+            $book1984 = Book::query()->where('isbn', '9786090900499')->firstOrFail();
+            $hobbit = Book::query()->where('isbn', '9786090158005')->firstOrFail();
+            $atomicHabits = Book::query()->where('isbn', '9786090152683')->firstOrFail();
+            $thinking = Book::query()->where('isbn', '9785415020980')->firstOrFail();
+            $littlePrince = Book::query()->where('isbn', '9786090141564')->firstOrFail();
 
             $copies = collect([
-                $this->createCopy($library, $hp1, $mainBranch, $fantasyLocation, 'KAL-HP1-001', 'QR-KAL-HP1-001', '9786090155331', BookCopy::STATUS_LOANED, 'gera', '2023-09-01', 'Dažnai skolinama knyga.'),
-                $this->createCopy($library, $hp1, $mainBranch, $fantasyLocation, 'KAL-HP1-002', 'QR-KAL-HP1-002', '9786090155332', BookCopy::STATUS_AVAILABLE, 'gera', '2023-09-01', null),
-                $this->createCopy($library, $witcher, $mainBranch, $fantasyLocation, 'KAL-RAG-001', 'QR-KAL-RAG-001', '9786094272211', BookCopy::STATUS_MAINTENANCE, 'sugadinta', '2024-01-15', 'Lūžta nugarėlė, išsiųsta tvarkymui.'),
-                $this->createCopy($library, $witcher, $mainBranch, $fantasyLocation, 'KAL-RAG-002', 'QR-KAL-RAG-002', '9786094272212', BookCopy::STATUS_AVAILABLE, 'gera', '2024-01-15', null),
-                $this->createCopy($library, $altoriu, $mainBranch, $classicLocation, 'KAL-ALT-001', 'QR-KAL-ALT-001', '9785415011231', BookCopy::STATUS_DAMAGED, 'sugadinta', '2021-11-20', 'Apiplyšęs viršelis.'),
-                $this->createCopy($library, $altoriu, $mainBranch, $classicLocation, 'KAL-ALT-002', 'QR-KAL-ALT-002', '9785415011232', BookCopy::STATUS_AVAILABLE, 'padėvėta', '2019-03-14', 'Senesnis egzempliorius.'),
-                $this->createCopy($library, $dievuMiskas, $mainBranch, $classicLocation, 'KAL-DM-001', 'QR-KAL-DM-001', '9786094661551', BookCopy::STATUS_LOST, 'gera', '2020-10-01', 'Nerastas po inventorizacijos.'),
-                $this->createCopy($library, $faultInOurStars, $childrenBranch, $childrenLocation, 'KAL-YA-001', 'QR-KAL-YA-001', '9786094665801', BookCopy::STATUS_WITHDRAWN, 'padėvėta', '2018-04-04', 'Per daug susidėvėjęs, nurašytas.'),
-                $this->createCopy($library, $faultInOurStars, $childrenBranch, $childrenLocation, 'KAL-YA-002', 'QR-KAL-YA-002', '9786094665802', BookCopy::STATUS_AVAILABLE, 'gera', '2024-02-10', 'Laisva kopija, skirta greitam išdavimui rezervacijos eilėje.'),
-                $this->createCopy($library, $book1984, $mainBranch, $classicLocation, 'KAL-1984-001', 'QR-KAL-1984-001', '9786090142321', BookCopy::STATUS_AVAILABLE, 'gera', '2023-01-15', null),
-                $this->createCopy($library, $book1984, $mainBranch, $classicLocation, 'KAL-1984-002', 'QR-KAL-1984-002', '9786090142322', BookCopy::STATUS_AVAILABLE, 'gera', '2023-01-15', null),
-                $this->createCopy($library, $hobbit, $mainBranch, $fantasyLocation, 'KAL-HOB-001', 'QR-KAL-HOB-001', '9786090135001', BookCopy::STATUS_AVAILABLE, 'gera', '2022-08-20', null),
-                $this->createCopy($library, $hobbit, $mainBranch, $fantasyLocation, 'KAL-HOB-002', 'QR-KAL-HOB-002', '9786090135002', BookCopy::STATUS_AVAILABLE, 'padėvėta', '2022-08-20', null),
-                $this->createCopy($library, $atomicHabits, $mainBranch, $classicLocation, 'KAL-AH-001', 'QR-KAL-AH-001', '9786090145101', BookCopy::STATUS_AVAILABLE, 'gera', '2024-06-10', null),
-                $this->createCopy($library, $thinking, $mainBranch, $classicLocation, 'KAL-TF-001', 'QR-KAL-TF-001', '9786090145451', BookCopy::STATUS_AVAILABLE, 'gera', '2024-04-08', null),
-                $this->createCopy($library, $littlePrince, $childrenBranch, $childrenLocation, 'KAL-MP-001', 'QR-KAL-MP-001', '9786094270531', BookCopy::STATUS_AVAILABLE, 'gera', '2023-11-09', null),
-                $this->createCopy($library, $littlePrince, $childrenBranch, $childrenLocation, 'KAL-MP-002', 'QR-KAL-MP-002', '9786094270532', BookCopy::STATUS_AVAILABLE, 'padėvėta', '2023-11-09', null),
+                $this->createCopy($library, $hp1, $mainBranch, $fantasyLocation, 'KAL-HP1-001', 'QR-KAL-HP1-001', '9786090141601', BookCopy::STATUS_LOANED, 'gera', '2023-09-01', 'Dažnai skolinama knyga.'),
+                $this->createCopy($library, $hp1, $mainBranch, $fantasyLocation, 'KAL-HP1-002', 'QR-KAL-HP1-002', '9786090141602', BookCopy::STATUS_AVAILABLE, 'gera', '2023-09-01', null),
+                $this->createCopy($library, $witcher, $mainBranch, $fantasyLocation, 'KAL-RAG-001', 'QR-KAL-RAG-001', '9786090404251', BookCopy::STATUS_MAINTENANCE, 'sugadinta', '2024-01-15', 'Lūžta nugarėlė, išsiųsta tvarkymui.'),
+                $this->createCopy($library, $witcher, $mainBranch, $fantasyLocation, 'KAL-RAG-002', 'QR-KAL-RAG-002', '9786090404252', BookCopy::STATUS_AVAILABLE, 'gera', '2024-01-15', null),
+                $this->createCopy($library, $altoriu, $mainBranch, $classicLocation, 'KAL-ALT-001', 'QR-KAL-ALT-001', '9799955000351', BookCopy::STATUS_DAMAGED, 'sugadinta', '2021-11-20', 'Apiplyšęs viršelis.'),
+                $this->createCopy($library, $altoriu, $mainBranch, $classicLocation, 'KAL-ALT-002', 'QR-KAL-ALT-002', '9799955000352', BookCopy::STATUS_AVAILABLE, 'padėvėta', '2019-03-14', 'Senesnis egzempliorius.'),
+                $this->createCopy($library, $dievuMiskas, $mainBranch, $classicLocation, 'KAL-DM-001', 'QR-KAL-DM-001', 'KAL-PRV-001', BookCopy::STATUS_LOST, 'gera', '2020-10-01', 'Nerastas po inventorizacijos.'),
+                $this->createCopy($library, $faultInOurStars, $childrenBranch, $childrenLocation, 'KAL-YA-001', 'QR-KAL-YA-001', '9786094799711', BookCopy::STATUS_WITHDRAWN, 'padėvėta', '2018-04-04', 'Per daug susidėvėjęs, nurašytas.'),
+                $this->createCopy($library, $faultInOurStars, $childrenBranch, $childrenLocation, 'KAL-YA-002', 'QR-KAL-YA-002', '9786094799712', BookCopy::STATUS_AVAILABLE, 'gera', '2024-02-10', 'Laisva kopija, skirta greitam išdavimui rezervacijos eilėje.'),
+                $this->createCopy($library, $book1984, $mainBranch, $classicLocation, 'KAL-1984-001', 'QR-KAL-1984-001', '9786090900491', BookCopy::STATUS_AVAILABLE, 'gera', '2023-01-15', null),
+                $this->createCopy($library, $book1984, $mainBranch, $classicLocation, 'KAL-1984-002', 'QR-KAL-1984-002', '9786090900492', BookCopy::STATUS_AVAILABLE, 'gera', '2023-01-15', null),
+                $this->createCopy($library, $hobbit, $mainBranch, $fantasyLocation, 'KAL-HOB-001', 'QR-KAL-HOB-001', '9786090158001', BookCopy::STATUS_AVAILABLE, 'gera', '2022-08-20', null),
+                $this->createCopy($library, $hobbit, $mainBranch, $fantasyLocation, 'KAL-HOB-002', 'QR-KAL-HOB-002', '9786090158002', BookCopy::STATUS_AVAILABLE, 'padėvėta', '2022-08-20', null),
+                $this->createCopy($library, $atomicHabits, $mainBranch, $classicLocation, 'KAL-AH-001', 'QR-KAL-AH-001', '9786090152681', BookCopy::STATUS_AVAILABLE, 'gera', '2024-06-10', null),
+                $this->createCopy($library, $thinking, $mainBranch, $classicLocation, 'KAL-TF-001', 'QR-KAL-TF-001', '9785415020981', BookCopy::STATUS_AVAILABLE, 'gera', '2024-04-08', null),
+                $this->createCopy($library, $littlePrince, $childrenBranch, $childrenLocation, 'KAL-MP-001', 'QR-KAL-MP-001', '9786090141561', BookCopy::STATUS_AVAILABLE, 'gera', '2023-11-09', null),
+                $this->createCopy($library, $littlePrince, $childrenBranch, $childrenLocation, 'KAL-MP-002', 'QR-KAL-MP-002', '9786090141562', BookCopy::STATUS_AVAILABLE, 'padėvėta', '2023-11-09', null),
             ]);
 
             $loanA = Loan::create([
@@ -509,19 +401,6 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 'joined_at' => $user->created_at,
             ]
         );
-    }
-
-    private function firstOrCreateBook(array $data, array $authors, array $categories): Book
-    {
-        $book = Book::query()->firstOrCreate(
-            ['isbn' => $data['isbn']],
-            $data + ['subtitle' => null, 'cover_image' => null]
-        );
-
-        $book->authors()->syncWithoutDetaching(collect($authors)->pluck('id')->all());
-        $book->categories()->syncWithoutDetaching(collect($categories)->pluck('id')->all());
-
-        return $book;
     }
 
     private function createCopy(

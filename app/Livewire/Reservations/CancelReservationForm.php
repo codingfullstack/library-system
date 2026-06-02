@@ -18,8 +18,11 @@ class CancelReservationForm extends Component
 
     public string $reason = '';
 
+    public ?string $message = null;
+
     public function open(): void
     {
+        $this->message = null;
         $this->isOpen = true;
     }
 
@@ -29,7 +32,7 @@ class CancelReservationForm extends Component
         $this->resetErrorBag();
     }
 
-    public function save()
+    public function save(): void
     {
         $actor = Auth::user();
 
@@ -38,7 +41,7 @@ class CancelReservationForm extends Component
         }
 
         try {
-            app(CancelReservationAction::class)->handle(
+            $reservation = app(CancelReservationAction::class)->handle(
                 $actor,
                 $this->reservation->fresh(),
                 $this->reason
@@ -48,10 +51,16 @@ class CancelReservationForm extends Component
                 $this->addError($field, $messages[0] ?? 'Nepavyko atšaukti rezervacijos.');
             }
 
-            return null;
+            return;
         }
 
-        return redirect(request()->fullUrl())->with('success', 'Rezervacija atšaukta.');
+        $this->reservation = $reservation->fresh(['book']);
+        $this->isOpen = false;
+        $this->reason = '';
+        $this->message = 'Rezervacija atšaukta.';
+
+        $this->dispatch('reservation-updated', bookId: $this->reservation->book_id, reservationId: $this->reservation->id);
+        $this->dispatch('reservation-cancelled', reservationId: $this->reservation->id);
     }
 
     public function render()
@@ -63,11 +72,3 @@ class CancelReservationForm extends Component
         ]);
     }
 }
-
-
-
-
-
-
-
-

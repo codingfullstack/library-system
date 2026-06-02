@@ -12,19 +12,25 @@ class UserNotificationResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $data = $this->data ?? [];
+        $metadata = $data['metadata'] ?? ($this->metadata ?? []);
+        $sender = $data['sender'] ?? ($metadata['sender'] ?? null);
+
         return [
             'id' => $this->id,
-            'type' => $this->type,
-            'title' => $this->title,
-            'message' => $this->message,
-            'metadata' => $this->metadata ?? [],
+            'type' => $data['kind'] ?? $this->type,
+            'kind' => $data['kind'] ?? $this->type,
+            'title' => $data['title'] ?? $this->title,
+            'message' => $data['message'] ?? $this->message,
+            'url' => $data['url'] ?? route('notifications.index', absolute: false),
+            'metadata' => $metadata,
             'read_at' => $this->read_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
-            'sender' => $this->sender ? [
+            'sender' => $sender ?: ($this->sender ? [
                 'id' => $this->sender->id,
                 'name' => $this->sender->name,
                 'email' => $this->sender->email,
-            ] : null,
+            ] : null),
         ];
     }
 }

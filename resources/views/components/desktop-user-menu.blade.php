@@ -1,6 +1,6 @@
 @php
     $user = auth()->user();
-    $unreadNotificationsCount = $user?->notifications()->whereNull('read_at')->count() ?? 0;
+    $unreadNotificationsCount = $user?->unreadNotifications()->count() ?? 0;
     $displayLibrary = $user?->library?->name;
 @endphp
 
@@ -29,11 +29,9 @@
             <flux:menu.item :href="route('notifications.index')" icon="bell" wire:navigate>
                 <span class="flex items-center gap-2">
                     <span>{{ __('Pranešimai') }}</span>
-                    @if($unreadNotificationsCount > 0)
-                        <span class="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
-                            {{ $unreadNotificationsCount }}
-                        </span>
-                    @endif
+                    <span class="{{ $unreadNotificationsCount > 0 ? '' : 'hidden' }} ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[11px] font-semibold text-white" data-notification-count="{{ $unreadNotificationsCount }}">
+                        {{ $unreadNotificationsCount }}
+                    </span>
                 </span>
             </flux:menu.item>
 

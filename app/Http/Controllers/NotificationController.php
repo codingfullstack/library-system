@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\UserNotificationResource;
 use App\Queries\Notifications\GetUserNotificationsQuery;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\DatabaseNotification;
 
 class NotificationController extends Controller
 {
@@ -28,7 +30,7 @@ class NotificationController extends Controller
         $allNotifications = $user->notifications();
         $unreadCount = (clone $allNotifications)->whereNull('read_at')->count();
         $systemCount = (clone $allNotifications)->whereIn('type', ['system', 'new_user', 'qr_scan'])->count();
-        $reminderCount = (clone $allNotifications)->whereIn('type', ['loan_overdue', 'reservation_ready'])->count();
+        $reminderCount = (clone $allNotifications)->whereIn('type', ['loan_overdue', 'book_due_soon', 'reservation_ready'])->count();
         $otherCount = max((clone $allNotifications)->count() - $systemCount - $reminderCount, 0);
 
         return view('notifications.index', [
@@ -43,23 +45,58 @@ class NotificationController extends Controller
         ]);
     }
 
-    public function markAllRead(Request $request): RedirectResponse
+    public function markAllRead(Request $request): JsonResponse|\Illuminate\Http\RedirectResponse
     {
         $request->user()
             ->notifications()
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
 
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Pranesimai pazymeti kaip perskaityti.',
+                'unread_count' => $request->user()->unreadNotifications()->count(),
+            ]);
+        }
+
         return redirect()
             ->route('notifications.index', $request->only(['category', 'status', 'date', 'sort', 'per_page']))
-            ->with('status', 'Visi pranešimai pažymėti kaip perskaityti.');
+            ->with('status', 'Visi pranesimai pazymeti kaip perskaityti.');
+    }
+
+    public function unreadCount(Request $request): JsonResponse
+    {
+        return response()->json([
+            'unread_count' => $request->user()->unreadNotifications()->count(),
+        ]);
+    }
+
+    public function recent(Request $request): JsonResponse
+    {
+        $notifications = $request->user()
+            ->notifications()
+            ->limit((int) $request->integer('limit', 8))
+            ->get();
+
+        return response()->json([
+            'items' => UserNotificationResource::collection($notifications)->resolve(),
+            'unread_count' => $request->user()->unreadNotifications()->count(),
+        ]);
+    }
+
+    public function markRead(Request $request, DatabaseNotification $notification): JsonResponse
+    {
+        abort_unless(
+            $notification->notifiable_type === $request->user()->getMorphClass()
+                && (string) $notification->notifiable_id === (string) $request->user()->getKey(),
+            404
+        );
+
+        $notification->markAsRead();
+
+        return response()->json([
+            'message' => 'Pranesimas pazymetas kaip perskaitytas.',
+            'unread_count' => $request->user()->unreadNotifications()->count(),
+        ]);
     }
 }
-
-
-
-
-
-
-
-

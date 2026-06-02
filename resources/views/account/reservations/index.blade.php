@@ -173,7 +173,11 @@
                                                 ? now()->startOfDay()->diffInDays($reservation->expires_at->copy()->startOfDay(), false)
                                                 : null;
                                         @endphp
-                                        <tr class="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40">
+                                        <tr
+                                            x-data="{ cancelled: false }"
+                                            @reservation-cancelled.window="if ($event.detail.reservationId === {{ $reservation->id }}) cancelled = true"
+                                            class="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40"
+                                        >
                                             <td class="px-4 py-4 align-middle"><input type="checkbox" class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"></td>
                                             <td class="px-4 py-4 align-middle">
                                                 <div class="flex items-start gap-3">
@@ -191,8 +195,11 @@
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">{{ $reservation->library?->name ?: '-' }}</td>
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">{{ $reservation->reserved_at?->format('Y-m-d H:i') ?: '-' }}</td>
                                             <td class="px-4 py-4 align-middle">
-                                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClasses }}">
+                                                <span x-show="! cancelled" class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClasses }}">
                                                     {{ $statusLabel }}
+                                                </span>
+                                                <span x-cloak x-show="cancelled" class="inline-flex rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-300">
+                                                    Atšaukta
                                                 </span>
                                             </td>
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">
@@ -210,16 +217,22 @@
                                                 @endif
                                             </td>
                                             <td class="px-4 py-4 align-middle text-center text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                                                {{ $reservation->isPending() && $reservation->queue_position ? $reservation->queue_position : '-' }}
+                                                <span x-show="! cancelled">{{ $reservation->isPending() && $reservation->queue_position ? $reservation->queue_position : '-' }}</span>
+                                                <span x-cloak x-show="cancelled">-</span>
                                             </td>
                                             <td class="px-4 py-4 align-middle">
                                                 <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
                                                     <a href="{{ route('books.show', $reservation->book_id) }}" title="Peržiūrėti knygą" aria-label="Peržiūrėti knygą" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
                                                         <flux:icon.eye class="size-4" />
                                                     </a>
-                                                    @if($reservation->isPending())
-                                                        <livewire:reservations.cancel-reservation-form :reservation="$reservation" :compact="true" :key="'member-reservation-cancel-'.$reservation->id" />
-                                                    @endif
+                                                    <div x-show="! cancelled">
+                                                        @if($reservation->isPending())
+                                                            <livewire:reservations.cancel-reservation-form :reservation="$reservation" :compact="true" :key="'member-reservation-cancel-'.$reservation->id" />
+                                                        @endif
+                                                    </div>
+                                                    <span x-cloak x-show="cancelled" class="inline-flex rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-300">
+                                                        Atšaukta
+                                                    </span>
                                                 </div>
                                             </td>
                                         </tr>

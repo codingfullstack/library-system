@@ -7,10 +7,10 @@ use App\Support\UserManagement;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Support\Collection;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -127,14 +127,14 @@ class User extends Authenticatable
         return $this->hasMany(ScanLog::class);
     }
 
-    public function notifications(): HasMany
+    public function deviceTokens(): HasMany
     {
-        return $this->hasMany(UserNotification::class)->latest();
+        return $this->hasMany(DeviceToken::class);
     }
 
-    public function sentNotifications(): HasMany
+    public function receivesBroadcastNotificationsOn(): string
     {
-        return $this->hasMany(UserNotification::class, 'sent_by')->latest();
+        return 'users.'.$this->id;
     }
 
     public function isSuperAdmin(): bool

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class GetLibraryBookDetailsQuery
 {
-    public function handle(User $user, Book $book, array $filters = []): Book
+    public function handle(?User $user, Book $book, array $filters = []): Book
     {
         $libraryIds = $this->visibleLibraryIds($user);
 
@@ -18,7 +18,7 @@ class GetLibraryBookDetailsQuery
                 ->whereIn('library_id', $libraryIds))
             ->exists();
 
-        if ($user->role === 'narys' && is_array($libraryIds) && ! $hasVisibleCopies) {
+        if (($user === null || $user->role === 'narys') && is_array($libraryIds) && ! $hasVisibleCopies) {
             throw (new ModelNotFoundException())->setModel(Book::class, [$book->id]);
         }
 
@@ -94,8 +94,17 @@ class GetLibraryBookDetailsQuery
     /**
      * @return list<int>|null
      */
-    private function visibleLibraryIds(User $user): ?array
+    private function visibleLibraryIds(?User $user): ?array
     {
+        if ($user === null) {
+            return \App\Models\Library::query()
+                ->where('is_active', true)
+                ->where('is_public', true)
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id)
+                ->all();
+        }
+
         if ($user->isSuperAdmin()) {
             return null;
         }

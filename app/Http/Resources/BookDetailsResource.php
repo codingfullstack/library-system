@@ -21,7 +21,7 @@ class BookDetailsResource extends JsonResource
             'isbn' => $this->isbn,
             'description' => $this->description,
             'edition' => $this->edition,
-            'cover_image' => $this->cover_image,
+            'cover_image' => $this->cover_image_url,
             'publication_year' => $this->publication_year,
             'language' => $this->language,
             'page_count' => $this->page_count,

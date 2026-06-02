@@ -2,7 +2,7 @@
     @php
         $categoryMeta = static function ($type): array {
             return match ($type) {
-                'loan_overdue' => ['label' => 'Priminimas', 'category' => 'reminder', 'badge' => 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300', 'iconWrap' => 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300', 'icon' => 'bell-alert'],
+                'loan_overdue', 'book_due_soon' => ['label' => 'Priminimas', 'category' => 'reminder', 'badge' => 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300', 'iconWrap' => 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300', 'icon' => 'bell-alert'],
                 'reservation_ready', 'reservation_cancelled', 'reservation_fulfilled' => ['label' => 'Rezervacija', 'category' => 'reservation', 'badge' => 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300', 'iconWrap' => 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300', 'icon' => 'folder-git-2'],
                 'book_returned' => ['label' => 'Informacija', 'category' => 'info', 'badge' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300', 'iconWrap' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300', 'icon' => 'book-open-text'],
                 'system', 'new_user', 'qr_scan' => ['label' => 'Sistemos', 'category' => 'system', 'badge' => 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300', 'iconWrap' => 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300', 'icon' => 'cog-6-tooth'],
@@ -14,7 +14,7 @@
 
     <x-ui.page class="max-w-none px-4 py-0 sm:px-6 lg:px-8">
         <div class="bg-[#f7f8fa] py-8 dark:bg-zinc-950">
-            <div class="mx-auto max-w-[1500px] space-y-6">
+            <div class="mx-auto max-w-[1500px] space-y-6" data-notifications-page-content>
                 <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div>
                         <h1 class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">Pranešimai</h1>
@@ -23,7 +23,7 @@
 
                     <form method="POST" action="{{ route('notifications.mark-all-read', request()->query()) }}">
                         @csrf
-                        <button type="submit" class="inline-flex h-11 items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20">
+                        <button type="submit" data-mark-all-notifications-read class="inline-flex h-11 items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20">
                             <flux:icon.check class="size-4" />
                             Pažymėti visus kaip perskaitytus
                         </button>
@@ -155,7 +155,14 @@
                                 </thead>
                                 <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
                                     @foreach($notifications as $notification)
-                                        @php($meta = $categoryMeta($notification->type))
+                                        @php
+                                            $data = $notification->data ?? [];
+                                            $kind = $data['kind'] ?? $notification->type;
+                                            $title = $data['title'] ?? 'Naujas pranešimas';
+                                            $message = $data['message'] ?? '';
+                                            $url = $data['url'] ?? route('notifications.index');
+                                            $meta = $categoryMeta($kind);
+                                        @endphp
                                         <tr class="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40">
                                             <td class="px-4 py-4 align-top">
                                                 <div class="flex items-center gap-3">
@@ -187,8 +194,8 @@
                                                         @endswitch
                                                     </span>
                                                     <div class="min-w-0">
-                                                        <div class="text-sm font-semibold text-zinc-950 dark:text-white">{{ $notification->title }}</div>
-                                                        <div class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{{ $notification->message }}</div>
+                                                        <div class="text-sm font-semibold text-zinc-950 dark:text-white">{{ $title }}</div>
+                                                        <div class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{{ $message }}</div>
                                                     </div>
                                                 </div>
                                             </td>
@@ -216,12 +223,14 @@
                                             </td>
                                             <td class="px-4 py-4 align-top">
                                                 <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-                                                    <button type="button" title="Peržiūrėti pranešimą" aria-label="Peržiūrėti pranešimą" class="transition hover:text-zinc-800 dark:hover:text-zinc-200">
+                                                    <a href="{{ $url }}" title="Peržiūrėti pranešimą" aria-label="Peržiūrėti pranešimą" class="transition hover:text-zinc-800 dark:hover:text-zinc-200">
                                                         <flux:icon.eye class="size-4" />
-                                                    </button>
-                                                    <button type="button" title="Daugiau veiksmų" aria-label="Daugiau veiksmų" class="transition hover:text-zinc-800 dark:hover:text-zinc-200">
-                                                        <flux:icon.ellipsis-vertical class="size-4" />
-                                                    </button>
+                                                    </a>
+                                                    @unless($notification->read_at)
+                                                        <button type="button" title="Pažymėti kaip perskaitytą" aria-label="Pažymėti kaip perskaitytą" class="transition hover:text-emerald-700 dark:hover:text-emerald-300" data-mark-notification-read="{{ $notification->id }}">
+                                                            <flux:icon.check class="size-4" />
+                                                        </button>
+                                                    @endunless
                                                 </div>
                                             </td>
                                         </tr>

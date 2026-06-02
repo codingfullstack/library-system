@@ -3,7 +3,6 @@
 use App\Models\Library;
 use App\Models\LibraryMembership;
 use App\Models\User;
-use App\Models\UserNotification;
 use App\Support\UserManagement;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -197,8 +196,7 @@ it('lets staff add an existing member to a private library by scanned membership
         'auditable_id' => $member->id,
     ]);
 
-    expect(UserNotification::query()
-        ->where('user_id', $member->id)
+    expect($member->notifications()
         ->where('type', 'library_membership_added')
         ->exists())->toBeTrue();
 });

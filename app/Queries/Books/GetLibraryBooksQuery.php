@@ -9,7 +9,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class GetLibraryBooksQuery
 {
-    public function handle(User $user, array $filters = []): LengthAwarePaginator
+    public function handle(?User $user, array $filters = []): LengthAwarePaginator
     {
         $perPage = max(1, min((int) ($filters['per_page'] ?? 25), 100));
         $search = trim((string) ($filters['search'] ?? ''));
@@ -43,7 +43,7 @@ class GetLibraryBooksQuery
                 'categories:id,name',
                 'authors:id,name',
             ])
-            ->when($user->role === 'narys', fn ($builder) => $builder->with([
+            ->when($user?->role === 'narys' || $user === null, fn ($builder) => $builder->with([
                 'bookCopies' => fn ($copyQuery) => $copyQuery
                     ->withoutGlobalScope('library')
                     ->whereIn('library_id', $libraryIds)
@@ -183,8 +183,17 @@ class GetLibraryBooksQuery
     /**
      * @return list<int>|null
      */
-    private function visibleLibraryIds(User $user, array $filters): ?array
+    private function visibleLibraryIds(?User $user, array $filters): ?array
     {
+        if ($user === null) {
+            return \App\Models\Library::query()
+                ->where('is_active', true)
+                ->where('is_public', true)
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id)
+                ->all();
+        }
+
         if ($user->isSuperAdmin()) {
             $libraryId = $filters['library_id'] ?? null;
 
@@ -200,7 +209,6 @@ class GetLibraryBooksQuery
         return $libraryId ? [(int) $libraryId] : [];
     }
 }
-
 
 
 

@@ -3,6 +3,7 @@
 use App\Actions\Loans\BorrowBookCopyAction;
 use App\Actions\BookCopies\ChangeBookCopyStatusAction;
 use App\Actions\Reservations\CancelReservationAction;
+use App\Livewire\Reservations\CancelReservationForm;
 use App\Models\Book;
 use App\Models\BookCopy;
 use App\Models\Branch;
@@ -12,7 +13,9 @@ use App\Models\Location;
 use App\Models\Reservation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -35,11 +38,10 @@ it('sends an internal notification when staff cancels a reservation with a reaso
 
     app(CancelReservationAction::class)->handle($staff, $reservation, 'Nėradome tinkamo egzemplioriaus šiandien.');
 
-    $this->assertDatabaseHas('user_notifications', [
-        'user_id' => $member->id,
-        'sent_by' => $staff->id,
+    $this->assertDatabaseHas('notifications', [
+        'notifiable_type' => $member->getMorphClass(),
+        'notifiable_id' => $member->id,
         'type' => 'reservation_cancelled',
-        'title' => 'Rezervacija atšaukta',
     ]);
 
     $this->assertDatabaseHas('audit_logs', [
@@ -47,6 +49,35 @@ it('sends an internal notification when staff cancels a reservation with a reaso
         'auditable_type' => Reservation::class,
         'auditable_id' => $reservation->id,
     ]);
+});
+
+it('cancels a reservation through livewire without redirecting to the update endpoint', function () {
+    $library = Library::factory()->create();
+    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create(['title' => 'Livewire rezervacija']);
+
+    $reservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $member->id,
+        'status' => Reservation::STATUS_RESERVED,
+        'reserved_at' => now()->subHour(),
+        'expires_at' => now()->addDay(),
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+
+    Livewire::actingAs($staff)
+        ->test(CancelReservationForm::class, ['reservation' => $reservation])
+        ->set('reason', 'Atšaukimo priežastis testui.')
+        ->call('save')
+        ->assertNoRedirect()
+        ->assertDispatched('reservation-updated')
+        ->assertDispatched('reservation-cancelled', reservationId: $reservation->id)
+        ->assertSee('Atšaukta');
+
+    expect($reservation->fresh()->status)->toBe(Reservation::STATUS_CANCELLED);
 });
 
 it('requires an override before issuing a copy when another member has an active reservation', function () {
@@ -134,18 +165,16 @@ it('allows reservation override with a required reason and records it in audit l
         'auditable_id' => $reservation->id,
     ]);
 
-    $this->assertDatabaseMissing('user_notifications', [
-        'user_id' => $otherMember->id,
+    $this->assertDatabaseMissing('notifications', [
+        'notifiable_type' => $otherMember->getMorphClass(),
+        'notifiable_id' => $otherMember->id,
         'type' => 'reservation_fulfilled',
-        'related_type' => Reservation::class,
-        'related_id' => $reservation->id,
     ]);
 
-    $this->assertDatabaseMissing('user_notifications', [
-        'user_id' => $reservedMember->id,
+    $this->assertDatabaseMissing('notifications', [
+        'notifiable_type' => $reservedMember->getMorphClass(),
+        'notifiable_id' => $reservedMember->id,
         'type' => 'reservation_cancelled',
-        'related_type' => Reservation::class,
-        'related_id' => $reservation->id,
     ]);
 });
 
@@ -187,17 +216,27 @@ it('shows notifications for the authenticated user', function () {
     $sender = User::factory()->staff()->create(['library_id' => $user->library_id]);
 
     $user->notifications()->create([
-        'sent_by' => $sender->id,
+        'id' => (string) Str::uuid(),
         'type' => 'reservation_cancelled',
-        'title' => 'Rezervacija atšaukta',
-        'message' => 'Tavo rezervacija buvo atšaukta.',
+        'data' => [
+            'kind' => 'reservation_cancelled',
+            'title' => 'Rezervacija atsaukta',
+            'message' => 'Tavo rezervacija buvo atšaukta.',
+            'url' => route('notifications.index'),
+            'created_at' => now()->toIso8601String(),
+            'sender' => [
+                'id' => $sender->id,
+                'name' => $sender->name,
+                'email' => $sender->email,
+            ],
+        ],
     ]);
 
     $this->actingAs($user)
         ->get(route('notifications.index'))
         ->assertOk()
         ->assertSee('Pranešimai')
-        ->assertSee('Rezervacija atšaukta')
+        ->assertSee('Rezervacija atsaukta')
         ->assertSee('Tavo rezervacija buvo atšaukta.');
 });
 
@@ -229,11 +268,10 @@ it('creates an overdue notification when a member is at least one day late', fun
         ->get(route('books.index'))
         ->assertOk();
 
-    $this->assertDatabaseHas('user_notifications', [
-        'user_id' => $member->id,
+    $this->assertDatabaseHas('notifications', [
+        'notifiable_type' => $member->getMorphClass(),
+        'notifiable_id' => $member->id,
         'type' => 'loan_overdue',
-        'related_type' => \App\Models\Loan::class,
-        'related_id' => $loan->id,
     ]);
 });
 
@@ -265,11 +303,10 @@ it('does not duplicate the same overdue notification on later requests', functio
     $this->actingAs($member)->get(route('books.index'))->assertOk();
 
     expect(
-        \App\Models\UserNotification::query()
-            ->where('user_id', $member->id)
+        $member->notifications()
             ->where('type', 'loan_overdue')
-            ->where('related_type', \App\Models\Loan::class)
-            ->where('related_id', $loan->id)
+            ->where('data->related_type', \App\Models\Loan::class)
+            ->where('data->related_id', $loan->id)
             ->count()
     )->toBe(1);
 });
@@ -314,19 +351,67 @@ it('creates a reservation ready notification for the first waiting member', func
 
     app(\App\Actions\Loans\ReturnBookCopyAction::class)->handle($staff, $bookCopy);
 
-    $this->assertDatabaseHas('user_notifications', [
-        'user_id' => $member->id,
+    $this->assertDatabaseHas('notifications', [
+        'notifiable_type' => $member->getMorphClass(),
+        'notifiable_id' => $member->id,
         'type' => 'reservation_ready',
-        'related_type' => Reservation::class,
-        'related_id' => $reservation->id,
     ]);
 
-    $this->assertDatabaseHas('user_notifications', [
-        'user_id' => $member->id,
+    $this->assertDatabaseHas('notifications', [
+        'notifiable_type' => $member->getMorphClass(),
+        'notifiable_id' => $member->id,
         'type' => 'book_returned',
-        'related_type' => Loan::class,
-        'related_id' => $loan->id,
     ]);
+});
+
+it('does not duplicate return side effects when the same copy is returned twice', function () {
+    $library = Library::factory()->create();
+    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create(['title' => 'Single return book']);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $bookCopy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_LOANED,
+    ]);
+
+    $loan = Loan::factory()->create([
+        'library_id' => $library->id,
+        'book_copy_id' => $bookCopy->id,
+        'user_id' => $member->id,
+        'issued_by' => $staff->id,
+        'status' => 'aktyvi',
+        'returned_at' => null,
+    ]);
+
+    app(\App\Actions\Loans\ReturnBookCopyAction::class)->handle($staff, $bookCopy);
+
+    expect(fn () => app(\App\Actions\Loans\ReturnBookCopyAction::class)->handle($staff, $bookCopy->fresh()))
+        ->toThrow(ValidationException::class);
+
+    expect($loan->fresh()->returned_at)->not->toBeNull()
+        ->and($bookCopy->fresh()->status)->toBe(BookCopy::STATUS_AVAILABLE);
+
+    expect($member->notifications()
+        ->where('type', 'book_returned')
+        ->where('data->related_type', Loan::class)
+        ->where('data->related_id', $loan->id)
+        ->count())->toBe(1);
+
+    expect(\App\Models\AuditLog::query()
+        ->where('action', 'loan_returned')
+        ->where('auditable_type', Loan::class)
+        ->where('auditable_id', $loan->id)
+        ->count())->toBe(1);
+
+    expect(\App\Models\BookCopyStatusHistory::query()
+        ->where('book_copy_id', $bookCopy->id)
+        ->where('to_status', BookCopy::STATUS_AVAILABLE)
+        ->count())->toBe(1);
 });
 
 it('creates a reservation fulfilled notification when reserved book is issued to the same member', function () {
@@ -362,11 +447,10 @@ it('creates a reservation fulfilled notification when reserved book is issued to
         'notes' => 'Išduota pagal rezervacija.',
     ]);
 
-    $this->assertDatabaseHas('user_notifications', [
-        'user_id' => $member->id,
+    $this->assertDatabaseHas('notifications', [
+        'notifiable_type' => $member->getMorphClass(),
+        'notifiable_id' => $member->id,
         'type' => 'reservation_fulfilled',
-        'related_type' => Reservation::class,
-        'related_id' => $reservation->id,
     ]);
 });
 
@@ -472,6 +556,43 @@ it('allows issuing an available copy to the member who is first in reservation q
         'id' => $bookCopy->id,
         'status' => BookCopy::STATUS_LOANED,
     ]);
+});
+
+it('does not create a second active loan when the same copy is borrowed twice', function () {
+    $library = Library::factory()->create();
+    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $firstMember = User::factory()->member()->create(['library_id' => $library->id]);
+    $secondMember = User::factory()->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create(['title' => 'Single borrow book']);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $bookCopy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_AVAILABLE,
+    ]);
+
+    app(BorrowBookCopyAction::class)->handle($staff, $bookCopy, [
+        'user_id' => $firstMember->id,
+        'due_at' => now()->addDays(14)->toDateString(),
+        'no_due_date' => false,
+        'notes' => null,
+    ]);
+
+    expect(fn () => app(BorrowBookCopyAction::class)->handle($staff, $bookCopy->fresh(), [
+        'user_id' => $secondMember->id,
+        'due_at' => now()->addDays(14)->toDateString(),
+        'no_due_date' => false,
+        'notes' => null,
+    ]))->toThrow(ValidationException::class);
+
+    expect(Loan::query()
+        ->where('book_copy_id', $bookCopy->id)
+        ->whereNull('returned_at')
+        ->count())->toBe(1)
+        ->and($bookCopy->fresh()->status)->toBe(BookCopy::STATUS_LOANED);
 });
 
 

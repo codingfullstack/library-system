@@ -3,7 +3,8 @@
 namespace App\Actions\Notifications;
 
 use App\Models\User;
-use App\Models\UserNotification;
+use App\Notifications\LibraryNotification;
+use Illuminate\Notifications\DatabaseNotification;
 
 class CreateUserNotificationAction
 {
@@ -19,37 +20,60 @@ class CreateUserNotificationAction
         array $metadata = [],
         ?string $relatedType = null,
         ?int $relatedId = null
-    ): UserNotification {
+    ): ?DatabaseNotification {
         $existing = null;
 
         if ($relatedType && $relatedId) {
-            $existing = UserNotification::query()
-                ->where('user_id', $recipient->id)
+            $existing = $recipient->notifications()
                 ->where('type', $type)
-                ->where('related_type', $relatedType)
-                ->where('related_id', $relatedId)
+                ->where('data->related_type', $relatedType)
+                ->where('data->related_id', $relatedId)
                 ->first();
         }
 
-        if ($existing) {
-            return tap($existing)->update([
-                'sent_by' => $sender?->id,
-                'title' => $title,
-                'message' => $message,
-                'metadata' => $metadata,
-            ]);
-        }
-
-        return UserNotification::create([
-            'user_id' => $recipient->id,
-            'sent_by' => $sender?->id,
-            'type' => $type,
+        $payload = [
+            'kind' => $type,
             'title' => $title,
             'message' => $message,
+            'url' => (string) ($metadata['url'] ?? route('notifications.index', absolute: false)),
+            'created_at' => now()->toIso8601String(),
             'related_type' => $relatedType,
             'related_id' => $relatedId,
             'metadata' => $metadata,
-        ]);
+        ];
+
+        if ($existing) {
+            $existing->forceFill([
+                'data' => array_merge($payload, [
+                    'sender' => $sender ? [
+                        'id' => $sender->id,
+                        'name' => $sender->name,
+                        'email' => $sender->email,
+                    ] : null,
+                ]),
+            ]);
+            $existing->save();
+
+            return $existing;
+        }
+
+        $recipient->notify(new LibraryNotification(
+            kind: $type,
+            title: $title,
+            message: $message,
+            url: $payload['url'],
+            metadata: array_merge($metadata, [
+                'sender' => $sender ? [
+                    'id' => $sender->id,
+                    'name' => $sender->name,
+                    'email' => $sender->email,
+                ] : null,
+            ]),
+            relatedType: $relatedType,
+            relatedId: $relatedId,
+        ));
+
+        return null;
     }
 }
 
