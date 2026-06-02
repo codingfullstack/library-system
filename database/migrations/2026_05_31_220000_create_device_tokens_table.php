@@ -12,10 +12,11 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->text('token');
+            $table->char('token_hash', 64);
             $table->string('device_name')->nullable();
             $table->timestamps();
 
-            $table->unique('token', 'device_tokens_token_unique');
+            $table->unique('token_hash', 'device_tokens_token_hash_unique');
             $table->index('user_id');
         });
     }

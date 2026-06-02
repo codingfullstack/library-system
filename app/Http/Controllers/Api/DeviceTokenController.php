@@ -13,11 +13,13 @@ class DeviceTokenController extends Controller
     public function store(StoreDeviceTokenRequest $request): JsonResponse
     {
         $validated = $request->validated();
+        $token = trim($validated['token']);
 
         $deviceToken = DeviceToken::query()->updateOrCreate(
-            ['token' => $validated['token']],
+            ['token_hash' => DeviceToken::hashToken($token)],
             [
                 'user_id' => $request->user()->getKey(),
+                'token' => $token,
                 'device_name' => $validated['device_name'] ?? null,
             ]
         );
@@ -35,7 +37,7 @@ class DeviceTokenController extends Controller
     {
         $deleted = $request->user()
             ->deviceTokens()
-            ->where('token', $request->validated('token'))
+            ->where('token_hash', DeviceToken::hashToken($request->validated('token')))
             ->delete();
 
         return response()->json([
