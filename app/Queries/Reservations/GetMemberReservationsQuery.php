@@ -44,7 +44,7 @@ class GetMemberReservationsQuery
             ->where('user_id', $user->id)
             ->when($libraryId, fn ($builder) => $builder->where('library_id', $libraryId))
             ->with([
-                'book:id,title,subtitle,isbn',
+                'book:id,slug,title,subtitle,isbn',
                 'library:id,name',
             ]);
 
@@ -113,11 +113,3 @@ class GetMemberReservationsQuery
         return [$parsedDate->startOfDay(), $parsedDate->endOfDay()];
     }
 }
-
-
-
-
-
-
-
-

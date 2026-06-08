@@ -10,7 +10,7 @@ final readonly class SeoData
         public string $title,
         public string $description,
         public ?string $canonicalUrl = null,
+        public ?string $image = null,
         public string $type = 'website',
-    ) {
-    }
+    ) {}
 }

@@ -15,7 +15,7 @@ class GetLibraryBookCopyDetailsQuery
         $query = BookCopy::query()
             ->whereKey($bookCopy->id)
             ->with([
-                'book:id,title,subtitle,isbn',
+                'book:id,slug,title,subtitle,isbn',
                 'branch:id,name',
                 'location:id,name,room,shelf',
                 'statusHistories' => function ($historyQuery) {
@@ -64,17 +64,9 @@ class GetLibraryBookCopyDetailsQuery
         $copy = $query->first();
 
         if (! $copy) {
-            throw (new ModelNotFoundException())->setModel(BookCopy::class, [$bookCopy->id]);
+            throw (new ModelNotFoundException)->setModel(BookCopy::class, [$bookCopy->id]);
         }
 
         return $copy;
     }
 }
-
-
-
-
-
-
-
-

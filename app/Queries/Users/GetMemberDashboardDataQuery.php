@@ -17,7 +17,7 @@ class GetMemberDashboardDataQuery
             ->when($libraryId, fn ($query) => $query->where('library_id', $libraryId))
             ->whereIn('status', ['aktyvi', 'vėluoja'])
             ->whereNull('returned_at')
-            ->with(['bookCopy.book:id,title,subtitle,isbn'])
+            ->with(['bookCopy.book:id,slug,title,subtitle,isbn'])
             ->orderByRaw('CASE WHEN due_at IS NULL THEN 1 ELSE 0 END')
             ->orderBy('due_at')
             ->limit(5)
@@ -26,7 +26,7 @@ class GetMemberDashboardDataQuery
         $activeReservations = Reservation::query()
             ->where('user_id', $user->id)
             ->when($libraryId, fn ($query) => $query->where('library_id', $libraryId))
-            ->with(['book:id,title,subtitle,isbn', 'library:id,name'])
+            ->with(['book:id,slug,title,subtitle,isbn', 'library:id,name'])
             ->latest('reserved_at')
             ->limit(5)
             ->get();
@@ -59,12 +59,3 @@ class GetMemberDashboardDataQuery
         ];
     }
 }
-
-
-
-
-
-
-
-
-

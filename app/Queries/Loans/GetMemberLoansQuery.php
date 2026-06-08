@@ -16,7 +16,7 @@ class GetMemberLoansQuery
         return $this->baseQuery($user, $filters)
             ->with([
                 'bookCopy:id,book_id,inventory_code',
-                'bookCopy.book:id,title,subtitle,isbn',
+                'bookCopy.book:id,slug,title,subtitle,isbn',
                 'library:id,name',
                 'issuer:id,name',
             ])
@@ -82,11 +82,3 @@ class GetMemberLoansQuery
         return $query;
     }
 }
-
-
-
-
-
-
-
-

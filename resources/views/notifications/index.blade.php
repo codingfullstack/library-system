@@ -12,25 +12,25 @@
         };
     @endphp
 
-    <x-ui.page class="max-w-none px-4 py-0 sm:px-6 lg:px-8">
-        <div class="bg-[#f7f8fa] py-8 dark:bg-zinc-950">
-            <div class="mx-auto max-w-[1500px] space-y-6" data-notifications-page-content>
+    <x-ui.page class="max-w-none overflow-x-hidden px-3 py-0 sm:px-6 lg:px-8">
+        <div class="min-w-0 bg-[#f7f8fa] py-6 dark:bg-zinc-950 sm:py-8">
+            <div class="mx-auto w-full max-w-[1500px] min-w-0 space-y-5 sm:space-y-6" data-notifications-page-content>
                 <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                    <div>
-                        <h1 class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">Pranešimai</h1>
+                    <div class="min-w-0">
+                        <h1 class="text-3xl font-bold tracking-tight text-zinc-950 dark:text-white sm:text-4xl">Pranešimai</h1>
                         <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Peržiūrėkite ir valdykite sistemos pranešimus</p>
                     </div>
 
-                    <form method="POST" action="{{ route('notifications.mark-all-read', request()->query()) }}">
+                    <form method="POST" action="{{ route('notifications.mark-all-read', request()->query()) }}" class="w-full sm:w-auto">
                         @csrf
-                        <button type="submit" data-mark-all-notifications-read class="inline-flex h-11 items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20">
+                        <button type="submit" data-mark-all-notifications-read class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20 sm:w-auto">
                             <flux:icon.check class="size-4" />
                             Pažymėti visus kaip perskaitytus
                         </button>
                     </form>
                 </div>
 
-                <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                <div class="grid min-w-0 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-5">
                     <div class="rounded-[22px] border border-emerald-200 bg-white px-5 py-4 shadow-sm dark:border-emerald-900/30 dark:bg-zinc-900">
                         <div class="flex items-start gap-3">
                             <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
@@ -92,7 +92,7 @@
                     </div>
                 </div>
 
-                <section class="overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                <section class="w-full min-w-0 overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                     <div class="border-b border-zinc-200/80 px-5 py-4 dark:border-zinc-700">
                         <form method="GET" action="{{ route('notifications.index') }}" class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_200px_minmax(0,1fr)_180px]">
                             <div>
@@ -132,7 +132,7 @@
                             </div>
 
                             <div class="flex items-end gap-3">
-                                <button type="submit" class="app-button-secondary h-10 rounded-xl px-4">
+                                <button type="submit" class="app-button-secondary h-10 w-full rounded-xl px-4 sm:w-auto">
                                     <flux:icon.funnel class="mr-2 size-4" />
                                     Filtruoti
                                 </button>
@@ -141,7 +141,82 @@
                     </div>
 
                     @if($notifications->count())
-                        <div class="overflow-x-auto">
+                        <div class="grid gap-3 p-4 md:hidden">
+                            @foreach($notifications as $notification)
+                                @php
+                                    $data = $notification->data ?? [];
+                                    $kind = $data['kind'] ?? $notification->type;
+                                    $title = $data['title'] ?? 'Naujas pranešimas';
+                                    $message = $data['message'] ?? '';
+                                    $url = $data['url'] ?? route('notifications.index');
+                                    $meta = $categoryMeta($kind);
+                                @endphp
+
+                                <article class="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/50">
+                                    <div class="flex items-start gap-3">
+                                        <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl {{ $meta['iconWrap'] }}">
+                                            @switch($meta['icon'])
+                                                @case('bell-alert')
+                                                    <flux:icon.bell-alert class="size-5" />
+                                                    @break
+                                                @case('folder-git-2')
+                                                    <flux:icon.folder-git-2 class="size-5" />
+                                                    @break
+                                                @case('book-open-text')
+                                                    <flux:icon.book-open-text class="size-5" />
+                                                    @break
+                                                @case('cog-6-tooth')
+                                                    <flux:icon.cog-6-tooth class="size-5" />
+                                                    @break
+                                                @case('clipboard-document')
+                                                    <flux:icon.clipboard-document class="size-5" />
+                                                    @break
+                                                @default
+                                                    <flux:icon.ellipsis-horizontal-circle class="size-5" />
+                                            @endswitch
+                                        </span>
+
+                                        <div class="min-w-0 flex-1">
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $meta['badge'] }}">
+                                                    {{ $meta['label'] }}
+                                                </span>
+                                                @if($notification->read_at)
+                                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                                        <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                                                        Perskaitytas
+                                                    </span>
+                                                @else
+                                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-500/10 dark:text-violet-300">
+                                                        <span class="h-2 w-2 rounded-full bg-violet-500"></span>
+                                                        Neskaitytas
+                                                    </span>
+                                                @endif
+                                            </div>
+
+                                            <a href="{{ $url }}" class="mt-3 block break-words text-sm font-semibold text-zinc-950 transition hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">
+                                                {{ $title }}
+                                            </a>
+
+                                            @if($message !== '')
+                                                <p class="mt-1 break-words text-sm leading-5 text-zinc-600 dark:text-zinc-400">{{ $message }}</p>
+                                            @endif
+
+                                            <div class="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+                                                <span>{{ $notification->created_at?->format('Y-m-d H:i') }}</span>
+                                                @unless($notification->read_at)
+                                                    <button type="button" class="font-semibold text-emerald-700 hover:text-emerald-600 dark:text-emerald-300" data-mark-notification-read="{{ $notification->id }}">
+                                                        Pažymėti kaip perskaitytą
+                                                    </button>
+                                                @endunless
+                                            </div>
+                                        </div>
+                                    </div>
+                                </article>
+                            @endforeach
+                        </div>
+
+                        <div class="hidden overflow-x-auto md:block">
                             <table class="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
                                 <thead class="bg-zinc-50/80 dark:bg-zinc-950/50">
                                     <tr>

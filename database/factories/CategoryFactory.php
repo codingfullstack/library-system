@@ -2,8 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Support\GeneratesSlugs;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Str;
 
 class CategoryFactory extends Factory
 {
@@ -24,9 +24,8 @@ class CategoryFactory extends Factory
 
         return [
             'name' => $name,
-            'slug' => Str::slug($name),
+            'slug' => GeneratesSlugs::from($name, 'kategorija'),
             'description' => fake()->optional()->sentence(),
         ];
     }
 }
-

@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Seo;
 
-use App\Models\Book;
-use App\Models\Library;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Route;
@@ -24,8 +22,6 @@ final class GenerateSitemapAction
             $sitemap->add($url);
         }
 
-        $this->addPublicBooks($sitemap);
-        $this->addPublicLibraries($sitemap);
         $this->addPublicNews($sitemap);
 
         $sitemap->writeToFile($targetPath);
@@ -42,8 +38,8 @@ final class GenerateSitemapAction
             ['name' => 'home', 'frequency' => Url::CHANGE_FREQUENCY_DAILY, 'priority' => 1.0],
             ['name' => 'public.libraries.index', 'frequency' => Url::CHANGE_FREQUENCY_DAILY, 'priority' => 0.9],
             ['name' => 'about', 'frequency' => Url::CHANGE_FREQUENCY_MONTHLY, 'priority' => 0.7],
-            ['name' => 'contact', 'frequency' => Url::CHANGE_FREQUENCY_MONTHLY, 'priority' => 0.6],
-            ['name' => 'books.index', 'frequency' => Url::CHANGE_FREQUENCY_DAILY, 'priority' => 0.9],
+            ['name' => 'contacts', 'frequency' => Url::CHANGE_FREQUENCY_MONTHLY, 'priority' => 0.6],
+            ['name' => 'help', 'frequency' => Url::CHANGE_FREQUENCY_MONTHLY, 'priority' => 0.6],
         ];
 
         return collect($routes)
@@ -53,49 +49,6 @@ final class GenerateSitemapAction
                 ->setPriority($route['priority']))
             ->values()
             ->all();
-    }
-
-    private function addPublicBooks(Sitemap $sitemap): void
-    {
-        Book::query()
-            ->select(['id', 'updated_at'])
-            ->whereHas('bookCopies.library', fn (Builder $query) => $query
-                ->where('is_active', true)
-                ->where('is_public', true))
-            ->orderBy('id')
-            ->chunkById(500, function ($books) use ($sitemap): void {
-                foreach ($books as $book) {
-                    $sitemap->add(
-                        Url::create(route('books.show', $book))
-                            ->setLastModificationDate($book->updated_at)
-                            ->setChangeFrequency(Url::CHANGE_FREQUENCY_WEEKLY)
-                            ->setPriority(0.8)
-                    );
-                }
-            });
-    }
-
-    private function addPublicLibraries(Sitemap $sitemap): void
-    {
-        if (! Route::has('public.libraries.show')) {
-            return;
-        }
-
-        Library::query()
-            ->select(['id', 'updated_at'])
-            ->where('is_active', true)
-            ->where('is_public', true)
-            ->orderBy('id')
-            ->chunkById(500, function ($libraries) use ($sitemap): void {
-                foreach ($libraries as $library) {
-                    $sitemap->add(
-                        Url::create(route('public.libraries.show', $library))
-                            ->setLastModificationDate($library->updated_at)
-                            ->setChangeFrequency(Url::CHANGE_FREQUENCY_WEEKLY)
-                            ->setPriority(0.8)
-                    );
-                }
-            });
     }
 
     private function addPublicNews(Sitemap $sitemap): void
@@ -129,12 +82,12 @@ final class GenerateSitemapAction
     }
 
     /**
-     * @param class-string<Model> $modelClass
+     * @param  class-string<Model>  $modelClass
      */
     private function hasColumn(string $modelClass, string $column): bool
     {
         /** @var Model $model */
-        $model = new $modelClass();
+        $model = new $modelClass;
 
         return $model->getConnection()->getSchemaBuilder()->hasColumn($model->getTable(), $column);
     }

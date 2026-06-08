@@ -29,10 +29,23 @@
 
             <main>
                 <section class="relative isolate overflow-hidden bg-[#f8fcfa] dark:bg-[#07110f]">
-                    <div
-                        class="absolute inset-y-0 right-0 hidden w-[46%] bg-cover bg-center lg:block"
-                        style="background-image: linear-gradient(90deg, rgba(248,252,250,0.94), rgba(248,252,250,0.22) 28%, rgba(248,252,250,0) 56%), url('https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1400&q=85');"
-                    ></div>
+                    <picture class="absolute inset-y-0 right-0 hidden w-[46%] lg:block">
+                        <source
+                            srcset="
+                                https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=900&q=80 900w,
+                                https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1400&q=85 1400w,
+                                https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=2000&q=85 2000w
+                            "
+                            sizes="46vw"
+                        >
+                        <img
+                            src="https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1400&q=85"
+                            alt="Bibliotekos skaitykla su knygų lentynomis"
+                            class="h-full w-full object-cover object-center"
+                            fetchpriority="high"
+                        >
+                    </picture>
+                    <div class="absolute inset-y-0 right-0 hidden w-[46%] bg-[linear-gradient(90deg,rgba(248,252,250,0.94),rgba(248,252,250,0.22)_28%,rgba(248,252,250,0)_56%)] lg:block"></div>
                     <div class="absolute inset-y-0 left-[50%] hidden w-64 rounded-l-[100%] bg-[#f8fcfa] lg:block dark:bg-[#07110f]"></div>
 
                     <div class="relative mx-auto grid min-h-[400px] w-full max-w-[1780px] items-center px-8 py-12 lg:grid-cols-[minmax(0,0.54fr)_minmax(0,0.46fr)] lg:px-12 xl:px-16">
@@ -74,26 +87,26 @@
                         @endforeach
                     </div>
 
-                    <div id="bibliotekos" class="mt-6 grid gap-6 rounded-xl border border-slate-200 bg-white px-8 py-7 shadow-sm md:grid-cols-2 xl:grid-cols-4 dark:border-zinc-800 dark:bg-zinc-900">
+                    <div id="bibliotekos" class="mt-6 grid gap-4 rounded-xl border border-slate-200 bg-white px-4 py-5 shadow-sm sm:px-6 md:grid-cols-2 md:gap-6 md:px-8 md:py-7 xl:grid-cols-4 dark:border-zinc-800 dark:bg-zinc-900">
                         @foreach($stats as $stat)
-                            <div class="flex items-center justify-center gap-5">
-                                <span class="inline-flex size-14 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                            <div class="flex min-w-0 items-center gap-4 rounded-lg px-1 py-2 md:px-0 md:py-0 xl:justify-center">
+                                <span class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 sm:h-14 sm:w-14 dark:bg-emerald-500/10 dark:text-emerald-300">
                                     @switch($stat['icon'])
                                         @case('users')
-                                            <flux:icon.users class="size-7" />
+                                            <flux:icon.users class="size-6 sm:size-7" />
                                             @break
                                         @case('building-library')
-                                            <flux:icon.building-library class="size-7" />
+                                            <flux:icon.building-library class="size-6 sm:size-7" />
                                             @break
                                         @case('calendar-days')
-                                            <flux:icon.calendar-days class="size-7" />
+                                            <flux:icon.calendar-days class="size-6 sm:size-7" />
                                             @break
                                         @default
-                                            <flux:icon.book-open-text class="size-7" />
+                                            <flux:icon.book-open-text class="size-6 sm:size-7" />
                                     @endswitch
                                 </span>
-                                <span>
-                                    <span class="block text-3xl font-bold text-emerald-700 dark:text-emerald-300">{{ $stat['value'] }}</span>
+                                <span class="min-w-0 text-left">
+                                    <span class="block text-2xl font-bold leading-none text-emerald-700 sm:text-3xl dark:text-emerald-300">{{ $stat['value'] }}</span>
                                     <span class="mt-1 block text-sm font-semibold text-slate-600 dark:text-zinc-300">{{ $stat['label'] }}</span>
                                 </span>
                             </div>

@@ -16,6 +16,7 @@ class BookDetailsResource extends JsonResource
 
         return [
             'id' => $this->id,
+            'slug' => $this->slug,
             'title' => $this->title,
             'subtitle' => $this->subtitle,
             'isbn' => $this->isbn,
@@ -65,11 +66,3 @@ class BookDetailsResource extends JsonResource
         ];
     }
 }
-
-
-
-
-
-
-
-

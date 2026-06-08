@@ -87,7 +87,7 @@ class SyncReservationQueueAction
     private function firstPendingReservation(int $libraryId, int $bookId): ?Reservation
     {
         return $this->pendingReservationsQuery($libraryId, $bookId)
-            ->with(['user:id,name,email', 'book:id,title'])
+            ->with(['user:id,name,email', 'book:id,slug,title'])
             ->first();
     }
 
@@ -100,11 +100,3 @@ class SyncReservationQueueAction
             ->orderBy('reserved_at');
     }
 }
-
-
-
-
-
-
-
-

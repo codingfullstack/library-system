@@ -61,7 +61,31 @@ select:focus[data-flux-control] {
     @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
 }
 
+[x-cloak] {
+    display: none !important;
+}
+
 @layer components {
+    @media (max-width: 1023px) {
+        body:has(>[data-flux-main]) {
+            grid-template-columns: minmax(0, 1fr) !important;
+            grid-template-areas:
+                "header"
+                "main"
+                "footer" !important;
+        }
+
+        body > header {
+            grid-area: header;
+        }
+
+        body > [data-flux-main] {
+            grid-column: 1 / -1;
+            min-width: 0;
+            width: 100%;
+        }
+    }
+
     .app-page {
         @apply mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8;
     }

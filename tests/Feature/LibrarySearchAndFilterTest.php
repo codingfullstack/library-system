@@ -6,8 +6,8 @@ use App\Models\BookCopy;
 use App\Models\Branch;
 use App\Models\Category;
 use App\Models\Library;
-use App\Models\Location;
 use App\Models\Loan;
+use App\Models\Location;
 use App\Models\Publisher;
 use App\Models\Reservation;
 use App\Models\User;
@@ -110,6 +110,33 @@ it('filters book copies on the book page by status branch and location', functio
     $response->assertOk();
     $response->assertSee('INV-MATCH-001');
     $response->assertDontSee('INV-OTHER-001');
+});
+
+it('uses only Lithuanian slug based book URLs', function () {
+    $library = Library::factory()->create();
+    $user = User::factory()->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create(['title' => 'Haris Poteris ir Išminties akmuo']);
+    BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+    ]);
+
+    expect(rawurldecode(route('books.show', $book)))->toContain('/knygos/haris-poteris-ir-išminties-akmuo');
+
+    $this->get('/knygos/'.$book->slug)
+        ->assertRedirect(route('login'));
+
+    $this->get('/books/'.$book->id)
+        ->assertNotFound();
+
+    $this->actingAs($user)
+        ->get('/knygos/'.$book->slug)
+        ->assertOk()
+        ->assertSee('Haris Poteris');
+
+    $this->actingAs($user)
+        ->get('/books/'.$book->id)
+        ->assertNotFound();
 });
 
 it('filters book copies on the book page by lifecycle group', function () {
@@ -311,9 +338,3 @@ it('shows global management search results for visible entities', function () {
     $response->assertSee('Paieškos leidykla');
     $response->assertSee('Paieškos knyga');
 });
-
-
-
-
-
-

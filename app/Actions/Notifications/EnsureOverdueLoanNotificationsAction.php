@@ -15,7 +15,7 @@ class EnsureOverdueLoanNotificationsAction
 
         $overdueLoans = Loan::query()
             ->select(['id', 'library_id', 'book_copy_id', 'user_id', 'due_at', 'returned_at', 'status'])
-            ->with(['bookCopy:id,book_id', 'bookCopy.book:id,title'])
+            ->with(['bookCopy:id,book_id', 'bookCopy.book:id,slug,title'])
             ->where('user_id', $user->id)
             ->whereNull('returned_at')
             ->whereNotNull('due_at')
@@ -47,11 +47,3 @@ class EnsureOverdueLoanNotificationsAction
         }
     }
 }
-
-
-
-
-
-
-
-

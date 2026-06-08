@@ -41,7 +41,7 @@ class GetLibraryReservationsQuery
             ->select('reservations.*')
             ->selectSub($queuePositionSubquery, 'queue_position')
             ->with([
-                'book:id,title,subtitle,isbn',
+                'book:id,slug,title,subtitle,isbn',
                 'user:id,name,email,membership_number',
                 'library:id,name',
             ]);
@@ -122,11 +122,3 @@ class GetLibraryReservationsQuery
         return [$parsedDate->startOfDay(), $parsedDate->endOfDay()];
     }
 }
-
-
-
-
-
-
-
-

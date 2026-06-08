@@ -185,7 +185,7 @@
                                                         {{ str($reservation->book?->title ?? 'BK')->words(1, '')->substr(0, 2)->upper() }}
                                                     </div>
                                                     <div class="min-w-0">
-                                                        <a href="{{ route('books.show', $reservation->book_id) }}" class="font-semibold text-zinc-950 transition hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">
+                                                        <a href="{{ $reservation->book ? route('books.show', $reservation->book) : '#' }}" class="font-semibold text-zinc-950 transition hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">
                                                             {{ $reservation->book?->title ?: 'Nežinoma knyga' }}
                                                         </a>
                                                         <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">ISBN: {{ $reservation->book?->isbn ?: '-' }}</div>
@@ -222,7 +222,7 @@
                                             </td>
                                             <td class="px-4 py-4 align-middle">
                                                 <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-                                                    <a href="{{ route('books.show', $reservation->book_id) }}" title="Peržiūrėti knygą" aria-label="Peržiūrėti knygą" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
+                                                    <a href="{{ $reservation->book ? route('books.show', $reservation->book) : '#' }}" title="Peržiūrėti knygą" aria-label="Peržiūrėti knygą" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
                                                         <flux:icon.eye class="size-4" />
                                                     </a>
                                                     <div x-show="! cancelled">

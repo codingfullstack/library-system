@@ -16,6 +16,7 @@ use App\Models\Publisher;
 use App\Models\Reservation;
 use App\Models\ScanLog;
 use App\Models\User;
+use App\Support\GeneratesSlugs;
 use App\Support\UserManagement;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
@@ -56,6 +57,7 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 'address' => 'Varniu g. 12',
                 'city' => 'Kaltinenai',
                 'is_active' => true,
+                'is_public' => true,
             ]);
 
             $mainBranch = Branch::create([
@@ -105,20 +107,20 @@ class KaltinenuLibraryDemoSeeder extends Seeder
             ]);
 
             $fictionCategory = Category::query()->firstOrCreate(
-                ['slug' => 'grozine-literatura'],
-                ['name' => 'Grožinė literatūra', 'description' => 'Romanai, apsakymai ir kita grožinė literatūra.']
+                ['name' => 'Grožinė literatūra'],
+                ['slug' => GeneratesSlugs::from('Grožinė literatūra', 'kategorija'), 'description' => 'Romanai, apsakymai ir kita grožinė literatūra.']
             );
             $fantasyCategory = Category::query()->firstOrCreate(
-                ['slug' => 'fantastika'],
-                ['name' => 'Fantastika', 'description' => 'Fantastinė, maginė ir nuotykių literatūra.']
+                ['name' => 'Fantastika'],
+                ['slug' => GeneratesSlugs::from('Fantastika', 'kategorija'), 'description' => 'Fantastinė, maginė ir nuotykių literatūra.']
             );
             $classicCategory = Category::query()->firstOrCreate(
-                ['slug' => 'klasika'],
-                ['name' => 'Klasika', 'description' => 'Lietuvių ir pasaulio literatūros klasika.']
+                ['name' => 'Klasika'],
+                ['slug' => GeneratesSlugs::from('Klasika', 'kategorija'), 'description' => 'Lietuvių ir pasaulio literatūros klasika.']
             );
             $youthCategory = Category::query()->firstOrCreate(
-                ['slug' => 'jaunimo-literatura'],
-                ['name' => 'Jaunimo literatura', 'description' => 'Knygos jauniesiems skaitytojams.']
+                ['name' => 'Jaunimo literatura'],
+                ['slug' => GeneratesSlugs::from('Jaunimo literatura', 'kategorija'), 'description' => 'Knygos jauniesiems skaitytojams.']
             );
 
             $almaLittera = Publisher::query()->firstOrCreate(['name' => 'Alma littera'], ['country' => 'Lietuva']);
@@ -212,12 +214,12 @@ class KaltinenuLibraryDemoSeeder extends Seeder
             $saintExupery = Author::query()->firstOrCreate(['name' => 'Antoine de Saint-Exupery'], ['bio' => 'Prancūzų autorius, parašęs Mažąjį princą.']);
 
             $psychologyCategory = Category::query()->firstOrCreate(
-                ['slug' => 'psichologija'],
-                ['name' => 'Psichologija', 'description' => 'Psichologijos ir saviugdos knygos.']
+                ['name' => 'Psichologija'],
+                ['slug' => GeneratesSlugs::from('Psichologija', 'kategorija'), 'description' => 'Psichologijos ir saviugdos knygos.']
             );
             $romanCategory = Category::query()->firstOrCreate(
-                ['slug' => 'romanai'],
-                ['name' => 'Romanai', 'description' => 'Grožinės literatūros romanai.']
+                ['name' => 'Romanai'],
+                ['slug' => GeneratesSlugs::from('Romanai', 'kategorija'), 'description' => 'Grožinės literatūros romanai.']
             );
 
             $book1984 = Book::query()->where('isbn', '9786090900499')->firstOrFail();
@@ -534,5 +536,3 @@ class KaltinenuLibraryDemoSeeder extends Seeder
         }
     }
 }
-
-

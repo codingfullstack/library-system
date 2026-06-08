@@ -3,7 +3,7 @@
     <nav class="flex flex-wrap gap-8">
         <a href="{{ route('help') }}" class="transition hover:text-emerald-700 dark:hover:text-emerald-300" wire:navigate>Privatumo politika</a>
         <a href="{{ route('help') }}" class="transition hover:text-emerald-700 dark:hover:text-emerald-300" wire:navigate>Naudojimo sąlygos</a>
-        <a href="{{ route('help') }}" class="transition hover:text-emerald-700 dark:hover:text-emerald-300" wire:navigate>Kontaktai</a>
+        <a href="{{ route('contacts') }}" class="transition hover:text-emerald-700 dark:hover:text-emerald-300" wire:navigate>Kontaktai</a>
     </nav>
 </footer>
 

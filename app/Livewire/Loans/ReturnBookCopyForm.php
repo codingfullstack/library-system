@@ -17,7 +17,7 @@ class ReturnBookCopyForm extends Component
 
     public function mount(BookCopy $bookCopy): void
     {
-        $this->bookCopy = $bookCopy;
+        $this->bookCopy = $bookCopy->loadMissing('book:id,slug,title');
     }
 
     public function confirm(): void
@@ -56,7 +56,7 @@ class ReturnBookCopyForm extends Component
         }
 
         return redirect()
-            ->route('books.show', $this->bookCopy->book_id)
+            ->route('books.show', $this->bookCopy->book)
             ->with('success', 'Kopija sėkmingai grąžinta.');
     }
 
@@ -84,11 +84,3 @@ class ReturnBookCopyForm extends Component
         };
     }
 }
-
-
-
-
-
-
-
-

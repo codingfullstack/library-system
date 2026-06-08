@@ -20,7 +20,7 @@ class GetActiveLibraryLoansQuery
                 'issuer:id,name',
                 'receiver:id,name',
                 'bookCopy:id,book_id,inventory_code,status,branch_id,location_id',
-                'bookCopy.book:id,title,subtitle,isbn',
+                'bookCopy.book:id,slug,title,subtitle,isbn',
                 'bookCopy.branch:id,name',
                 'bookCopy.location:id,name,room,shelf',
             ]);
@@ -135,12 +135,3 @@ class GetActiveLibraryLoansQuery
         return $query;
     }
 }
-
-
-
-
-
-
-
-
-

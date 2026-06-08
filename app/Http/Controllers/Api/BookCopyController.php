@@ -40,7 +40,7 @@ class BookCopyController extends Controller
         }
 
         $copy = $findBookCopyByQrQuery->handle($request->user(), $qrCode, [
-            'book:id,title,subtitle,isbn',
+            'book:id,slug,title,subtitle,isbn',
             'book.reservations.user:id,name,email,membership_number',
             'branch:id,name',
             'location:id,name,room,shelf',
@@ -110,8 +110,3 @@ class BookCopyController extends Controller
         ]);
     }
 }
-
-
-
-
-

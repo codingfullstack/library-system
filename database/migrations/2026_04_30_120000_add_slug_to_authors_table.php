@@ -1,10 +1,10 @@
 <?php
 
+use App\Support\GeneratesSlugs;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 
 return new class extends Migration
 {
@@ -21,8 +21,7 @@ return new class extends Migration
             ->orderBy('id')
             ->get()
             ->each(function (object $author) use (&$usedSlugs): void {
-                $baseSlug = Str::slug((string) $author->name);
-                $baseSlug = $baseSlug !== '' ? $baseSlug : 'autorius';
+                $baseSlug = GeneratesSlugs::from((string) $author->name, 'autorius');
                 $candidate = $baseSlug;
                 $suffix = 2;
 
@@ -52,5 +51,3 @@ return new class extends Migration
         });
     }
 };
-
-

@@ -10,9 +10,9 @@ use App\Queries\Management\AuditLogs\GetRecentAuditLogsForAuthorQuery;
 use App\Queries\Management\Authors\GenerateUniqueAuthorSlugQuery;
 use App\Queries\Management\Authors\GetManageAuthorsQuery;
 use App\Support\AuditLogChanges;
+use App\Support\GeneratesSlugs;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class AuthorController extends Controller
@@ -27,7 +27,7 @@ class AuthorController extends Controller
     public function create(): View
     {
         return view('manage.authors.create', [
-            'author' => new Author(),
+            'author' => new Author,
         ]);
     }
 
@@ -37,7 +37,7 @@ class AuthorController extends Controller
     ): RedirectResponse {
         $validated = $request->validated();
         $validated['slug'] = $generateUniqueAuthorSlugQuery->handle(
-            $validated['slug'] ?: Str::slug($validated['name'])
+            $validated['slug'] ?: GeneratesSlugs::from($validated['name'], 'autorius')
         );
 
         $author = Author::create($validated);
@@ -78,7 +78,7 @@ class AuthorController extends Controller
     ): RedirectResponse {
         $validated = $request->validated();
         $validated['slug'] = $generateUniqueAuthorSlugQuery->handle(
-            $validated['slug'] ?: Str::slug($validated['name']),
+            $validated['slug'] ?: GeneratesSlugs::from($validated['name'], 'autorius'),
             $author->id
         );
 
@@ -130,11 +130,3 @@ class AuthorController extends Controller
             ->with('success', 'Autorius ištrintas.');
     }
 }
-
-
-
-
-
-
-
-

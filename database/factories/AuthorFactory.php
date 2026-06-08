@@ -2,8 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Support\GeneratesSlugs;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Str;
 
 class AuthorFactory extends Factory
 {
@@ -11,10 +11,8 @@ class AuthorFactory extends Factory
     {
         return [
             'name' => fake()->name(),
-            'slug' => Str::slug(fake()->unique()->name()),
+            'slug' => GeneratesSlugs::from(fake()->unique()->name(), 'autorius'),
             'bio' => fake()->optional()->paragraph(),
         ];
     }
 }
-
-

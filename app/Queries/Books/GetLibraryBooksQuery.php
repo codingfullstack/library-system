@@ -4,6 +4,7 @@ namespace App\Queries\Books;
 
 use App\Models\Book;
 use App\Models\BookCopy;
+use App\Models\Library;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
@@ -53,6 +54,7 @@ class GetLibraryBooksQuery
             ]))
             ->select([
                 'id',
+                'slug',
                 'title',
                 'subtitle',
                 'isbn',
@@ -186,7 +188,7 @@ class GetLibraryBooksQuery
     private function visibleLibraryIds(?User $user, array $filters): ?array
     {
         if ($user === null) {
-            return \App\Models\Library::query()
+            return Library::query()
                 ->where('is_active', true)
                 ->where('is_public', true)
                 ->pluck('id')
@@ -209,10 +211,3 @@ class GetLibraryBooksQuery
         return $libraryId ? [(int) $libraryId] : [];
     }
 }
-
-
-
-
-
-
-

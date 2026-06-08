@@ -75,7 +75,7 @@ class GetManageBookCopiesQuery
     {
         return BookCopy::query()
             ->with([
-                'book:id,title,isbn,cover_image',
+                'book:id,slug,title,isbn,cover_image',
                 'branch:id,name',
                 'location:id,name,room,shelf',
                 'library:id,name',
@@ -84,11 +84,3 @@ class GetManageBookCopiesQuery
             ->when(! $user->isSuperAdmin(), fn (Builder $query) => $query->where('library_id', $user->activeLibraryId()));
     }
 }
-
-
-
-
-
-
-
-

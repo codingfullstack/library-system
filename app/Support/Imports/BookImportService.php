@@ -8,6 +8,7 @@ use App\Models\Book;
 use App\Models\Category;
 use App\Models\Publisher;
 use App\Models\User;
+use App\Support\GeneratesSlugs;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -15,8 +16,7 @@ class BookImportService
 {
     public function __construct(
         private readonly RecordAuditLogAction $recordAuditLogAction,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<int, array<string, string|null>>  $rows
@@ -63,7 +63,7 @@ class BookImportService
                         return;
                     }
 
-                    $book = new Book();
+                    $book = new Book;
 
                     $publisher = $this->resolvePublisher(
                         $row['publisher_name'] ?? $row['publisher'] ?? null,
@@ -101,7 +101,7 @@ class BookImportService
                         'line' => $line,
                         'status' => 'sukurta',
                         'label' => $book->title,
-                        'message' => $isbn ? 'Sukurta naują knygą (' . $isbn . ').' : 'Sukurta naują knygą.',
+                        'message' => $isbn ? 'Sukurta naują knygą ('.$isbn.').' : 'Sukurta naują knygą.',
                     ];
                 });
             } catch (\Throwable $exception) {
@@ -206,7 +206,7 @@ class BookImportService
                 $author = Author::query()->where('name', $name)->first();
 
                 if (! $author) {
-                    throw new \RuntimeException('Autorius "' . $name . '" nerastas. Naudokite author_slugs.');
+                    throw new \RuntimeException('Autorius "'.$name.'" nerastas. Naudokite author_slugs.');
                 }
 
                 return $author;
@@ -230,8 +230,8 @@ class BookImportService
 
     private function uniqueCategorySlug(string $name): string
     {
-        $base = Str::slug($name);
-        $slug = $base !== '' ? $base : 'kategorija';
+        $base = GeneratesSlugs::from($name, 'kategorija');
+        $slug = $base;
         $suffix = 1;
 
         while (Category::query()->where('slug', $slug)->exists()) {
@@ -269,11 +269,3 @@ class BookImportService
         return $title !== '' ? $title : ($isbn !== '' ? $isbn : '-');
     }
 }
-
-
-
-
-
-
-
-

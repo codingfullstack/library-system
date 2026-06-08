@@ -42,13 +42,13 @@ class CancelReservationAction
             'status' => Reservation::STATUS_CANCELLED,
             'cancelled_at' => now(),
             'notes' => $normalizedReason !== ''
-                ? trim(implode("\n\n", array_filter([$reservation->notes, 'Atšaukimo priežastis: ' . $normalizedReason])))
+                ? trim(implode("\n\n", array_filter([$reservation->notes, 'Atšaukimo priežastis: '.$normalizedReason])))
                 : $reservation->notes,
         ]);
 
         app(SyncReservationQueueAction::class)->handle($reservation->library_id, $reservation->book_id);
 
-        $reservation->loadMissing(['book:id,title', 'user:id,name,email']);
+        $reservation->loadMissing(['book:id,slug,title', 'user:id,name,email']);
 
         app(RecordAuditLogAction::class)->handle(
             $actor,
@@ -108,11 +108,3 @@ class CancelReservationAction
         return $actor->effectiveRole($reservation->library_id) === 'narys' && $reservation->user_id === $actor->id;
     }
 }
-
-
-
-
-
-
-
-

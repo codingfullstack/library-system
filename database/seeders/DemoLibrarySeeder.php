@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\Author;
 use App\Models\AuditLog;
+use App\Models\Author;
 use App\Models\Book;
 use App\Models\BookCopy;
 use App\Models\BookCopyStatusHistory;
@@ -17,6 +17,7 @@ use App\Models\Publisher;
 use App\Models\Reservation;
 use App\Models\ScanLog;
 use App\Models\User;
+use App\Support\GeneratesSlugs;
 use App\Support\UserManagement;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Seeder;
@@ -24,7 +25,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 class DemoLibrarySeeder extends Seeder
 {
@@ -123,7 +123,7 @@ class DemoLibrarySeeder extends Seeder
 
             $categories = $this->seedCategories()->keyBy('slug');
             $publishers = $this->seedPublishers()->keyBy('name');
-            $authors = $this->seedAuthors()->keyBy('name');
+            $authors = $this->seedAuthors()->keyBy('slug');
             $books = $this->seedBooks($categories, $publishers, $authors);
 
             [$branchesX, $locationsX] = $this->seedBranchesAndLocations($libraryX, [
@@ -367,11 +367,11 @@ class DemoLibrarySeeder extends Seeder
         ];
 
         return collect($names)->map(function (string $name) {
-            return Category::query()->firstOrCreate(
-                ['slug' => Str::slug($name)],
+            return Category::query()->updateOrCreate(
+                ['name' => $name],
                 [
-                    'name' => $name,
-                    'description' => $name . ' skiltis bendram katalogui.',
+                    'slug' => $this->uniqueCategorySlug($name),
+                    'description' => $name.' skiltis bendram katalogui.',
                 ]
             );
         })->values();
@@ -451,10 +451,10 @@ class DemoLibrarySeeder extends Seeder
         ];
 
         return collect($authors)->map(function (array $author) {
-            return Author::query()->firstOrCreate(
-                ['slug' => Str::slug($author['name'])],
+            return Author::query()->updateOrCreate(
+                ['name' => $author['name']],
                 [
-                    'name' => $author['name'],
+                    'slug' => $this->uniqueAuthorSlug($author['name']),
                     'bio' => $author['bio'],
                 ]
             );
@@ -462,9 +462,9 @@ class DemoLibrarySeeder extends Seeder
     }
 
     /**
-     * @param Collection<string, Category> $categories
-     * @param Collection<string, Publisher> $publishers
-     * @param Collection<string, Author> $authors
+     * @param  Collection<string, Category>  $categories
+     * @param  Collection<string, Publisher>  $publishers
+     * @param  Collection<string, Author>  $authors
      * @return Collection<int, Book>
      */
     private function seedBooks(Collection $categories, Collection $publishers, Collection $authors): Collection
@@ -634,7 +634,7 @@ class DemoLibrarySeeder extends Seeder
 
         return collect($catalog)->map(function (array $book) use ($categories, $publishers, $authors) {
             $isbn = filled($book['isbn'] ?? null) ? $book['isbn'] : null;
-            $categoryIds = collect($book['categories'])->map(fn (string $name) => $categories[Str::slug($name)]->id);
+            $categoryIds = collect($book['categories'])->map(fn (string $name) => $categories[GeneratesSlugs::from($name, 'kategorija')]->id);
 
             $record = Book::query()->updateOrCreate(
                 $isbn ? ['isbn' => $isbn] : ['title' => $book['title']],
@@ -654,7 +654,7 @@ class DemoLibrarySeeder extends Seeder
             );
 
             $record->authors()->sync(
-                collect($book['authors'])->map(fn (string $name) => $authors[$name]->id)->all()
+                collect($book['authors'])->map(fn (string $name) => $authors[GeneratesSlugs::from($name, 'autorius')]->id)->all()
             );
 
             $record->categories()->sync($categoryIds->all());
@@ -664,7 +664,7 @@ class DemoLibrarySeeder extends Seeder
     }
 
     /**
-     * @param list<string> $branchNames
+     * @param  list<string>  $branchNames
      * @return array{0: Collection<int, Branch>, 1: Collection<int, Location>}
      */
     private function seedBranchesAndLocations(Library $library, array $branchNames): array
@@ -673,7 +673,7 @@ class DemoLibrarySeeder extends Seeder
             return Branch::create([
                 'library_id' => $library->id,
                 'name' => $branchName,
-                'code' => $library->code . '-BR-' . str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT),
+                'code' => $library->code.'-BR-'.str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT),
                 'address' => $library->address,
                 'city' => $library->city,
             ]);
@@ -695,7 +695,7 @@ class DemoLibrarySeeder extends Seeder
                         'library_id' => $library->id,
                         'branch_id' => $branch->id,
                         'name' => $location['name'],
-                        'code' => $branch->code . '-LOC-' . str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT),
+                        'code' => $branch->code.'-LOC-'.str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT),
                         'room' => $location['room'],
                         'shelf' => $location['shelf'],
                     ]);
@@ -707,11 +707,11 @@ class DemoLibrarySeeder extends Seeder
     }
 
     /**
-     * @param Collection<int, Book> $books
-     * @param Collection<int, Branch> $branches
-     * @param Collection<int, Location> $locations
-     * @param Collection<int, User> $employees
-     * @param Collection<int, User> $members
+     * @param  Collection<int, Book>  $books
+     * @param  Collection<int, Branch>  $branches
+     * @param  Collection<int, Location>  $locations
+     * @param  Collection<int, User>  $employees
+     * @param  Collection<int, User>  $members
      * @return Collection<int, BookCopy>
      */
     private function seedCopiesForLibrary(
@@ -759,7 +759,7 @@ class DemoLibrarySeeder extends Seeder
                     'location_id' => $location->id,
                     'inventory_code' => sprintf('%s-%s-%03d', $library->code, $prefix, $inventoryCounter++),
                     'qr_code' => sprintf('QR-%s-%04d', $library->code, $inventoryCounter + 500),
-                    'barcode' => '978' . str_pad((string) rand(1000000000, 9999999999), 10, '0', STR_PAD_LEFT),
+                    'barcode' => '978'.str_pad((string) rand(1000000000, 9999999999), 10, '0', STR_PAD_LEFT),
                     'status' => BookCopy::STATUS_AVAILABLE,
                     'condition_status' => $condition,
                     'acquired_at' => now()->subMonths(rand(6, 48))->format('Y-m-d'),
@@ -771,6 +771,7 @@ class DemoLibrarySeeder extends Seeder
 
                 if ($targetStatus === BookCopy::STATUS_LOANED) {
                     $this->seedLoanForCopy($copy, $members->random(), $employees->random(), false);
+
                     continue;
                 }
 
@@ -836,8 +837,8 @@ class DemoLibrarySeeder extends Seeder
     }
 
     /**
-     * @param Collection<int, BookCopy> $copies
-     * @param Collection<int, User> $members
+     * @param  Collection<int, BookCopy>  $copies
+     * @param  Collection<int, User>  $members
      */
     private function seedReservationsForLibrary(Library $library, Collection $copies, Collection $members): void
     {
@@ -911,8 +912,8 @@ class DemoLibrarySeeder extends Seeder
     }
 
     /**
-     * @param Collection<int, BookCopy> $copies
-     * @param Collection<int, User> $employees
+     * @param  Collection<int, BookCopy>  $copies
+     * @param  Collection<int, User>  $employees
      */
     private function seedScanLogs(Library $library, Collection $copies, Collection $employees): void
     {
@@ -930,10 +931,10 @@ class DemoLibrarySeeder extends Seeder
     }
 
     /**
-     * @param Collection<int, Book> $books
-     * @param Collection<int, BookCopy> $copies
-     * @param Collection<int, User> $employees
-     * @param Collection<int, User> $members
+     * @param  Collection<int, Book>  $books
+     * @param  Collection<int, BookCopy>  $copies
+     * @param  Collection<int, User>  $employees
+     * @param  Collection<int, User>  $members
      */
     private function seedAuditLogsForLibrary(
         Library $library,
@@ -983,7 +984,7 @@ class DemoLibrarySeeder extends Seeder
                         : sprintf('Atnaujinta egzemplioriaus %s informacija.', $copy->inventory_code),
                     'metadata' => [
                         'inventory_code' => $copy->inventory_code,
-                        'target_status_label' => \App\Models\BookCopy::statusLabels()[$copy->status] ?? $copy->status,
+                        'target_status_label' => BookCopy::statusLabels()[$copy->status] ?? $copy->status,
                     ],
                 ], $createdAt);
             }
@@ -1080,8 +1081,32 @@ class DemoLibrarySeeder extends Seeder
 
         return $safe;
     }
+
+    private function uniqueCategorySlug(string $name): string
+    {
+        $base = GeneratesSlugs::from($name, 'kategorija');
+        $slug = $base;
+        $suffix = 2;
+
+        while (Category::query()->where('slug', $slug)->where('name', '!=', $name)->exists()) {
+            $slug = "{$base}-{$suffix}";
+            $suffix++;
+        }
+
+        return $slug;
+    }
+
+    private function uniqueAuthorSlug(string $name): string
+    {
+        $base = GeneratesSlugs::from($name, 'autorius');
+        $slug = $base;
+        $suffix = 2;
+
+        while (Author::query()->where('slug', $slug)->where('name', '!=', $name)->exists()) {
+            $slug = "{$base}-{$suffix}";
+            $suffix++;
+        }
+
+        return $slug;
+    }
 }
-
-
-
-

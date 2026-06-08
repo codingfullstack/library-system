@@ -3,16 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\Book;
-use App\Http\Controllers\Controller;
-use App\Queries\Management\AuditLogs\GetRecentAuditLogsForBookQuery;
 use App\Queries\Books\GetBookCopyFiltersDataQuery;
 use App\Queries\Books\GetBookIndexFiltersDataQuery;
+use App\Queries\Books\GetLibraryBookDetailsQuery;
 use App\Queries\Books\GetLibraryBooksQuery;
+use App\Queries\Management\AuditLogs\GetRecentAuditLogsForBookQuery;
+use App\Services\SeoService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
-use App\Queries\Books\GetLibraryBookDetailsQuery;
-use App\Services\SeoService;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Str;
+use RalphJSmit\Laravel\SEO\Support\SEOData;
 
 class BookController extends Controller
 {
@@ -20,9 +21,7 @@ class BookController extends Controller
         Request $request,
         GetLibraryBooksQuery $getLibraryBooksQuery,
         GetBookIndexFiltersDataQuery $getBookIndexFiltersDataQuery,
-        SeoService $seoService,
-    ): View
-    {
+    ): View {
         $actor = $request->user();
         $filters = [
             'search' => $request->query('search'),
@@ -37,19 +36,6 @@ class BookController extends Controller
         ];
         $books = $getLibraryBooksQuery->handle($actor, $filters);
 
-        if ($actor === null) {
-            return view('public.books.index', array_merge(
-                [
-                    'books' => $books,
-                    'seo' => $seoService->make(
-                        title: 'Knygu katalogas',
-                        description: 'Viesas biblioteku knygu katalogas su paieska pagal pavadinima, autoriu, kategorija ir ISBN.'
-                    ),
-                ],
-                $getBookIndexFiltersDataQuery->handle(null)
-            ));
-        }
-
         return view($actor->effectiveRole() === 'narys' ? 'account.books.index' : 'books.index', array_merge(
             ['books' => $books],
             $getBookIndexFiltersDataQuery->handle($actor)
@@ -63,8 +49,7 @@ class BookController extends Controller
         GetBookCopyFiltersDataQuery $getBookCopyFiltersDataQuery,
         GetRecentAuditLogsForBookQuery $getRecentAuditLogsForBookQuery,
         SeoService $seoService,
-    ): View
-    {
+    ): View {
         $actor = $request->user();
         $book = $getLibraryBookDetailsQuery->handle($actor, $book, [
             'copy_lifecycle' => $request->query('copy_lifecycle'),
@@ -72,17 +57,6 @@ class BookController extends Controller
             'branch_id' => $request->query('branch_id'),
             'location_id' => $request->query('location_id'),
         ]);
-
-        if ($actor === null) {
-            return view('public.books.show', [
-                'book' => $book,
-                'seo' => $seoService->make(
-                    title: $book->title,
-                    description: $book->description ?: 'Knygos informacija, autoriai, kategorijos ir prieinamumas viesose bibliotekose.',
-                    type: 'article',
-                ),
-            ]);
-        }
 
         if ($actor->effectiveRole() === 'narys') {
             $currentReservation = $book->reservations
@@ -97,6 +71,7 @@ class BookController extends Controller
                 'book' => $book,
                 'memberReservation' => $memberReservation,
                 'currentReservation' => $currentReservation,
+                'seo' => $this->bookSeo($book, $seoService),
             ]);
         }
 
@@ -121,16 +96,29 @@ class BookController extends Controller
                 'auditLogs' => $actor?->isSuperAdmin()
                     ? $getRecentAuditLogsForBookQuery->handle($book)
                     : collect(),
+                'seo' => $this->bookSeo($book, $seoService),
             ],
             $getBookCopyFiltersDataQuery->handle($request->user(), $book)
         ));
     }
+
+    private function bookSeo(Book $book, SeoService $seoService): SEOData
+    {
+        $description = filled($book->description)
+            ? Str::limit(strip_tags((string) $book->description), 155, '')
+            : collect([
+                $book->authors->pluck('name')->join(', '),
+                $book->publisher?->name,
+                $book->publication_year,
+                $book->categories->pluck('name')->join(', '),
+            ])->filter()->join(', ');
+
+        return $seoService->make(
+            title: $book->title,
+            description: $description ?: 'Knygos informacija bibliotekų sistemoje.',
+            canonicalUrl: route('books.show', $book),
+            image: $book->cover_image_url,
+            robots: 'noindex,nofollow',
+        );
+    }
 }
-
-
-
-
-
-
-
-

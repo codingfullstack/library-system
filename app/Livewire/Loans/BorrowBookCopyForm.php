@@ -40,7 +40,7 @@ class BorrowBookCopyForm extends Component
 
     public function mount(BookCopy $bookCopy, ?int $preferredReservationId = null): void
     {
-        $this->bookCopy = $bookCopy->loadMissing('library:id,name');
+        $this->bookCopy = $bookCopy->loadMissing(['book:id,slug,title', 'library:id,name']);
         $this->preferredReservationId = $preferredReservationId;
         $this->dueAt = now()->addDays(14)->toDateString();
         $this->preferredReservation = $this->resolvePreferredReservation();
@@ -143,7 +143,7 @@ class BorrowBookCopyForm extends Component
         }
 
         return redirect()
-            ->route('books.show', $this->bookCopy->book_id)
+            ->route('books.show', $this->bookCopy->book)
             ->with('success', 'Kopija sėkmingai išduota rezervavusiam nariui.');
     }
 
@@ -196,7 +196,7 @@ class BorrowBookCopyForm extends Component
         }
 
         return redirect()
-            ->route('books.show', $this->bookCopy->book_id)
+            ->route('books.show', $this->bookCopy->book)
             ->with('success', 'Kopija sėkmingai išduota.');
     }
 
@@ -261,11 +261,3 @@ class BorrowBookCopyForm extends Component
         };
     }
 }
-
-
-
-
-
-
-
-

@@ -23,7 +23,7 @@ Route::prefix('auth')->group(function () {
         Route::delete('/device-token', [DeviceTokenController::class, 'destroy']);
     });
     Route::middleware(['auth:sanctum', 'library.context', 'throttle:api-read'])->group(function () {
-        Route::get('/books/{book}', [BookController::class, 'show']);
+        Route::get('/books/{book:id}', [BookController::class, 'show'])->whereNumber('book');
         Route::get('/books', [BookController::class, 'index']);
         Route::get('/book-copies/{bookCopy}', [ApiBookCopyController::class, 'show'])->whereNumber('bookCopy');
         Route::get('/reservations', [ReservationController::class, 'index']);

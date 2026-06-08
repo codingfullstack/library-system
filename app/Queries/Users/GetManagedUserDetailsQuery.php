@@ -11,12 +11,12 @@ class GetManagedUserDetailsQuery
         $user->load([
             'libraryMemberships.library:id,name,code',
             'loans' => function ($query) {
-                $query->with('bookCopy.book:id,title')
+                $query->with('bookCopy.book:id,slug,title')
                     ->latest('borrowed_at')
                     ->limit(5);
             },
             'reservations' => function ($query) {
-                $query->with('book:id,title')
+                $query->with('book:id,slug,title')
                     ->latest('reserved_at')
                     ->limit(5);
             },
@@ -32,11 +32,3 @@ class GetManagedUserDetailsQuery
         return $user;
     }
 }
-
-
-
-
-
-
-
-

@@ -95,7 +95,7 @@ class ReservationHistory extends Component
         }
 
         return redirect()
-            ->route('books.show', $this->bookId)
+            ->route('books.show', Book::query()->findOrFail($this->bookId))
             ->with('success', 'Kopija išduota pirmam eilėje esančiam nariui.');
     }
 
@@ -227,11 +227,3 @@ class ReservationHistory extends Component
             ->first();
     }
 }
-
-
-
-
-
-
-
-

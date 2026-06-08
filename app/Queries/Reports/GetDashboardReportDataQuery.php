@@ -110,10 +110,10 @@ class GetDashboardReportDataQuery
             'activityTimeline' => $activityTimeline,
             'periodLabel' => $periodLabel,
             'scopeLabel' => $user->isSuperAdmin()
-                ? 'Visų bibliotekų statistika - ' . $periodLabel
+                ? 'Visų bibliotekų statistika - '.$periodLabel
                 : ($user->availableLibraries()->firstWhere('id', $libraryId)?->name
-                    ? $user->availableLibraries()->firstWhere('id', $libraryId)->name . ' statistika - ' . $periodLabel
-                    : 'Bibliotekos statistika - ' . $periodLabel),
+                    ? $user->availableLibraries()->firstWhere('id', $libraryId)->name.' statistika - '.$periodLabel
+                    : 'Bibliotekos statistika - '.$periodLabel),
         ];
     }
 
@@ -331,7 +331,7 @@ class GetDashboardReportDataQuery
                 'book_copies.status',
             ])
             ->with([
-                'book:id,title',
+                'book:id,slug,title',
                 'library:id,name',
                 'branch:id,name',
             ])
@@ -506,7 +506,7 @@ class GetDashboardReportDataQuery
         $issued = Loan::query()
             ->when($libraryId, fn (Builder $query) => $query->where('library_id', $libraryId))
             ->whereBetween('borrowed_at', [$dateFrom, $dateTo])
-            ->selectRaw($this->dateBucketSelect('borrowed_at', $groupByMonth) . ', COUNT(*) as aggregate')
+            ->selectRaw($this->dateBucketSelect('borrowed_at', $groupByMonth).', COUNT(*) as aggregate')
             ->groupBy('period_key')
             ->pluck('aggregate', 'period_key');
 
@@ -514,14 +514,14 @@ class GetDashboardReportDataQuery
             ->when($libraryId, fn (Builder $query) => $query->where('library_id', $libraryId))
             ->whereNotNull('returned_at')
             ->whereBetween('returned_at', [$dateFrom, $dateTo])
-            ->selectRaw($this->dateBucketSelect('returned_at', $groupByMonth) . ', COUNT(*) as aggregate')
+            ->selectRaw($this->dateBucketSelect('returned_at', $groupByMonth).', COUNT(*) as aggregate')
             ->groupBy('period_key')
             ->pluck('aggregate', 'period_key');
 
         $reserved = Reservation::query()
             ->when($libraryId, fn (Builder $query) => $query->where('library_id', $libraryId))
             ->whereBetween('reserved_at', [$dateFrom, $dateTo])
-            ->selectRaw($this->dateBucketSelect('reserved_at', $groupByMonth) . ', COUNT(*) as aggregate')
+            ->selectRaw($this->dateBucketSelect('reserved_at', $groupByMonth).', COUNT(*) as aggregate')
             ->groupBy('period_key')
             ->pluck('aggregate', 'period_key');
 
@@ -623,11 +623,3 @@ class GetDashboardReportDataQuery
         return $query->whereBetween('reserved_at', [$dateFrom, $dateTo]);
     }
 }
-
-
-
-
-
-
-
-

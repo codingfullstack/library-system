@@ -31,7 +31,15 @@
                                 <flux:icon.building-library class="size-6" />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <h2 class="text-lg font-bold text-zinc-950 dark:text-white">{{ $library->name }}</h2>
+                                <h2 class="text-lg font-bold text-zinc-950 dark:text-white">
+                                    @auth
+                                        <a href="{{ route('public.libraries.show', ['library' => $library->slug]) }}" class="transition hover:text-emerald-700 dark:hover:text-emerald-300">
+                                            {{ $library->name }}
+                                        </a>
+                                    @else
+                                        {{ $library->name }}
+                                    @endauth
+                                </h2>
                                 <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ collect([$library->address, $library->city])->filter()->join(', ') ?: $library->code }}</p>
                             </div>
                         </div>

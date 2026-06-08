@@ -16,15 +16,14 @@ class ScanController extends Controller
         Request $request,
         FindBookCopyByQrQuery $findBookCopyByQrQuery,
         RecordScanLogAction $recordScanLogAction
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $validated = $request->validate([
             'qr_code' => ['required', 'string', 'max:128'],
             'device_info' => ['nullable', 'string', 'max:255'],
         ]);
 
         $bookCopy = $findBookCopyByQrQuery->handle($request->user(), $validated['qr_code'], [
-            'book:id,title,isbn',
+            'book:id,slug,title,isbn',
             'branch:id,name',
             'location:id,name,room,shelf',
             'activeLoan.user:id,name,email,membership_number',
@@ -60,11 +59,3 @@ class ScanController extends Controller
         );
     }
 }
-
-
-
-
-
-
-
-

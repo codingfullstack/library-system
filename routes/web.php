@@ -1,45 +1,38 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AccountController;
+use App\Http\Controllers\BookController;
 use App\Http\Controllers\BookCopyController;
 use App\Http\Controllers\BookCopyQrController;
-use App\Http\Controllers\BookController;
-use App\Http\Controllers\AccountController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DashboardExportController;
 use App\Http\Controllers\ListExportController;
 use App\Http\Controllers\LoanController;
-use App\Http\Controllers\MemberLibraryController;
-use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\PublicPageController;
-use App\Http\Controllers\ReservationController;
-use App\Http\Controllers\Management\AuthorController as ManageAuthorController;
 use App\Http\Controllers\Management\AuditLogController as ManageAuditLogController;
+use App\Http\Controllers\Management\AuthorController as ManageAuthorController;
 use App\Http\Controllers\Management\BookController as ManageBookController;
 use App\Http\Controllers\Management\BookCopyController as ManageBookCopyController;
 use App\Http\Controllers\Management\BranchController as ManageBranchController;
 use App\Http\Controllers\Management\CategoryController as ManageCategoryController;
+use App\Http\Controllers\Management\ImportController as ManageImportController;
 use App\Http\Controllers\Management\LibraryController as ManageLibraryController;
 use App\Http\Controllers\Management\LocationController as ManageLocationController;
 use App\Http\Controllers\Management\PublisherController as ManagePublisherController;
 use App\Http\Controllers\Management\SearchController as ManageSearchController;
 use App\Http\Controllers\Management\UserController as ManageUserController;
 use App\Http\Controllers\Management\UserMembershipController as ManageUserMembershipController;
-use App\Http\Controllers\Management\ImportController as ManageImportController;
+use App\Http\Controllers\MemberLibraryController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PublicPageController;
+use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\UserQrController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PublicPageController::class, 'home'])->name('home');
-Route::get('/about', [PublicPageController::class, 'about'])->name('about');
-Route::redirect('/apie', '/about');
-Route::get('/libraries', [PublicPageController::class, 'libraries'])->name('public.libraries.index');
-Route::redirect('/bibliotekos', '/libraries');
-Route::get('/libraries/{library}', [PublicPageController::class, 'library'])->name('public.libraries.show');
-Route::get('/contact', [PublicPageController::class, 'contact'])->name('contact');
-Route::middleware('overdue.notifications')->group(function () {
-    Route::get('/books', [BookController::class, 'index'])->name('books.index');
-    Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
-});
-Route::view('/pagalba', 'help')->name('help');
+Route::get('/bibliotekos', [PublicPageController::class, 'libraries'])->name('public.libraries.index');
+Route::get('/apie', [PublicPageController::class, 'about'])->name('about');
+Route::get('/kontaktai', [PublicPageController::class, 'contact'])->name('contacts');
+Route::get('/pagalba', [PublicPageController::class, 'help'])->name('help');
 
 Route::middleware(['auth', 'overdue.notifications', 'verified', 'library.context', 'role:superadministratorius,administratorius,darbuotojas'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
@@ -47,7 +40,12 @@ Route::middleware(['auth', 'overdue.notifications', 'verified', 'library.context
 });
 
 Route::middleware(['auth', 'overdue.notifications'])->group(function () {
-    Route::post('/libraries/{library}/join', [MemberLibraryController::class, 'join'])->middleware(['verified'])->name('libraries.join');
+    Route::get('/bibliotekos/{library:slug}', [PublicPageController::class, 'library'])->name('public.libraries.show');
+
+    Route::get('/knygos', [BookController::class, 'index'])->name('books.index');
+    Route::get('/knygos/{book:slug}', [BookController::class, 'show'])->name('books.show');
+
+    Route::post('/bibliotekos/{library:id}/prisijungti', [MemberLibraryController::class, 'join'])->middleware(['verified'])->name('libraries.join');
 
     Route::get('/exports/{resource}.csv', ListExportController::class)->name('exports.list');
 
@@ -87,7 +85,12 @@ Route::middleware(['auth', 'overdue.notifications', 'verified', 'library.context
         Route::post('imports/{resource}', [ManageImportController::class, 'store'])->name('imports.store');
         Route::get('imports/{resource}/template', [ManageImportController::class, 'template'])->name('imports.template');
         Route::get('books', fn () => redirect()->route('books.index', request()->query()))->name('books.index');
-        Route::resource('books', ManageBookController::class)->except(['index', 'show']);
+        Route::get('books/create', [ManageBookController::class, 'create'])->name('books.create');
+        Route::post('books', [ManageBookController::class, 'store'])->name('books.store');
+        Route::get('books/{book:id}/edit', [ManageBookController::class, 'edit'])->name('books.edit');
+        Route::put('books/{book:id}', [ManageBookController::class, 'update'])->name('books.update');
+        Route::patch('books/{book:id}', [ManageBookController::class, 'update'])->name('books.update');
+        Route::delete('books/{book:id}', [ManageBookController::class, 'destroy'])->name('books.destroy');
         Route::resource('authors', ManageAuthorController::class)->except('show');
         Route::resource('branches', ManageBranchController::class)->except('show');
         Route::resource('locations', ManageLocationController::class)->except('show');
@@ -118,5 +121,4 @@ Route::middleware(['auth', 'overdue.notifications', 'verified', 'library.context
         Route::resource('publishers', ManagePublisherController::class)->except('show');
     });
 
-require __DIR__ . '/settings.php';
-
+require __DIR__.'/settings.php';

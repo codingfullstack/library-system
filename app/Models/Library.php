@@ -2,17 +2,22 @@
 
 namespace App\Models;
 
+use App\Support\GeneratesSlugs;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use RalphJSmit\Laravel\SEO\Support\HasSEO;
+use RalphJSmit\Laravel\SEO\Support\SEOData;
 
 class Library extends Model
 {
     use HasFactory;
+    use HasSEO;
 
     protected $fillable = [
         'name',
+        'slug',
         'code',
         'email',
         'phone',
@@ -26,6 +31,47 @@ class Library extends Model
         'is_active' => 'boolean',
         'is_public' => 'boolean',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (Library $library): void {
+            if (! $library->slug || $library->isDirty('name')) {
+                $library->slug = $library->uniqueSlug();
+            }
+        });
+    }
+
+    private function uniqueSlug(): string
+    {
+        $base = GeneratesSlugs::from($this->name, 'biblioteka');
+        $slug = $base;
+        $suffix = 1;
+
+        while (static::query()
+            ->where('slug', $slug)
+            ->when($this->exists, fn ($query) => $query->whereKeyNot($this->getKey()))
+            ->exists()) {
+            $slug = sprintf('%s-%d', $base, $suffix++);
+        }
+
+        return $slug;
+    }
+
+    public function getDynamicSEOData(): SEOData
+    {
+        $description = collect([$this->city, $this->address, $this->name])
+            ->filter()
+            ->join(', ');
+
+        return new SEOData(
+            title: $this->name,
+            description: $description ?: 'Viešos bibliotekos informacija bibliotekų sistemoje.',
+            url: route('public.libraries.show', $this),
+            canonical_url: route('public.libraries.show', $this),
+            type: 'website',
+            robots: $this->is_active && $this->is_public ? null : 'noindex,nofollow',
+        );
+    }
 
     public function users(): BelongsToMany
     {
@@ -76,11 +122,3 @@ class Library extends Model
         return $this->hasMany(ScanLog::class);
     }
 }
-
-
-
-
-
-
-
-

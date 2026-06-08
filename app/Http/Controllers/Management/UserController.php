@@ -42,8 +42,7 @@ class UserController extends Controller
         User $user,
         GetManagedUserDetailsQuery $getManagedUserDetailsQuery,
         GetRecentAuditLogsForUserQuery $getRecentAuditLogsForUserQuery
-    ): View
-    {
+    ): View {
         $actor = $request->user();
         $this->ensureVisible($actor, $user);
         $user = $getManagedUserDetailsQuery->handle($user);
@@ -51,12 +50,12 @@ class UserController extends Controller
         return view('manage.users.show', [
             'managedUser' => $user,
             'recentLoans' => $user->loans()
-                ->with('bookCopy.book:id,title')
+                ->with('bookCopy.book:id,slug,title')
                 ->latest('borrowed_at')
                 ->paginate(5, ['*'], 'user-loans-page')
                 ->withQueryString(),
             'recentReservations' => $user->reservations()
-                ->with('book:id,title')
+                ->with('book:id,slug,title')
                 ->latest('reserved_at')
                 ->paginate(5, ['*'], 'user-reservations-page')
                 ->withQueryString(),
@@ -70,8 +69,7 @@ class UserController extends Controller
         Request $request,
         User $user,
         GetRecentAuditLogsForUserQuery $getRecentAuditLogsForUserQuery
-    ): View
-    {
+    ): View {
         $actor = $request->user();
         $this->ensureVisible($actor, $user);
 
@@ -198,11 +196,3 @@ class UserController extends Controller
         }
     }
 }
-
-
-
-
-
-
-
-

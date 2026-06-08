@@ -127,7 +127,7 @@
                                 <div class="space-y-3">
                                     @foreach($activeLoans as $loan)
                                         <div class="rounded-lg bg-zinc-50 p-3 ring-1 ring-zinc-200 dark:bg-zinc-950/50 dark:ring-zinc-800">
-                                            <a href="{{ route('books.show', $loan->bookCopy?->book_id) }}" class="text-sm font-semibold text-zinc-950 hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">
+                                            <a href="{{ $loan->bookCopy?->book ? route('books.show', $loan->bookCopy->book) : '#' }}" class="text-sm font-semibold text-zinc-950 hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">
                                                 {{ $loan->bookCopy?->book?->title ?: 'Nežinoma knyga' }}
                                             </a>
                                             <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
@@ -159,7 +159,7 @@
                                 <div class="space-y-3">
                                     @foreach($activeReservations as $reservation)
                                         <div class="rounded-lg bg-zinc-50 p-3 ring-1 ring-zinc-200 dark:bg-zinc-950/50 dark:ring-zinc-800">
-                                            <a href="{{ route('books.show', $reservation->book_id) }}" class="text-sm font-semibold text-zinc-950 hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">
+                                            <a href="{{ $reservation->book ? route('books.show', $reservation->book) : '#' }}" class="text-sm font-semibold text-zinc-950 hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">
                                                 {{ $reservation->book?->title ?: 'Nežinoma knyga' }}
                                             </a>
                                             <div class="mt-2 text-sm text-zinc-700 dark:text-zinc-300">

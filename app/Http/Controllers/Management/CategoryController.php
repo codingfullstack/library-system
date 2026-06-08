@@ -10,9 +10,9 @@ use App\Queries\Management\AuditLogs\GetRecentAuditLogsForCategoryQuery;
 use App\Queries\Management\Categories\GenerateUniqueCategorySlugQuery;
 use App\Queries\Management\Categories\GetManageCategoriesQuery;
 use App\Support\AuditLogChanges;
+use App\Support\GeneratesSlugs;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class CategoryController extends Controller
@@ -27,7 +27,7 @@ class CategoryController extends Controller
     public function create(): View
     {
         return view('manage.categories.create', [
-            'category' => new Category(),
+            'category' => new Category,
         ]);
     }
 
@@ -119,7 +119,7 @@ class CategoryController extends Controller
     ): array {
         $validated = $request->validated();
         $name = $validated['name'];
-        $slug = $validated['slug'] ?: Str::slug($name);
+        $slug = $validated['slug'] ?: GeneratesSlugs::from($name, 'kategorija');
 
         return [
             'name' => $name,
@@ -128,11 +128,3 @@ class CategoryController extends Controller
         ];
     }
 }
-
-
-
-
-
-
-
-

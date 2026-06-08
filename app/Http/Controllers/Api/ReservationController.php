@@ -20,8 +20,7 @@ class ReservationController extends Controller
         Request $request,
         GetLibraryReservationsQuery $getLibraryReservationsQuery,
         GetMemberReservationsQuery $getMemberReservationsQuery
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $user = $request->user();
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:120'],
@@ -64,7 +63,7 @@ class ReservationController extends Controller
         );
 
         $reservation->load([
-            'book:id,title,subtitle,isbn',
+            'book:id,slug,title,subtitle,isbn',
             'user:id,name,email,membership_number',
         ]);
 
@@ -82,7 +81,7 @@ class ReservationController extends Controller
         $reservation = $cancelReservationAction->handle($request->user(), $reservation);
 
         $reservation->load([
-            'book:id,title,subtitle,isbn',
+            'book:id,slug,title,subtitle,isbn',
             'user:id,name,email,membership_number',
         ]);
 
@@ -92,11 +91,3 @@ class ReservationController extends Controller
         ]);
     }
 }
-
-
-
-
-
-
-
-

@@ -2,16 +2,33 @@ User-agent: *
 Allow: /
 
 Disallow: /dashboard
+Disallow: /dashboard/
 Disallow: /admin
+Disallow: /admin/
 Disallow: /manage
+Disallow: /manage/
+Disallow: /api/
 Disallow: /login
 Disallow: /register
 Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /email/
+Disallow: /two-factor-challenge
+Disallow: /user/
 Disallow: /profile
 Disallow: /settings
+Disallow: /settings/
 Disallow: /reservations
 Disallow: /loans
 Disallow: /account
+Disallow: /account/
 Disallow: /notifications
+Disallow: /storage/
+Disallow: /livewire
+Disallow: /flux/
+Disallow: /sanctum/
+Disallow: /up
+Disallow: /bibliotekos/
+Disallow: /knygos/
 
 Sitemap: https://projektas.link/sitemap.xml

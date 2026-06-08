@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Management;
 use App\Actions\AuditLogs\RecordAuditLogAction;
 use App\Actions\BookCopies\ChangeBookCopyStatusAction;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\ManageBookCopyRequest;
 use App\Http\Requests\ManageBookCopyLifecycleRequest;
+use App\Http\Requests\ManageBookCopyRequest;
 use App\Models\BookCopy;
 use App\Queries\Management\AuditLogs\GetRecentAuditLogsForModelQuery;
 use App\Queries\Management\BookCopies\GetManageBookCopiesQuery;
@@ -66,7 +66,7 @@ class BookCopyController extends Controller
             $request->validated('notes') ?: 'Egzempliorius sukurtas sistemoje.'
         );
 
-        $copy->loadMissing('book:id,title');
+        $copy->loadMissing('book:id,slug,title');
 
         app(RecordAuditLogAction::class)->handle(
             $request->user(),
@@ -92,8 +92,7 @@ class BookCopyController extends Controller
         Request $request,
         BookCopy $bookCopy,
         GetRecentAuditLogsForModelQuery $getRecentAuditLogsForModelQuery
-    ): View
-    {
+    ): View {
         $this->authorize('update', $bookCopy);
 
         $bookCopy->loadMissing(['book.authors:id,name', 'book.publisher:id,name', 'book.categories:id,name']);
@@ -163,7 +162,7 @@ class BookCopyController extends Controller
         }
 
         $bookCopy->loadMissing([
-            'book:id,title',
+            'book:id,slug,title',
             'branch:id,name',
             'location:id,name,room,shelf',
         ]);
@@ -257,7 +256,7 @@ class BookCopyController extends Controller
     private function generateQrCode(int $libraryId): string
     {
         do {
-            $candidate = 'QR-' . $libraryId . '-' . strtoupper(Str::random(12));
+            $candidate = 'QR-'.$libraryId.'-'.strtoupper(Str::random(12));
         } while (
             BookCopy::query()
                 ->where('library_id', $libraryId)
@@ -268,11 +267,3 @@ class BookCopyController extends Controller
         return $candidate;
     }
 }
-
-
-
-
-
-
-
-
