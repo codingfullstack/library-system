@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
-        @include('partials.head')
+        @include('partials.public-head')
     </head>
     <body class="min-h-screen bg-white text-slate-950 antialiased dark:bg-zinc-950 dark:text-white">
         @php
@@ -31,6 +31,7 @@
                 <section class="relative isolate overflow-hidden bg-[#f8fcfa] dark:bg-[#07110f]">
                     <picture class="absolute inset-y-0 right-0 hidden w-[46%] lg:block">
                         <source
+                            media="(min-width: 1024px)"
                             srcset="
                                 https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=900&q=80 900w,
                                 https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1400&q=85 1400w,
@@ -39,10 +40,12 @@
                             sizes="46vw"
                         >
                         <img
-                            src="https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1400&q=85"
+                            src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="
                             alt="Bibliotekos skaitykla su knygų lentynomis"
                             class="h-full w-full object-cover object-center"
                             fetchpriority="high"
+                            width="1400"
+                            height="934"
                         >
                     </picture>
                     <div class="absolute inset-y-0 right-0 hidden w-[46%] bg-[linear-gradient(90deg,rgba(248,252,250,0.94),rgba(248,252,250,0.22)_28%,rgba(248,252,250,0)_56%)] lg:block"></div>
@@ -138,7 +141,6 @@
             @include('partials.public-footer')
         </div>
 
-        @fluxScripts
     </body>
 </html>
 

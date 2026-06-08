@@ -9,6 +9,7 @@ use App\Models\Reservation;
 use App\Models\User;
 use App\Services\SeoService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Cache;
 use RalphJSmit\Laravel\SEO\SchemaCollection;
 
 class PublicPageController extends Controller
@@ -139,29 +140,31 @@ class PublicPageController extends Controller
 
     private function publicStats(): array
     {
-        $publicLibraryIds = Library::query()
-            ->where('is_active', true)
-            ->where('is_public', true)
-            ->pluck('id');
+        return Cache::remember('public.pages.stats', now()->addMinutes(15), function (): array {
+            $publicLibraryIds = Library::query()
+                ->where('is_active', true)
+                ->where('is_public', true)
+                ->pluck('id');
 
-        return [
-            'books' => Book::query()
-                ->whereHas('bookCopies', fn ($query) => $query->whereIn('library_id', $publicLibraryIds))
-                ->count(),
-            'copies' => BookCopy::query()->whereIn('library_id', $publicLibraryIds)->count(),
-            'members' => User::query()
-                ->where('role', 'narys')
-                ->whereHas('libraryMemberships', fn ($membershipQuery) => $membershipQuery
+            return [
+                'books' => Book::query()
+                    ->whereHas('bookCopies', fn ($query) => $query->whereIn('library_id', $publicLibraryIds))
+                    ->count(),
+                'copies' => BookCopy::query()->whereIn('library_id', $publicLibraryIds)->count(),
+                'members' => User::query()
+                    ->where('role', 'narys')
+                    ->whereHas('libraryMemberships', fn ($membershipQuery) => $membershipQuery
+                        ->whereIn('library_id', $publicLibraryIds)
+                        ->where('is_active', true))
+                    ->distinct('users.id')
+                    ->count('users.id'),
+                'libraries' => $publicLibraryIds->count(),
+                'activeReservations' => Reservation::query()
+                    ->pending()
                     ->whereIn('library_id', $publicLibraryIds)
-                    ->where('is_active', true))
-                ->distinct('users.id')
-                ->count('users.id'),
-            'libraries' => $publicLibraryIds->count(),
-            'activeReservations' => Reservation::query()
-                ->pending()
-                ->whereIn('library_id', $publicLibraryIds)
-                ->count(),
-        ];
+                    ->count(),
+            ];
+        });
     }
 
     /**

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
-        @include('partials.head')
+        @include('partials.public-head')
     </head>
     <body class="min-h-screen bg-white text-slate-950 antialiased dark:bg-zinc-950 dark:text-white">
         @include('partials.public-header')
@@ -46,6 +46,5 @@
         </main>
 
         @include('partials.public-footer')
-        @fluxScripts
     </body>
 </html>
