@@ -7,6 +7,7 @@ use App\Actions\Reservations\CancelReservationAction;
 use App\Models\Book;
 use App\Models\BookCopy;
 use App\Models\Reservation;
+use App\Models\User;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -64,22 +65,34 @@ class ReservationHistory extends Component
 
     public function issueCurrent(): mixed
     {
+        return $this->issueFirstInQueue();
+    }
+
+    public function issueFirstInQueue(): mixed
+    {
         $actor = Auth::user();
 
         if (! $actor) {
             abort(403);
         }
 
-        $reservation = $this->currentReservation();
         $bookCopy = $this->firstAvailableCopy();
 
-        if (! $reservation || ! $bookCopy) {
-            $this->addError('reservation', 'Nėra rezervacijos, kuria butu galima išduoti.');
+        if (! $bookCopy) {
+            $this->addError('reservation', 'Nėra laisvo egzemplioriaus, kurį galėtumėte išduoti.');
 
             return null;
         }
 
-        Gate::authorize('update', $bookCopy);
+        Gate::authorize('borrow', $bookCopy);
+
+        $reservation = $this->currentReservation($bookCopy);
+
+        if (! $reservation) {
+            $this->addError('reservation', 'Nėra rezervacijos, kurią būtų galima išduoti šiam egzemplioriui.');
+
+            return null;
+        }
 
         try {
             app(BorrowBookCopyAction::class)->handle($actor, $bookCopy, [
@@ -102,14 +115,20 @@ class ReservationHistory extends Component
     public function render()
     {
         $reservations = $this->reservations();
-        $currentReservationId = $reservations->getCollection()->first(fn (Reservation $reservation) => $reservation->isPending())?->id;
-        $borrowableCopy = $this->firstBorrowableCopy();
+        $borrowableCopy = $this->firstAvailableCopy();
+        $currentReservationId = $this->currentReservation($borrowableCopy)?->id
+            ?? $reservations->getCollection()->first(fn (Reservation $reservation) => $reservation->isPending())?->id;
+        $canManage = $this->canManage();
+        $canIssueCurrent = $borrowableCopy !== null && $currentReservationId !== null && $canManage;
 
         return view('livewire.reservations.reservation-history', [
             'reservations' => $reservations,
             'currentReservationId' => $currentReservationId,
-            'canManage' => $this->canManage(),
-            'canIssueCurrent' => $borrowableCopy !== null && $this->canManage(),
+            'canManage' => $canManage,
+            'canIssueCurrent' => $canIssueCurrent,
+            'unavailableIssueMessage' => $canManage && $borrowableCopy === null
+                ? $this->unavailableIssueMessage()
+                : null,
         ]);
     }
 
@@ -189,7 +208,7 @@ class ReservationHistory extends Component
         return $actor && $actor->hasAnyEffectiveRole(['administratorius', 'darbuotojas']);
     }
 
-    private function currentReservation(): ?Reservation
+    private function currentReservation(?BookCopy $bookCopy = null): ?Reservation
     {
         $actor = Auth::user();
 
@@ -202,13 +221,30 @@ class ReservationHistory extends Component
             ->when(! $actor->isSuperAdmin(), function ($query) use ($actor) {
                 $query->where('library_id', $actor->activeLibraryId());
             })
+            ->when($bookCopy, function ($query) use ($bookCopy) {
+                $query->where('library_id', $bookCopy->library_id)
+                    ->where(function ($scopeQuery) use ($bookCopy) {
+                        $scopeQuery
+                            ->where(function ($libraryScopeQuery) {
+                                $libraryScopeQuery
+                                    ->where('scope', Reservation::SCOPE_LIBRARY)
+                                    ->whereNull('branch_id');
+                            })
+                            ->orWhere(function ($branchScopeQuery) use ($bookCopy) {
+                                $branchScopeQuery
+                                    ->where('scope', Reservation::SCOPE_BRANCH)
+                                    ->where('branch_id', $bookCopy->branch_id);
+                            });
+                    });
+            })
             ->with('user:id,name,email,membership_number')
             ->pending()
             ->orderBy('reserved_at')
+            ->orderBy('id')
             ->first();
     }
 
-    private function firstBorrowableCopy(): ?BookCopy
+    private function firstAvailableCopy(): ?BookCopy
     {
         $actor = Auth::user();
 
@@ -216,14 +252,41 @@ class ReservationHistory extends Component
             return null;
         }
 
+        $activeLibraryId = $actor->activeLibraryId();
+
+        if (! $activeLibraryId) {
+            return null;
+        }
+
         return BookCopy::query()
             ->where('book_id', $this->bookId)
-            ->when(! $actor->isSuperAdmin(), function ($query) use ($actor) {
-                $query->where('library_id', $actor->activeLibraryId());
+            ->where('library_id', $activeLibraryId)
+            ->where('status', BookCopy::STATUS_AVAILABLE)
+            ->when($actor->role === User::ROLE_STAFF, function ($query) use ($actor, $activeLibraryId) {
+                $branchId = $actor->assignedBranchId($activeLibraryId);
+
+                if ($branchId === null) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+
+                $query->where('branch_id', $branchId);
             })
-            ->where('status', 'laisva')
             ->orderBy('inventory_code')
             ->orderBy('id')
-            ->first();
+            ->get()
+            ->first(fn (BookCopy $bookCopy) => Gate::allows('borrow', $bookCopy));
+    }
+
+    private function unavailableIssueMessage(): string
+    {
+        $actor = Auth::user();
+
+        if ($actor?->role === User::ROLE_STAFF) {
+            return 'Jūsų filiale nėra laisvo egzemplioriaus išdavimui.';
+        }
+
+        return 'Šioje bibliotekoje nėra laisvo egzemplioriaus išdavimui.';
     }
 }

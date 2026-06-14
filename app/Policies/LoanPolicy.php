@@ -32,15 +32,10 @@ class LoanPolicy
         return $user->hasAnyEffectiveRole(['superadministratorius', 'administratorius', 'darbuotojas']);
     }
 
-  public function update(User $user, BookCopy $bookCopy): bool
-{
-    if ($user->isSuperAdmin()) {
-        return true;
+    public function update(User $user, BookCopy $bookCopy): bool
+    {
+        return $user->canManageBookCopy($bookCopy);
     }
-
-    return $user->hasAnyEffectiveRole(['administratorius', 'darbuotojas'], $bookCopy->library_id)
-        && $user->belongsToLibrary($bookCopy->library_id);
-}
 
     public function delete(User $user, Loan $loan): bool
     {

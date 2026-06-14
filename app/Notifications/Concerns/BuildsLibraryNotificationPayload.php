@@ -3,6 +3,7 @@
 namespace App\Notifications\Concerns;
 
 use App\Notifications\Channels\FcmChannel;
+use App\Support\Notifications\NotificationUiConfig;
 use Illuminate\Notifications\Messages\BroadcastMessage;
 
 trait BuildsLibraryNotificationPayload
@@ -13,10 +14,15 @@ trait BuildsLibraryNotificationPayload
     public function payload(): array
     {
         $notificationId = (string) ($this->id ?? '');
+        $ui = NotificationUiConfig::for($this->kind);
 
         return [
             'kind' => $this->kind,
-            'type' => $this->kind,
+            'type' => $ui['type'],
+            'ui' => $ui,
+            'category' => $ui['category'],
+            'icon' => $ui['icon'],
+            'color' => $ui['color'],
             'notification_id' => $notificationId,
             'title' => $this->title,
             'body' => $this->message,

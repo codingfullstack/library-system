@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\UserNotificationResource;
 use App\Queries\Notifications\GetUserNotificationsQuery;
+use App\Support\Notifications\NotificationUiConfig;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
 
@@ -29,23 +31,28 @@ class NotificationController extends Controller
 
         $allNotifications = $user->notifications();
         $unreadCount = (clone $allNotifications)->whereNull('read_at')->count();
-        $systemCount = (clone $allNotifications)->whereIn('type', ['system', 'new_user', 'qr_scan'])->count();
-        $reminderCount = (clone $allNotifications)->whereIn('type', ['loan_overdue', 'book_due_soon', 'reservation_ready'])->count();
-        $otherCount = max((clone $allNotifications)->count() - $systemCount - $reminderCount, 0);
+        $infoTypes = NotificationUiConfig::typesForCategory('info');
+        $loanTypes = NotificationUiConfig::typesForCategory('loan');
+        $warningTypes = NotificationUiConfig::typesForCategory('warning');
+        $reservationTypes = NotificationUiConfig::typesForCategory('reservation');
+
+        $infoCount = (clone $allNotifications)->whereIn('type', $infoTypes)->count();
+        $loanCount = (clone $allNotifications)->whereIn('type', $loanTypes)->count();
+        $warningCount = (clone $allNotifications)->whereIn('type', $warningTypes)->count();
+        $reservationCount = (clone $allNotifications)->whereIn('type', $reservationTypes)->count();
 
         return view('notifications.index', [
             'notifications' => $notifications,
             'unreadCount' => $unreadCount,
-            'overdueCount' => $user->notifications()->where('type', 'loan_overdue')->count(),
-            'reservationCount' => $user->notifications()->where('type', 'reservation_cancelled')->count(),
-            'systemCount' => $systemCount,
-            'reminderCount' => $reminderCount,
-            'otherCount' => $otherCount,
+            'loanCount' => $loanCount,
+            'reservationCount' => $reservationCount,
+            'infoCount' => $infoCount,
+            'warningCount' => $warningCount,
             'filters' => $filters,
         ]);
     }
 
-    public function markAllRead(Request $request): JsonResponse|\Illuminate\Http\RedirectResponse
+    public function markAllRead(Request $request): JsonResponse|RedirectResponse
     {
         $request->user()
             ->notifications()
@@ -54,14 +61,14 @@ class NotificationController extends Controller
 
         if ($request->expectsJson()) {
             return response()->json([
-                'message' => 'Pranesimai pazymeti kaip perskaityti.',
+                'message' => 'Pranešimai pažymėti kaip perskaityti.',
                 'unread_count' => $request->user()->unreadNotifications()->count(),
             ]);
         }
 
         return redirect()
             ->route('notifications.index', $request->only(['category', 'status', 'date', 'sort', 'per_page']))
-            ->with('status', 'Visi pranesimai pazymeti kaip perskaityti.');
+            ->with('status', 'Visi pranešimai pažymėti kaip perskaityti.');
     }
 
     public function unreadCount(Request $request): JsonResponse
@@ -95,7 +102,7 @@ class NotificationController extends Controller
         $notification->markAsRead();
 
         return response()->json([
-            'message' => 'Pranesimas pazymetas kaip perskaitytas.',
+            'message' => 'Pranešimas pažymėtas kaip perskaitytas.',
             'unread_count' => $request->user()->unreadNotifications()->count(),
         ]);
     }

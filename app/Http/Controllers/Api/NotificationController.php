@@ -40,7 +40,7 @@ class NotificationController extends Controller
             ->update(['read_at' => now()]);
 
         return response()->json([
-            'message' => 'Pranesimai pazymeti kaip perskaityti.',
+            'message' => 'Pranešimai pažymėti kaip perskaityti.',
             'unread_count' => $request->user()->unreadNotifications()->count(),
         ]);
     }
@@ -56,7 +56,7 @@ class NotificationController extends Controller
         $notification->markAsRead();
 
         return response()->json([
-            'message' => 'Pranesimas pazymetas kaip perskaitytas.',
+            'message' => 'Pranešimas pažymėtas kaip perskaitytas.',
             'unread_count' => $request->user()->unreadNotifications()->count(),
         ]);
     }

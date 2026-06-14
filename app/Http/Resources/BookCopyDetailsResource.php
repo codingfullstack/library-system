@@ -25,7 +25,7 @@ class BookCopyDetailsResource extends JsonResource
 
         if ($canViewOperationalDetails && $this->relationLoaded('book') && $this->book && $this->book->relationLoaded('reservations')) {
             $currentReservation = $this->book->reservations
-                ->filter(fn ($reservation) => $reservation->isPending())
+                ->filter(fn ($reservation) => $reservation->isPending() && $this->reservationAppliesToCopy($reservation))
                 ->sortBy('reserved_at')
                 ->first();
         }
@@ -35,8 +35,20 @@ class BookCopyDetailsResource extends JsonResource
                 ->with('user:id,name,email,membership_number')
                 ->where('library_id', $this->library_id)
                 ->where('book_id', $this->book_id)
+                ->where(function ($query) {
+                    $query->where(function ($libraryScopeQuery) {
+                        $libraryScopeQuery
+                            ->where('scope', Reservation::SCOPE_LIBRARY)
+                            ->whereNull('branch_id');
+                    })->orWhere(function ($branchScopeQuery) {
+                        $branchScopeQuery
+                            ->where('scope', Reservation::SCOPE_BRANCH)
+                            ->where('branch_id', $this->branch_id);
+                    });
+                })
                 ->pending()
                 ->orderBy('reserved_at')
+                ->orderBy('id')
                 ->first();
         }
 
@@ -119,8 +131,20 @@ class BookCopyDetailsResource extends JsonResource
                 : [],
         ];
     }
-}
 
+    private function reservationAppliesToCopy(Reservation $reservation): bool
+    {
+        if ((int) $reservation->library_id !== (int) $this->library_id) {
+            return false;
+        }
+
+        if ($reservation->scope === Reservation::SCOPE_BRANCH) {
+            return (int) $reservation->branch_id === (int) $this->branch_id;
+        }
+
+        return ($reservation->scope ?: Reservation::SCOPE_LIBRARY) === Reservation::SCOPE_LIBRARY;
+    }
+}
 
 
 

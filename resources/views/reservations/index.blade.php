@@ -15,11 +15,6 @@
                             <flux:icon.arrow-down-tray class="size-4" />
                             Eksportuoti
                         </a>
-
-                        <button type="button" class="inline-flex h-11 items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
-                            <flux:icon.funnel class="size-4" />
-                            Filtruoti
-                        </button>
                     </div>
                 </div>
 
@@ -190,12 +185,11 @@
                                 <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
                                     @foreach ($reservations as $reservation)
                                         @php
-                                            $statusMeta = match ($reservation->status) {
-                                                'rezervuota' => ['label' => 'Aktyvi', 'classes' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'],
-                                                'įvykdyta' => ['label' => 'Įvykdyta', 'classes' => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'],
-                                                'atšaukta' => ['label' => 'Atšaukta', 'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300'],
-                                                'pasibaigusi' => ['label' => 'Pasibaigusi', 'classes' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'],
-                                                default => ['label' => ucfirst((string) $reservation->status), 'classes' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'],
+                                            $statusMeta = match (true) {
+                                                $reservation->status === 'įvykdyta' || $reservation->fulfilled_at !== null => ['label' => 'Įvykdyta', 'classes' => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'],
+                                                $reservation->status === 'atšaukta' || $reservation->cancelled_at !== null => ['label' => 'Atšaukta', 'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300'],
+                                                $reservation->isPending() => ['label' => 'Aktyvi', 'classes' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'],
+                                                default => ['label' => 'Pasibaigusi', 'classes' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'],
                                             };
                                             $daysUntilExpiry = $reservation->expires_at ? now()->startOfDay()->diffInDays($reservation->expires_at->copy()->startOfDay(), false) : null;
                                         @endphp

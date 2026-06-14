@@ -29,6 +29,15 @@
                 </div>
             </div>
         @endif
+    @elseif($returnUnavailableTitle)
+        <button
+            type="button"
+            class="app-button-secondary w-full opacity-60"
+            title="{{ $returnUnavailableTitle }}"
+            disabled
+        >
+            Grąžinti negalima
+        </button>
     @endif
 </div>
 

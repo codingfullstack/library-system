@@ -18,6 +18,7 @@ use App\Models\Reservation;
 use App\Models\ScanLog;
 use App\Models\User;
 use App\Support\GeneratesSlugs;
+use App\Support\Notifications\NotificationUiConfig;
 use App\Support\UserManagement;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Seeder;
@@ -25,6 +26,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class DemoLibrarySeeder extends Seeder
 {
@@ -140,6 +142,9 @@ class DemoLibrarySeeder extends Seeder
                 'Kalniečiai',
             ]);
 
+            $this->assignStaffBranch($staffX, $libraryX, $branchesX->first());
+            $this->assignStaffBranch($staffY, $libraryY, $branchesY->first());
+
             $employeesX = collect([$adminX, $staffX]);
             $employeesY = collect([$adminY, $staffY]);
 
@@ -154,6 +159,12 @@ class DemoLibrarySeeder extends Seeder
 
             $this->seedAuditLogsForLibrary($libraryX, $books, $copiesX, $employeesX, $membersX);
             $this->seedAuditLogsForLibrary($libraryY, $books, $copiesY, $employeesY, $membersY);
+
+            $eglePetrauskaite = $membersX->firstWhere('email', 'egle.petrauskaite@example.com');
+
+            if ($eglePetrauskaite) {
+                $this->seedNotificationCatalogForEglePetrauskaite($eglePetrauskaite, $staffX, $libraryX, $books);
+            }
         });
     }
 
@@ -323,6 +334,18 @@ class DemoLibrarySeeder extends Seeder
                 'joined_at' => $user->created_at,
             ]
         );
+    }
+
+    private function assignStaffBranch(User $user, Library $library, ?Branch $branch): void
+    {
+        if (! $branch || $user->role !== User::ROLE_STAFF) {
+            return;
+        }
+
+        LibraryMembership::query()
+            ->where('library_id', $library->id)
+            ->where('user_id', $user->id)
+            ->update(['branch_id' => $branch->id]);
     }
 
     /**
@@ -1010,6 +1033,132 @@ class DemoLibrarySeeder extends Seeder
                     ],
                 ], $createdAt);
             }
+        }
+    }
+
+    /**
+     * @param  Collection<int, Book>  $books
+     */
+    private function seedNotificationCatalogForEglePetrauskaite(User $member, User $sender, Library $library, Collection $books): void
+    {
+        $member->notifications()
+            ->get()
+            ->filter(fn ($notification) => (bool) data_get($notification->data, 'metadata.demo_notification_catalog'))
+            ->each->delete();
+
+        $bookTitle = $books->first()?->title ?: 'Demo knyga';
+        $notificationDefinitions = [
+            'reservation_created' => [
+                'title' => 'Rezervacija sukurta',
+                'message' => sprintf('Jūs sėkmingai rezervavote knygą "%s". Jūsų vieta eilėje: 1.', $bookTitle),
+            ],
+            'reservation_queue_changed' => [
+                'title' => 'Rezervacijos eilė pasikeitė',
+                'message' => sprintf('Knygos "%s" rezervacijos eilėje dabar esate 1 vietoje.', $bookTitle),
+            ],
+            'reservation_ready' => [
+                'title' => 'Rezervacija paruošta',
+                'message' => sprintf('Knyga "%s" jau laukia jūsų. Atsiimkite iki rytojaus darbo pabaigos.', $bookTitle),
+            ],
+            'reservation_cancelled' => [
+                'title' => 'Rezervacija atšaukta',
+                'message' => sprintf('Jūsų rezervacija knygai "%s" buvo atšaukta bibliotekos darbuotojo.', $bookTitle),
+            ],
+            'reservation_fulfilled' => [
+                'title' => 'Rezervacija įvykdyta',
+                'message' => sprintf('Pagal jūsų rezervaciją išduota knyga "%s".', $bookTitle),
+            ],
+            'loan_overdue' => [
+                'title' => 'Vėluojate grąžinti knygą',
+                'message' => sprintf('Knygos "%s" grąžinimo terminas jau praėjo. Prašome susisiekti su biblioteka.', $bookTitle),
+            ],
+            'book_due_soon' => [
+                'title' => 'Artėja grąžinimo terminas',
+                'message' => sprintf('Knygą "%s" reikės grąžinti per artimiausias 2 dienas.', $bookTitle),
+            ],
+            'book_returned' => [
+                'title' => 'Knyga grąžinta',
+                'message' => sprintf('Knyga "%s" sėkmingai grąžinta. Ačiū, kad naudojatės biblioteka.', $bookTitle),
+            ],
+            'library_membership_added' => [
+                'title' => 'Pridėta bibliotekos narystė',
+                'message' => sprintf('Jūs buvote pridėta prie bibliotekos "%s".', $library->name),
+            ],
+            'system' => [
+                'title' => 'Sistemos pranešimas',
+                'message' => 'Bibliotekos sistema atnaujino jūsų paskyros informaciją.',
+            ],
+            'new_user' => [
+                'title' => 'Paskyra aktyvuota',
+                'message' => 'Jūsų skaitytojo paskyra aktyvuota ir paruošta naudojimui.',
+            ],
+            'qr_scan' => [
+                'title' => 'QR kodas nuskaitytas',
+                'message' => 'Jūsų skaitytojo QR kodas sėkmingai nuskaitytas bibliotekoje.',
+            ],
+            'report_ready' => [
+                'title' => 'Ataskaita paruošta',
+                'message' => 'Jūsų prašyta bibliotekos ataskaita paruošta peržiūrai.',
+            ],
+            'issuance_summary' => [
+                'title' => 'Išdavimo suvestinė',
+                'message' => 'Paruošta nauja jūsų išduotų ir grąžintų knygų suvestinė.',
+            ],
+            'system_warning' => [
+                'title' => 'Sistemos įspėjimas',
+                'message' => 'Sistemai reikalingas jūsų dėmesys: patikrinkite paskyros duomenis.',
+            ],
+            'system_error' => [
+                'title' => 'Sistemos klaida',
+                'message' => 'Nepavyko atlikti vieno veiksmo. Bandykite dar kartą arba kreipkitės į biblioteką.',
+            ],
+            'account_security' => [
+                'title' => 'Paskyros saugumas',
+                'message' => 'Užfiksuotas naujas prisijungimas prie jūsų paskyros.',
+            ],
+        ];
+
+        foreach ($notificationDefinitions as $index => $definition) {
+            $kind = (string) $index;
+            $ui = NotificationUiConfig::for($kind);
+            $id = (string) Str::uuid();
+            $createdAt = now()->subMinutes((count($notificationDefinitions) - array_search($kind, array_keys($notificationDefinitions), true)) * 8);
+
+            $member->notifications()->create([
+                'id' => $id,
+                'type' => $kind,
+                'data' => [
+                    'kind' => $kind,
+                    'type' => $ui['type'],
+                    'ui' => $ui,
+                    'category' => $ui['category'],
+                    'icon' => $ui['icon'],
+                    'color' => $ui['color'],
+                    'notification_id' => $id,
+                    'title' => $definition['title'],
+                    'body' => $definition['message'],
+                    'message' => $definition['message'],
+                    'url' => route('notifications.index', absolute: false),
+                    'deep_link' => "libraryapp://notification/{$id}",
+                    'created_at' => $createdAt->toIso8601String(),
+                    'related_type' => null,
+                    'related_id' => null,
+                    'metadata' => [
+                        'demo_notification_catalog' => true,
+                        'library_id' => $library->id,
+                        'library_name' => $library->name,
+                        'book_title' => $bookTitle,
+                        'sender' => [
+                            'id' => $sender->id,
+                            'name' => $sender->name,
+                            'email' => $sender->email,
+                        ],
+                    ],
+                ],
+                'read_at' => $kind === 'system' ? $createdAt->copy()->addMinutes(5) : null,
+                'created_at' => $createdAt,
+                'updated_at' => $createdAt,
+            ]);
         }
     }
 

@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\BookDetailsResource;
 use App\Http\Resources\BookResource;
+use App\Models\Book;
 use App\Queries\Books\GetLibraryBookDetailsQuery;
 use App\Queries\Books\GetLibraryBooksQuery;
-use App\Models\Book;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -51,7 +51,7 @@ class BookController extends Controller
         GetLibraryBookDetailsQuery $getLibraryBookDetailsQuery
     ): JsonResponse {
         $validated = $request->validate([
-            'copy_status' => ['nullable', Rule::in(['laisva', 'iÅ¡duota', 'prarasta', 'sugadinta', 'tvarkoma', 'nuraÅ¡yta'])],
+            'copy_status' => ['nullable', Rule::in(['laisva', 'išduota', 'prarasta', 'sugadinta', 'tvarkoma', 'nurašyta'])],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'location_id' => ['nullable', 'integer', 'exists:locations,id'],
         ]);
@@ -67,11 +67,3 @@ class BookController extends Controller
         );
     }
 }
-
-
-
-
-
-
-
-

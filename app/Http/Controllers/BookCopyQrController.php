@@ -27,9 +27,16 @@ class BookCopyQrController extends Controller
         $writer = new Writer($renderer);
         $svg = $writer->writeString($copy->qr_code);
 
-        return response($svg, 200, [
+        $headers = [
             'Content-Type' => 'image/svg+xml',
-        ]);
+        ];
+
+        if (request()->boolean('download')) {
+            $baseName = preg_replace('/[^A-Za-z0-9._-]+/', '-', $copy->inventory_code ?: 'book-copy-'.$copy->id);
+            $headers['Content-Disposition'] = 'attachment; filename="'.$baseName.'-qr.svg"';
+        }
+
+        return response($svg, 200, $headers);
     }
 }
 

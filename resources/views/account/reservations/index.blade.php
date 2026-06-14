@@ -153,17 +153,17 @@
                                     @foreach($reservations as $reservation)
                                         @php
                                             $statusLabel = match (true) {
-                                                $reservation->isCurrent() => 'Paruošta atsiimti',
-                                                $reservation->isPending() => 'Aktyvi',
                                                 $reservation->status === 'įvykdyta' || ! is_null($reservation->fulfilled_at) => 'Įvykdyta',
                                                 $reservation->status === 'atšaukta' || ! is_null($reservation->cancelled_at) => 'Atšaukta',
-                                                $reservation->status === 'pasibaigusi' => 'Pasibaigusi',
-                                                default => $reservation->status,
+                                                $reservation->isCurrent() => 'Paruošta atsiimti',
+                                                $reservation->isPending() => 'Aktyvi',
+                                                default => 'Pasibaigusi',
                                             };
 
-                                            $statusClasses = match ($reservation->status) {
-                                                'įvykdyta' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
-                                                'atšaukta', 'pasibaigusi' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300',
+                                            $statusClasses = match (true) {
+                                                $reservation->status === 'įvykdyta' || ! is_null($reservation->fulfilled_at) => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
+                                                $reservation->status === 'atšaukta' || ! is_null($reservation->cancelled_at) => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300',
+                                                ! $reservation->isPending() => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
                                                 default => $reservation->isCurrent()
                                                     ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300'
                                                     : 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',

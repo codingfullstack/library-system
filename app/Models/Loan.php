@@ -92,6 +92,37 @@ class Loan extends Model
         return $this->due_at->diffInDays(now());
     }
 
+    public function isDueSoon(): bool
+    {
+        if ($this->returned_at !== null || $this->due_at === null || $this->isOverdue()) {
+            return false;
+        }
+
+        return $this->due_at->between(now(), now()->addDays(7));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function statusLabels(): array
+    {
+        return [
+            self::STATUS_ACTIVE => 'Aktyvi',
+            self::STATUS_OVERDUE => 'Vėluoja',
+            self::STATUS_RETURNED => 'Grąžinta',
+            self::STATUS_LOST => 'Prarasta',
+        ];
+    }
+
+    public function statusLabel(): string
+    {
+        if ($this->isOverdue() && $this->status === self::STATUS_ACTIVE) {
+            return self::statusLabels()[self::STATUS_OVERDUE];
+        }
+
+        return self::statusLabels()[$this->status] ?? (string) $this->status;
+    }
+
     public function getIsOverdueAttribute(): bool
     {
         return $this->isOverdue();

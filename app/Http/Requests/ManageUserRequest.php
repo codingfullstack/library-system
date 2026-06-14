@@ -31,6 +31,12 @@ class ManageUserRequest extends FormRequest
                 'integer',
                 'exists:libraries,id',
             ],
+            'branch_id' => [
+                Rule::requiredIf(fn () => (string) $this->input('role') === User::ROLE_STAFF),
+                'nullable',
+                'integer',
+                Rule::exists('branches', 'id')->where(fn ($query) => $query->where('library_id', $this->input('library_id'))),
+            ],
             'phone' => ['nullable', 'string', 'max:255'],
             'is_active' => ['nullable', 'boolean'],
             'password' => [
@@ -66,6 +72,10 @@ class ManageUserRequest extends FormRequest
 
                 if ($role === 'superadministratorius' && $libraryId) {
                     $validator->errors()->add('library_id', 'Superadmin rolei biblioteka nepriskiriama.');
+                }
+
+                if ($role !== User::ROLE_STAFF && $this->input('branch_id')) {
+                    $validator->errors()->add('branch_id', 'Filialas priskiriamas tik darbuotojui.');
                 }
             },
         ];

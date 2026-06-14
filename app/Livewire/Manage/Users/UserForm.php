@@ -3,6 +3,7 @@
 namespace App\Livewire\Manage\Users;
 
 use App\Actions\AuditLogs\RecordAuditLogAction;
+use App\Models\Branch;
 use App\Models\Library;
 use App\Models\User;
 use App\Support\AuditLogChanges;
@@ -25,6 +26,8 @@ class UserForm extends Component
     public string $role = 'narys';
 
     public $libraryId = null;
+
+    public $branchId = null;
 
     public string $phone = '';
 
@@ -49,6 +52,7 @@ class UserForm extends Component
             $this->email = $managedUser->email;
             $this->role = $managedUser->role;
             $this->libraryId = $managedUser->defaultLibraryId();
+            $this->branchId = $managedUser->assignedBranchId($this->libraryId);
             $this->phone = (string) ($managedUser->phone ?? '');
             $this->isActive = (bool) $managedUser->is_active;
 
@@ -69,11 +73,16 @@ class UserForm extends Component
 
         if (! UserManagement::requiresLibrary($value)) {
             $this->libraryId = null;
+            $this->branchId = null;
             return;
         }
 
         if (! $actor->isSuperAdmin()) {
             $this->libraryId = $actor->activeLibraryId();
+        }
+
+        if ($value !== User::ROLE_STAFF) {
+            $this->branchId = null;
         }
     }
 
@@ -87,11 +96,16 @@ class UserForm extends Component
             abort_unless(UserManagement::canManageUser($actor, $this->managedUser), 404);
         }
 
+        if ($actor->id === $this->managedUser?->id) {
+            $this->guardSelfMutation($actor);
+        }
+
         $this->validate($this->rules(), [], [
             'name' => 'vardas',
             'email' => 'el. paštas',
             'role' => 'role',
             'libraryId' => 'biblioteka',
+            'branchId' => 'filialas',
             'phone' => 'telefonas',
             'isActive' => 'aktyvumas',
             'password' => 'slaptažodis',
@@ -106,13 +120,14 @@ class UserForm extends Component
         if ($actor->isSuperAdmin()) {
             if (! UserManagement::requiresLibrary($this->role)) {
                 $this->libraryId = null;
+                $this->branchId = null;
             }
         } else {
             $this->libraryId = $actor->activeLibraryId();
         }
 
-        if ($actor->id === $this->managedUser?->id) {
-            $this->guardSelfMutation($actor);
+        if ($this->role !== User::ROLE_STAFF) {
+            $this->branchId = null;
         }
 
         if ($this->managedUser?->isSuperAdmin() && $this->role !== 'superadministratorius') {
@@ -191,6 +206,7 @@ class UserForm extends Component
             'libraries' => $actor?->isSuperAdmin()
                 ? Library::query()->orderBy('name')->get(['id', 'name', 'code'])
                 : collect(),
+            'branches' => $this->availableBranches(),
             'previewMembershipNumber' => $this->previewMembershipNumber(),
         ]);
     }
@@ -209,6 +225,12 @@ class UserForm extends Component
                 'nullable',
                 'integer',
                 'exists:libraries,id',
+            ],
+            'branchId' => [
+                Rule::requiredIf(fn () => $this->role === User::ROLE_STAFF),
+                'nullable',
+                'integer',
+                Rule::exists('branches', 'id')->where(fn ($query) => $query->where('library_id', $this->libraryId)),
             ],
             'phone' => ['nullable', 'string', 'max:255'],
             'isActive' => ['boolean'],
@@ -275,7 +297,23 @@ class UserForm extends Component
             return;
         }
 
-        UserManagement::syncLibraryMembership($user, (int) $this->libraryId);
+        UserManagement::syncLibraryMembership(
+            $user,
+            (int) $this->libraryId,
+            $this->branchId ? (int) $this->branchId : null
+        );
+    }
+
+    private function availableBranches()
+    {
+        if (! $this->libraryId || $this->role !== User::ROLE_STAFF) {
+            return collect();
+        }
+
+        return Branch::query()
+            ->where('library_id', $this->libraryId)
+            ->orderBy('name')
+            ->get(['id', 'name', 'code']);
     }
 
     private function ensureAnotherSuperAdminExists(User $user): void

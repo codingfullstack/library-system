@@ -112,6 +112,38 @@ it('filters book copies on the book page by status branch and location', functio
     $response->assertDontSee('INV-OTHER-001');
 });
 
+it('searches book copies on the book page', function () {
+    $library = Library::factory()->create();
+    $user = User::factory()->staff()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create(['title' => 'Ieškoma knyga']);
+
+    BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'inventory_code' => 'LIB-X-X-026',
+        'barcode' => 'BAR-026',
+        'qr_code' => 'QR-026',
+    ]);
+
+    BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'inventory_code' => 'LIB-X-X-999',
+        'barcode' => 'BAR-999',
+        'qr_code' => 'QR-999',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('books.show', [
+        'book' => $book,
+        'copy_search' => 'X-026',
+    ]));
+
+    $response->assertOk();
+    $response->assertSee('LIB-X-X-026');
+    $response->assertDontSee('LIB-X-X-999');
+    $response->assertSee('value="X-026"', false);
+});
+
 it('uses only Lithuanian slug based book URLs', function () {
     $library = Library::factory()->create();
     $user = User::factory()->member()->create(['library_id' => $library->id]);
@@ -303,6 +335,39 @@ it('filters reservations by queue and library', function () {
     $response->assertDontSee('Antras narys');
     $response->assertDontSee('Kitos bibliotekos narys');
     $response->assertSee('1');
+});
+
+it('does not show expired reserved reservations as active on the reservations page', function () {
+    $library = Library::factory()->create();
+    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $member = User::factory()->member()->create(['library_id' => $library->id, 'name' => 'Lukas Petrauskas']);
+    $book = Book::factory()->create(['title' => 'Haris Poteris ir Išminties akmuo']);
+
+    Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $member->id,
+        'status' => Reservation::STATUS_RESERVED,
+        'reserved_at' => now()->subDays(10),
+        'expires_at' => now()->subDay(),
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+
+    $this->actingAs($staff)
+        ->get(route('reservations.index', [
+            'search' => 'haris',
+            'status' => Reservation::STATUS_RESERVED,
+        ]))
+        ->assertOk()
+        ->assertDontSee('Haris Poteris ir Išminties akmuo');
+
+    $this->actingAs($staff)
+        ->get(route('reservations.index', ['search' => 'haris']))
+        ->assertOk()
+        ->assertSee('Haris Poteris ir Išminties akmuo')
+        ->assertSee('Pasibaigusi')
+        ->assertDontSee('>Aktyvi</span>', false);
 });
 
 it('shows global management search results for visible entities', function () {

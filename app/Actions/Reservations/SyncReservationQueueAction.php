@@ -2,63 +2,81 @@
 
 namespace App\Actions\Reservations;
 
-use App\Actions\Notifications\CreateUserNotificationAction;
-use App\Models\BookCopy;
 use App\Models\Reservation;
+use App\Services\ReservationNotificationService;
+use App\Services\ReservationQueueService;
 use Illuminate\Database\Eloquent\Builder;
 
 class SyncReservationQueueAction
 {
     private const DEFAULT_WINDOW_DAYS = 14;
 
+    public function __construct(
+        private readonly ReservationQueueService $queueService,
+        private readonly ReservationNotificationService $notificationService,
+    ) {}
+
     public function handle(int $libraryId, int $bookId): void
     {
         $this->expireElapsedReservations($libraryId, $bookId);
 
-        $firstReservation = $this->firstPendingReservation($libraryId, $bookId);
+        $this->syncQueue($libraryId, $bookId, Reservation::SCOPE_LIBRARY, null);
+
+        Reservation::query()
+            ->where('library_id', $libraryId)
+            ->where('book_id', $bookId)
+            ->where('scope', Reservation::SCOPE_BRANCH)
+            ->pending()
+            ->whereNotNull('branch_id')
+            ->distinct()
+            ->pluck('branch_id')
+            ->each(fn ($branchId) => $this->syncQueue($libraryId, $bookId, Reservation::SCOPE_BRANCH, (int) $branchId));
+    }
+
+    private function syncQueue(int $libraryId, int $bookId, string $scope, ?int $branchId): void
+    {
+        $pendingReservations = $this->queueService->pendingReservations($libraryId, $bookId, $scope, $branchId);
+        $firstReservation = $pendingReservations->first();
 
         if (! $firstReservation) {
             return;
         }
 
-        if (! $this->hasAvailableCopies($libraryId, $bookId)) {
-            $this->pendingReservationsQuery($libraryId, $bookId)
+        if (! $this->queueService->hasAvailableCopies($libraryId, $bookId, $scope, $branchId)) {
+            $this->pendingReservationsQuery($libraryId, $bookId, $scope, $branchId)
                 ->whereNotNull('expires_at')
                 ->update(['expires_at' => null]);
+
+            $pendingReservations->each(
+                fn (Reservation $reservation) => $this->notificationService->notifyQueuePositionChanged($reservation)
+            );
 
             return;
         }
 
-        if ($firstReservation && ($firstReservation->expires_at === null || $firstReservation->expires_at->isPast())) {
+        if ($firstReservation->expires_at === null || $firstReservation->expires_at->isPast()) {
+            $firstReservation = Reservation::query()
+                ->with(['user:id,name,email', 'book:id,slug,title'])
+                ->findOrFail($firstReservation->id);
+
             $firstReservation->update([
                 'expires_at' => now()->addDays(self::DEFAULT_WINDOW_DAYS),
             ]);
 
-            app(CreateUserNotificationAction::class)->handle(
-                $firstReservation->user,
-                null,
-                'reservation_ready',
-                'Rezervacija paruošta',
-                sprintf(
-                    'Knyga "%s" jau laukia jūsų. Atsiimkite iki %s.',
-                    $firstReservation->book?->title ?: 'nežinoma knyga',
-                    $firstReservation->expires_at?->format('Y-m-d H:i') ?: '-'
-                ),
-                [
-                    'reservation_id' => $firstReservation->id,
-                    'book_id' => $firstReservation->book_id,
-                    'book_title' => $firstReservation->book?->title,
-                    'expires_at' => $firstReservation->expires_at?->toDateTimeString(),
-                ],
-                Reservation::class,
-                $firstReservation->id
-            );
+            $firstReservation->refresh();
+            $firstReservation->setAttribute('queue_position', 1);
+
+            $this->notificationService->notifyReady($firstReservation);
         }
 
-        $this->pendingReservationsQuery($libraryId, $bookId)
+        $this->pendingReservationsQuery($libraryId, $bookId, $scope, $branchId)
             ->whereKeyNot($firstReservation->id)
             ->whereNotNull('expires_at')
             ->update(['expires_at' => null]);
+
+        $pendingReservations->each(
+            fn (Reservation $reservation) => $this->notificationService->notifyQueuePositionChanged($reservation)
+        );
     }
 
     private function expireElapsedReservations(int $libraryId, int $bookId): void
@@ -74,29 +92,8 @@ class SyncReservationQueueAction
             ->update(['status' => Reservation::STATUS_EXPIRED]);
     }
 
-    private function hasAvailableCopies(int $libraryId, int $bookId): bool
+    private function pendingReservationsQuery(int $libraryId, int $bookId, string $scope, ?int $branchId): Builder
     {
-        return BookCopy::query()
-            ->withoutGlobalScope('library')
-            ->where('library_id', $libraryId)
-            ->where('book_id', $bookId)
-            ->where('status', BookCopy::STATUS_AVAILABLE)
-            ->exists();
-    }
-
-    private function firstPendingReservation(int $libraryId, int $bookId): ?Reservation
-    {
-        return $this->pendingReservationsQuery($libraryId, $bookId)
-            ->with(['user:id,name,email', 'book:id,slug,title'])
-            ->first();
-    }
-
-    private function pendingReservationsQuery(int $libraryId, int $bookId): Builder
-    {
-        return Reservation::query()
-            ->where('library_id', $libraryId)
-            ->where('book_id', $bookId)
-            ->pending()
-            ->orderBy('reserved_at');
+        return $this->queueService->pendingReservationsQuery($libraryId, $bookId, $scope, $branchId);
     }
 }

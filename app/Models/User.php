@@ -249,6 +249,52 @@ class User extends Authenticatable
             ->exists();
     }
 
+    public function assignedBranchId(int|string|null $libraryId = null): ?int
+    {
+        if ($this->role !== self::ROLE_STAFF) {
+            return null;
+        }
+
+        $libraryId = $libraryId ?: $this->activeLibraryId();
+
+        if (empty($libraryId)) {
+            return null;
+        }
+
+        $membership = $this->relationLoaded('libraryMemberships')
+            ? $this->libraryMemberships
+                ->where('is_active', true)
+                ->firstWhere('library_id', (int) $libraryId)
+            : $this->activeLibraryMemberships()
+                ->where('library_id', $libraryId)
+                ->first();
+
+        return $membership?->branch_id ? (int) $membership->branch_id : null;
+    }
+
+    public function canManageBookCopy(BookCopy $bookCopy): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        if (! $this->belongsToLibrary($bookCopy->library_id)) {
+            return false;
+        }
+
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        if ($this->role !== self::ROLE_STAFF) {
+            return false;
+        }
+
+        $branchId = $this->assignedBranchId($bookCopy->library_id);
+
+        return $branchId !== null && (int) $bookCopy->branch_id === $branchId;
+    }
+
     public function libraryRole(int|string|null $libraryId): ?string
     {
         if (empty($libraryId)) {

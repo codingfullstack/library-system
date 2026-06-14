@@ -4,6 +4,7 @@ namespace App\Livewire\Loans;
 
 use App\Actions\Loans\ReturnBookCopyAction;
 use App\Models\BookCopy;
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -43,7 +44,7 @@ class ReturnBookCopyForm extends Component
             abort(403);
         }
 
-        Gate::authorize('update', $this->bookCopy);
+        Gate::authorize('return', $this->bookCopy);
 
         try {
             app(ReturnBookCopyAction::class)->handle($actor, $this->bookCopy->fresh());
@@ -64,6 +65,7 @@ class ReturnBookCopyForm extends Component
     {
         return view('livewire.loans.return-book-copy-form', [
             'canReturn' => $this->canReturn(),
+            'returnUnavailableTitle' => $this->returnUnavailableTitle(),
         ]);
     }
 
@@ -73,7 +75,26 @@ class ReturnBookCopyForm extends Component
 
         return $actor
             && $this->bookCopy->activeLoan !== null
-            && Gate::allows('update', $this->bookCopy);
+            && Gate::allows('return', $this->bookCopy);
+    }
+
+    private function returnUnavailableTitle(): ?string
+    {
+        $actor = Auth::user();
+
+        if (! $actor || $this->canReturn()) {
+            return null;
+        }
+
+        if (
+            $actor->role === User::ROLE_STAFF
+            && $actor->belongsToLibrary($this->bookCopy->library_id)
+            && ! $actor->canManageBookCopy($this->bookCopy)
+        ) {
+            return 'Negalima priimti grąžinimo: egzempliorius priklauso kitam filialui.';
+        }
+
+        return null;
     }
 
     private function mapActionField(string $field): string

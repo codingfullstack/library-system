@@ -17,6 +17,8 @@ class ReservationResource extends JsonResource
             'library_id' => $this->library_id,
             'book_id' => $this->book_id,
             'user_id' => $this->user_id,
+            'scope' => $this->scope,
+            'branch_id' => $this->branch_id,
             'status' => $this->status,
             'status_label' => $this->statusLabel(),
             'reserved_at' => $this->reserved_at,
@@ -48,6 +50,12 @@ class ReservationResource extends JsonResource
                     'id' => $this->library->id,
                     'name' => $this->library->name,
                 ];
+            }),
+            'branch' => $this->whenLoaded('branch', function () {
+                return $this->branch ? [
+                    'id' => $this->branch->id,
+                    'name' => $this->branch->name,
+                ] : null;
             }),
         ];
     }

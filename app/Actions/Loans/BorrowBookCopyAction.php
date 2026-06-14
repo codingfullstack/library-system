@@ -37,6 +37,12 @@ class BorrowBookCopyAction
      */
     private function issueLocked(User $authUser, BookCopy $bookCopy, array $validated): array
     {
+        if (! $authUser->canManageBookCopy($bookCopy)) {
+            throw ValidationException::withMessages([
+                'book_copy' => ['Neturite teisės išduoti kito filialo egzemplioriaus.'],
+            ]);
+        }
+
         if ($bookCopy->status !== BookCopy::STATUS_AVAILABLE) {
             throw ValidationException::withMessages([
                 'book_copy' => ['Šios kopijos išduoti negalima.'],
@@ -61,8 +67,20 @@ class BorrowBookCopyAction
         $pendingReservations = Reservation::query()
             ->where('library_id', $bookCopy->library_id)
             ->where('book_id', $bookCopy->book_id)
+            ->where(function ($query) use ($bookCopy) {
+                $query->where(function ($libraryScopeQuery) {
+                    $libraryScopeQuery
+                        ->where('scope', Reservation::SCOPE_LIBRARY)
+                        ->whereNull('branch_id');
+                })->orWhere(function ($branchScopeQuery) use ($bookCopy) {
+                    $branchScopeQuery
+                        ->where('scope', Reservation::SCOPE_BRANCH)
+                        ->where('branch_id', $bookCopy->branch_id);
+                });
+            })
             ->pending()
             ->orderBy('reserved_at')
+            ->orderBy('id')
             ->lockForUpdate()
             ->get();
 

@@ -28,22 +28,22 @@ class BookCopyPolicy
 
     public function update(User $user, BookCopy $bookCopy): bool
     {
-        if ($user->isSuperAdmin()) {
-            return true;
-        }
-
-        return $user->hasAnyEffectiveRole(['administratorius', 'darbuotojas'], $bookCopy->library_id)
-            && $user->belongsToLibrary($bookCopy->library_id);
+        return $user->canManageBookCopy($bookCopy);
     }
 
     public function delete(User $user, BookCopy $bookCopy): bool
     {
-        if ($user->isSuperAdmin()) {
-            return true;
-        }
+        return $user->canManageBookCopy($bookCopy);
+    }
 
-        return $user->hasAnyEffectiveRole(['administratorius', 'darbuotojas'], $bookCopy->library_id)
-            && $user->belongsToLibrary($bookCopy->library_id);
+    public function borrow(User $user, BookCopy $bookCopy): bool
+    {
+        return $user->canManageBookCopy($bookCopy);
+    }
+
+    public function return(User $user, BookCopy $bookCopy): bool
+    {
+        return $user->canManageBookCopy($bookCopy);
     }
 }
 

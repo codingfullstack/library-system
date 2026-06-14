@@ -33,6 +33,12 @@ class ReturnBookCopyAction
      */
     private function returnLocked(User $authUser, BookCopy $bookCopy): array
     {
+        if (! $authUser->canManageBookCopy($bookCopy)) {
+            throw ValidationException::withMessages([
+                'book_copy' => ['Neturite teisės priimti kito filialo egzemplioriaus grąžinimo.'],
+            ]);
+        }
+
         $activeLoan = $bookCopy->activeLoan()
             ->lockForUpdate()
             ->first();

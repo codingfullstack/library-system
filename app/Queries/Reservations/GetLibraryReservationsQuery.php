@@ -18,24 +18,7 @@ class GetLibraryReservationsQuery
     {
         $perPage = max(1, min((int) ($filters['per_page'] ?? 25), 100));
 
-        $queuePositionSubquery = DB::table('reservations as queue_reservations')
-            ->selectRaw('COUNT(*)')
-            ->whereColumn('queue_reservations.book_id', 'reservations.book_id')
-            ->whereColumn('queue_reservations.library_id', 'reservations.library_id')
-            ->where('queue_reservations.status', Reservation::STATUS_RESERVED)
-            ->whereNull('queue_reservations.fulfilled_at')
-            ->whereNull('queue_reservations.cancelled_at')
-            ->where(function ($expiresQuery) {
-                $expiresQuery->whereNull('queue_reservations.expires_at')
-                    ->orWhere('queue_reservations.expires_at', '>', now());
-            })
-            ->where(function ($queueQuery) {
-                $queueQuery->whereColumn('queue_reservations.reserved_at', '<', 'reservations.reserved_at')
-                    ->orWhere(function ($sameTimeQuery) {
-                        $sameTimeQuery->whereColumn('queue_reservations.reserved_at', '=', 'reservations.reserved_at')
-                            ->whereColumn('queue_reservations.id', '<=', 'reservations.id');
-                    });
-            });
+        $queuePositionSubquery = $this->queuePositionSubquery();
 
         $query = $this->baseQuery($user, $filters)
             ->select('reservations.*')
@@ -44,6 +27,7 @@ class GetLibraryReservationsQuery
                 'book:id,slug,title,subtitle,isbn',
                 'user:id,name,email,membership_number',
                 'library:id,name',
+                'branch:id,name',
             ]);
 
         $queue = $filters['queue'] ?? null;
@@ -57,7 +41,8 @@ class GetLibraryReservationsQuery
         }
 
         return $query
-            ->latest()
+            ->orderByDesc('reserved_at')
+            ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
     }
@@ -72,10 +57,10 @@ class GetLibraryReservationsQuery
 
         return [
             'all_count' => (clone $baseQuery)->count(),
-            'active_count' => (clone $baseQuery)->where('status', Reservation::STATUS_RESERVED)->count(),
+            'active_count' => (clone $baseQuery)->pending()->count(),
             'fulfilled_count' => (clone $baseQuery)->where('status', Reservation::STATUS_FULFILLED)->count(),
             'cancelled_count' => (clone $baseQuery)->where('status', Reservation::STATUS_CANCELLED)->count(),
-            'expired_count' => (clone $baseQuery)->where('status', Reservation::STATUS_EXPIRED)->count(),
+            'expired_count' => (clone $baseQuery)->expired()->count(),
         ];
     }
 
@@ -93,7 +78,7 @@ class GetLibraryReservationsQuery
 
         return Reservation::query()
             ->when(! empty($libraryId), fn ($builder) => $builder->where('library_id', $libraryId))
-            ->when(! empty($status), fn ($builder) => $builder->where('status', $status))
+            ->when(! empty($status), fn ($builder) => $this->applyStatusFilter($builder, (string) $status))
             ->when($reservationDateRange, fn ($builder) => $builder->whereBetween('reserved_at', $reservationDateRange))
             ->when($search !== '', function (Builder $query) use ($search) {
                 $query->where(function ($q) use ($search) {
@@ -111,6 +96,15 @@ class GetLibraryReservationsQuery
             });
     }
 
+    private function applyStatusFilter(Builder $query, string $status): Builder
+    {
+        return match ($status) {
+            Reservation::STATUS_RESERVED => $query->pending(),
+            Reservation::STATUS_EXPIRED => $query->expired(),
+            default => $query->where('status', $status),
+        };
+    }
+
     private function dateRange(mixed $date): ?array
     {
         if (empty($date)) {
@@ -120,5 +114,41 @@ class GetLibraryReservationsQuery
         $parsedDate = CarbonImmutable::parse($date);
 
         return [$parsedDate->startOfDay(), $parsedDate->endOfDay()];
+    }
+
+    private function queuePositionSubquery()
+    {
+        return DB::table('reservations as queue_reservations')
+            ->selectRaw('COUNT(*)')
+            ->whereColumn('queue_reservations.book_id', 'reservations.book_id')
+            ->whereColumn('queue_reservations.library_id', 'reservations.library_id')
+            ->where(function ($scopeQuery) {
+                $scopeQuery->where(function ($libraryScopeQuery) {
+                    $libraryScopeQuery
+                        ->whereColumn('queue_reservations.scope', 'reservations.scope')
+                        ->where('queue_reservations.scope', Reservation::SCOPE_LIBRARY)
+                        ->whereNull('queue_reservations.branch_id')
+                        ->whereNull('reservations.branch_id');
+                })->orWhere(function ($branchScopeQuery) {
+                    $branchScopeQuery
+                        ->whereColumn('queue_reservations.scope', 'reservations.scope')
+                        ->where('queue_reservations.scope', Reservation::SCOPE_BRANCH)
+                        ->whereColumn('queue_reservations.branch_id', 'reservations.branch_id');
+                });
+            })
+            ->where('queue_reservations.status', Reservation::STATUS_RESERVED)
+            ->whereNull('queue_reservations.fulfilled_at')
+            ->whereNull('queue_reservations.cancelled_at')
+            ->where(function ($expiresQuery) {
+                $expiresQuery->whereNull('queue_reservations.expires_at')
+                    ->orWhere('queue_reservations.expires_at', '>', now());
+            })
+            ->where(function ($queueQuery) {
+                $queueQuery->whereColumn('queue_reservations.reserved_at', '<', 'reservations.reserved_at')
+                    ->orWhere(function ($sameTimeQuery) {
+                        $sameTimeQuery->whereColumn('queue_reservations.reserved_at', '=', 'reservations.reserved_at')
+                            ->whereColumn('queue_reservations.id', '<=', 'reservations.id');
+                    });
+            });
     }
 }

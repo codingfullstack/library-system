@@ -13,6 +13,7 @@ class LibraryMembershipFactory extends Factory
     {
         return [
             'library_id' => Library::factory(),
+            'branch_id' => null,
             'user_id' => User::factory()->member(),
             'membership_number' => fn () => 'MEM:' . (string) Str::ulid(),
             'is_active' => true,

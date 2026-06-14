@@ -160,7 +160,7 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                     'is_active' => true,
                 ]
             );
-            $this->attachLibraryMembership($staffA, $library);
+            $this->attachLibraryMembership($staffA, $library, $mainBranch);
 
             $staffB = User::query()->updateOrCreate(
                 ['email' => 'tomas@kaltinenubiblioteka.lt'],
@@ -174,7 +174,7 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                     'is_active' => true,
                 ]
             );
-            $this->attachLibraryMembership($staffB, $library);
+            $this->attachLibraryMembership($staffB, $library, $childrenBranch);
 
             $member1 = $this->createMember($library, 'Lukas Petrauskas', 'lukas.skaitytojas@example.com', '+37064444444');
             $member2 = $this->createMember($library, 'Emilija Jankauskaitė', 'emilija.skaitytoja@example.com', '+37065555555');
@@ -390,7 +390,7 @@ class KaltinenuLibraryDemoSeeder extends Seeder
         return $user;
     }
 
-    private function attachLibraryMembership(User $user, Library $library): void
+    private function attachLibraryMembership(User $user, Library $library, ?Branch $branch = null): void
     {
         LibraryMembership::query()->updateOrCreate(
             [
@@ -398,6 +398,7 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 'user_id' => $user->id,
             ],
             [
+                'branch_id' => $user->role === User::ROLE_STAFF ? $branch?->id : null,
                 'membership_number' => $user->membership_number,
                 'is_active' => $user->is_active,
                 'joined_at' => $user->created_at,

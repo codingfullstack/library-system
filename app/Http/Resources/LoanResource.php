@@ -23,9 +23,11 @@ class LoanResource extends JsonResource
             'due_at' => $this->due_at,
             'returned_at' => $this->returned_at,
             'status' => $this->status,
+            'status_label' => $this->statusLabel(),
             'renewal_count' => $this->renewal_count,
             'notes' => $this->notes,
             'is_overdue' => $this->is_overdue,
+            'is_due_soon' => $this->isDueSoon(),
             'overdue_days' => $this->overdue_days,
             'user' => $this->user ? [
                 'id' => $this->user->id,

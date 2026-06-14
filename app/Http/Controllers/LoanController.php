@@ -87,7 +87,7 @@ class LoanController extends Controller
         BookCopy $bookCopy,
         BorrowBookCopyAction $borrowBookCopyAction
     ): RedirectResponse {
-        Gate::authorize('update', $bookCopy);
+        Gate::authorize('borrow', $bookCopy);
 
         $borrowBookCopyAction->handle(
             $request->user(),
@@ -103,7 +103,7 @@ class LoanController extends Controller
         BookCopy $bookCopy,
         ReturnBookCopyAction $returnBookCopyAction
     ): RedirectResponse {
-        $this->authorize('update', $bookCopy);
+        $this->authorize('return', $bookCopy);
 
         $returnBookCopyAction->handle(
             $request->user(),

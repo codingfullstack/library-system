@@ -76,6 +76,14 @@ class GetActiveLibraryLoansQuery
         $query = Loan::query()
             ->when(! empty($libraryId), fn ($builder) => $builder->where('library_id', $libraryId));
 
+        if ($user->role === User::ROLE_STAFF) {
+            $branchId = $user->assignedBranchId($libraryId);
+
+            $query->whereHas('bookCopy', fn ($copyQuery) => $branchId
+                ? $copyQuery->where('branch_id', $branchId)
+                : $copyQuery->whereRaw('1 = 0'));
+        }
+
         if (! empty($status)) {
             $query->where('status', $status);
         } else {

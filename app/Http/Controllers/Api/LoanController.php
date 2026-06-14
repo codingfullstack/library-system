@@ -9,6 +9,7 @@ use App\Http\Requests\BorrowBookCopyRequest;
 use App\Http\Resources\LibraryMemberResource;
 use App\Http\Resources\LoanResource;
 use App\Models\BookCopy;
+use App\Models\Loan;
 use App\Queries\Loans\GetActiveLibraryLoansQuery;
 use App\Queries\Loans\GetMemberLoansQuery;
 use App\Queries\Users\SearchLibraryMembersQuery;
@@ -27,7 +28,12 @@ class LoanController extends Controller
         $user = $request->user();
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:120'],
-            'status' => ['nullable', Rule::in(['aktyvi', 'vÄ—luoja', 'grÄ…Å¾inta', 'prarasta'])],
+            'status' => ['nullable', Rule::in([
+                Loan::STATUS_ACTIVE,
+                Loan::STATUS_OVERDUE,
+                Loan::STATUS_RETURNED,
+                Loan::STATUS_LOST,
+            ])],
             'member_id' => ['nullable', 'integer', 'exists:users,id'],
             'employee_id' => ['nullable', 'integer', 'exists:users,id'],
             'overdue' => ['nullable', Rule::in(['yes', 'no'])],
@@ -73,7 +79,7 @@ class LoanController extends Controller
 
     public function borrow(BorrowBookCopyRequest $request, BookCopy $bookCopy, BorrowBookCopyAction $borrowBookCopyAction): JsonResponse
     {
-        $this->authorize('update', $bookCopy);
+        $this->authorize('borrow', $bookCopy);
 
         $result = $borrowBookCopyAction->handle(
             $request->user(),
@@ -86,7 +92,7 @@ class LoanController extends Controller
 
     public function returnBook(Request $request, BookCopy $bookCopy, ReturnBookCopyAction $returnBookCopyAction): JsonResponse
     {
-        $this->authorize('update', $bookCopy);
+        $this->authorize('return', $bookCopy);
 
         $result = $returnBookCopyAction->handle(
             $request->user(),
@@ -96,8 +102,6 @@ class LoanController extends Controller
         return response()->json($result);
     }
 }
-
-
 
 
 

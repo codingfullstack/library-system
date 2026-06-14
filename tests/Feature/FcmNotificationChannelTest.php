@@ -67,7 +67,8 @@ it('builds fcm payload with notification id and deep link', function () {
             && $message['notification']['body'] === 'Knyga laukia atsiemimo.'
             && $message['data']['title'] === 'Rezervacija paruosta'
             && $message['data']['body'] === 'Knyga laukia atsiemimo.'
-            && $message['data']['type'] === 'reservation_ready'
+            && $message['data']['type'] === 'RESERVATION'
+            && $message['data']['kind'] === 'reservation_ready'
             && $notificationId !== ''
             && $message['data']['related_type'] === Loan::class
             && $message['data']['related_id'] === '123'
@@ -95,7 +96,8 @@ it('stores database payload with the same deep link structure', function () {
     $stored = $user->notifications()->firstOrFail();
 
     expect($stored->data['notification_id'])->toBe($stored->id)
-        ->and($stored->data['type'])->toBe('book_due_soon')
+        ->and($stored->data['type'])->toBe('LOAN')
+        ->and($stored->data['kind'])->toBe('book_due_soon')
         ->and($stored->data['deep_link'])->toBe("libraryapp://notification/{$stored->id}")
         ->and($stored->data['body'])->toBe('Terminas arteja.');
 });

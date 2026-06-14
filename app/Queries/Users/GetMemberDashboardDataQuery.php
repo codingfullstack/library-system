@@ -26,6 +26,7 @@ class GetMemberDashboardDataQuery
         $activeReservations = Reservation::query()
             ->where('user_id', $user->id)
             ->when($libraryId, fn ($query) => $query->where('library_id', $libraryId))
+            ->pending()
             ->with(['book:id,slug,title,subtitle,isbn', 'library:id,name'])
             ->latest('reserved_at')
             ->limit(5)
@@ -42,9 +43,7 @@ class GetMemberDashboardDataQuery
             'activeReservationsCount' => Reservation::query()
                 ->where('user_id', $user->id)
                 ->when($libraryId, fn ($query) => $query->where('library_id', $libraryId))
-                ->where('status', Reservation::STATUS_RESERVED)
-                ->whereNull('fulfilled_at')
-                ->whereNull('cancelled_at')
+                ->pending()
                 ->count(),
             'overdueLoansCount' => Loan::query()
                 ->where('user_id', $user->id)

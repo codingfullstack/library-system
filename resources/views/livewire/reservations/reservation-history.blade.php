@@ -81,12 +81,16 @@
                             <div class="mt-4 flex justify-end gap-2">
                                 <button
                                     type="button"
-                                    wire:click="issueCurrent"
+                                    wire:click="issueFirstInQueue"
                                     wire:loading.attr="disabled"
                                     class="app-button-primary"
                                 >
                                     Išduoti pirmam eilėje
                                 </button>
+                            </div>
+                        @elseif ($isCurrent && $canManage && $unavailableIssueMessage)
+                            <div class="mt-4 rounded-lg bg-amber-50 p-3 text-sm font-medium text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                                {{ $unavailableIssueMessage }}
                             </div>
                         @endif
 

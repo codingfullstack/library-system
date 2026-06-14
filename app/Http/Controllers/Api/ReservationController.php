@@ -24,7 +24,12 @@ class ReservationController extends Controller
         $user = $request->user();
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:120'],
-            'status' => ['nullable', Rule::in(['rezervuota', 'Ä¯vykdyta', 'atÅ¡aukta', 'pasibaigusi'])],
+            'status' => ['nullable', Rule::in([
+                Reservation::STATUS_RESERVED,
+                Reservation::STATUS_FULFILLED,
+                Reservation::STATUS_CANCELLED,
+                Reservation::STATUS_EXPIRED,
+            ])],
             'queue' => ['nullable', Rule::in(['first', 'waiting'])],
             'library_id' => ['nullable', 'integer', 'exists:libraries,id'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
@@ -42,6 +47,10 @@ class ReservationController extends Controller
             ? $getMemberReservationsQuery->handle($user, $filters)
             : $getLibraryReservationsQuery->handle($user, $filters);
 
+        $summary = $user?->role === 'narys'
+            ? $getMemberReservationsQuery->summary($user, $filters)
+            : $getLibraryReservationsQuery->summary($user, $filters);
+
         return response()->json([
             'data' => ReservationResource::collection(collect($reservations->items()))->resolve(),
             'meta' => [
@@ -50,6 +59,7 @@ class ReservationController extends Controller
                 'per_page' => $reservations->perPage(),
                 'total' => $reservations->total(),
             ],
+            'summary' => $summary,
         ]);
     }
 
@@ -65,6 +75,7 @@ class ReservationController extends Controller
         $reservation->load([
             'book:id,slug,title,subtitle,isbn',
             'user:id,name,email,membership_number',
+            'branch:id,name',
         ]);
 
         return response()->json([
@@ -83,6 +94,7 @@ class ReservationController extends Controller
         $reservation->load([
             'book:id,slug,title,subtitle,isbn',
             'user:id,name,email,membership_number',
+            'branch:id,name',
         ]);
 
         return response()->json([

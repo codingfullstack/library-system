@@ -126,7 +126,6 @@
                                 </div>
                             </div>
                         </section>
-
                         @can('update', $copy)
                             <section class="overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                                 <div class="border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
@@ -182,6 +181,7 @@
                             </section>
                         @endcan
 
+                        @can('update', $copy)
                         <section class="overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                             <div class="border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
                                 <h2 class="text-lg font-semibold text-zinc-950 dark:text-white">Būsenos istorija</h2>
@@ -218,6 +218,7 @@
                                 @endif
                             </div>
                         </section>
+                        @endcan
 
                         @if(auth()->user()?->isSuperAdmin())
                             <section class="overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
@@ -249,13 +250,14 @@
                                         <img src="{{ route('book-copies.qr', $copy->id) }}" alt="Knygos kopijos QR kodas" class="h-40 w-40 object-contain">
                                     </div>
 
-                                    <a href="{{ route('book-copies.qr', $copy->id) }}" target="_blank" class="app-button-primary mt-5 w-full justify-center">
+                                    <a href="{{ route('book-copies.qr', ['id' => $copy->id, 'download' => 1]) }}" download class="app-button-primary mt-5 w-full justify-center">
                                         Atsisiųsti QR
                                     </a>
                                 </div>
                             </div>
                         </section>
 
+                        @can('update', $copy)
                         @if($copy->activeLoan)
                             <section class="overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                                 <div class="border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
@@ -282,6 +284,7 @@
                                 </div>
                             </section>
                         @endif
+                        @endcan
 
                         @if($copy->activeLoan)
                             <section class="overflow-hidden rounded-[28px] border border-amber-200 bg-amber-50 shadow-sm dark:border-amber-900/40 dark:bg-amber-950/30">

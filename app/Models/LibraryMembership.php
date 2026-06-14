@@ -12,6 +12,7 @@ class LibraryMembership extends Model
 
     protected $fillable = [
         'library_id',
+        'branch_id',
         'user_id',
         'membership_number',
         'is_active',
@@ -29,6 +30,11 @@ class LibraryMembership extends Model
     public function library(): BelongsTo
     {
         return $this->belongsTo(Library::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
     }
 
     public function user(): BelongsTo

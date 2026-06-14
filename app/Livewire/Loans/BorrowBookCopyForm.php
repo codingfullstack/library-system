@@ -20,6 +20,8 @@ class BorrowBookCopyForm extends Component
 
     public ?Reservation $preferredReservation = null;
 
+    public bool $compactPreferredActions = false;
+
     public bool $isOpen = false;
 
     public string $memberSearch = '';
@@ -38,10 +40,11 @@ class BorrowBookCopyForm extends Component
 
     public string $overrideReason = '';
 
-    public function mount(BookCopy $bookCopy, ?int $preferredReservationId = null): void
+    public function mount(BookCopy $bookCopy, ?int $preferredReservationId = null, bool $compactPreferredActions = false): void
     {
         $this->bookCopy = $bookCopy->loadMissing(['book:id,slug,title', 'library:id,name']);
         $this->preferredReservationId = $preferredReservationId;
+        $this->compactPreferredActions = $compactPreferredActions;
         $this->dueAt = now()->addDays(14)->toDateString();
         $this->preferredReservation = $this->resolvePreferredReservation();
     }
@@ -125,7 +128,7 @@ class BorrowBookCopyForm extends Component
             abort(403);
         }
 
-        Gate::authorize('update', $this->bookCopy);
+        Gate::authorize('borrow', $this->bookCopy);
 
         try {
             app(BorrowBookCopyAction::class)->handle($actor, $this->bookCopy->fresh(), [
@@ -155,7 +158,7 @@ class BorrowBookCopyForm extends Component
             abort(403);
         }
 
-        Gate::authorize('update', $this->bookCopy);
+        Gate::authorize('borrow', $this->bookCopy);
 
         $this->validate([
             'selectedMemberId' => ['required', 'integer'],
@@ -213,6 +216,7 @@ class BorrowBookCopyForm extends Component
             'members' => $members,
             'canBorrow' => $this->canBorrow(),
             'canIssuePreferred' => $this->canIssuePreferred(),
+            'borrowUnavailableTitle' => $this->borrowUnavailableTitle(),
             'issueLibraryName' => $this->bookCopy->library?->name,
         ]);
     }
@@ -224,7 +228,26 @@ class BorrowBookCopyForm extends Component
         return $actor
             && $this->bookCopy->status === BookCopy::STATUS_AVAILABLE
             && $this->bookCopy->activeLoan === null
-            && Gate::allows('update', $this->bookCopy);
+            && Gate::allows('borrow', $this->bookCopy);
+    }
+
+    private function borrowUnavailableTitle(): ?string
+    {
+        $actor = Auth::user();
+
+        if (! $actor || $this->canBorrow()) {
+            return null;
+        }
+
+        if (
+            $actor->role === User::ROLE_STAFF
+            && $actor->belongsToLibrary($this->bookCopy->library_id)
+            && ! $actor->canManageBookCopy($this->bookCopy)
+        ) {
+            return 'Negalima išduoti: egzempliorius priklauso kitam filialui.';
+        }
+
+        return null;
     }
 
     private function canIssuePreferred(): bool

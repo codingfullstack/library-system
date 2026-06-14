@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BookController;
 use App\Http\Controllers\Api\BookCopyController as ApiBookCopyController;
+use App\Http\Controllers\Api\DashboardSummaryController;
 use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\LoanController;
 use App\Http\Controllers\Api\MemberDashboardController;
@@ -19,6 +20,7 @@ Route::prefix('auth')->group(function () {
     Route::middleware(['auth:sanctum', 'library.context', 'throttle:api-sensitive'])->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
+        Route::get('/dashboard/summary', DashboardSummaryController::class);
         Route::post('/device-token', [DeviceTokenController::class, 'store']);
         Route::delete('/device-token', [DeviceTokenController::class, 'destroy']);
     });

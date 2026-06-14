@@ -74,7 +74,7 @@ class UserManagement
         return $candidate;
     }
 
-    public static function syncLibraryMembership(User $user, int $libraryId): LibraryMembership
+    public static function syncLibraryMembership(User $user, int $libraryId, ?int $branchId = null): LibraryMembership
     {
         if ($user->isSuperAdmin()) {
             throw new \InvalidArgumentException('Superadministratoriui bibliotekos narystė nepriskiriama.');
@@ -86,6 +86,7 @@ class UserManagement
                 'user_id' => $user->id,
             ],
             [
+                'branch_id' => $user->role === User::ROLE_STAFF ? $branchId : null,
                 'membership_number' => $user->membership_number,
                 'is_active' => $user->is_active,
                 'joined_at' => $user->created_at,

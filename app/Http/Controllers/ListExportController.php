@@ -2,9 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AuditLog;
-use App\Models\BookCopy;
-use App\Models\Reservation;
 use App\Models\User;
 use App\Queries\Books\GetLibraryBooksQuery;
 use App\Queries\Loans\GetActiveLibraryLoansQuery;
@@ -155,7 +152,7 @@ class ListExportController extends Controller
             $reservation->library?->name,
             $reservation->reserved_at?->format('Y-m-d H:i'),
             $reservation->expires_at?->format('Y-m-d H:i'),
-            $this->reservationStatusLabel($reservation->status),
+            $reservation->statusLabel(),
             $reservation->isPending() ? $reservation->queue_position : null,
         ])->all();
 
@@ -352,17 +349,6 @@ class ListExportController extends Controller
         );
     }
 
-    private function reservationStatusLabel(string $status): string
-    {
-        return match ($status) {
-            Reservation::STATUS_RESERVED => 'Aktyvi',
-            Reservation::STATUS_FULFILLED => 'Įvykdyta',
-            Reservation::STATUS_CANCELLED => 'Atšaukta',
-            Reservation::STATUS_EXPIRED => 'Pasibaigusi',
-            default => $status,
-        };
-    }
-
     private function userRoleLabel(string $role): string
     {
         return match ($role) {
@@ -390,19 +376,9 @@ class ListExportController extends Controller
 
         $filename = sprintf('%s-%s.csv', $baseFilename, now()->format('Y-m-d-His'));
 
-        return response("\xEF\xBB\xBF" . $content, 200, [
+        return response("\xEF\xBB\xBF".$content, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 }
-
-
-
-
-
-
-
-
-
-

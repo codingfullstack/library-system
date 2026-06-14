@@ -3,7 +3,9 @@
 namespace App\Queries\Books;
 
 use App\Models\Book;
+use App\Models\Library;
 use App\Models\User;
+use App\Services\ReservationQueueService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class GetLibraryBookDetailsQuery
@@ -19,11 +21,12 @@ class GetLibraryBookDetailsQuery
             ->exists();
 
         if (($user === null || $user->role === 'narys') && is_array($libraryIds) && ! $hasVisibleCopies) {
-            throw (new ModelNotFoundException())->setModel(Book::class, [$book->id]);
+            throw (new ModelNotFoundException)->setModel(Book::class, [$book->id]);
         }
 
         $copyStatus = $filters['copy_status'] ?? null;
         $copyLifecycle = $filters['copy_lifecycle'] ?? null;
+        $copySearch = trim((string) ($filters['copy_search'] ?? ''));
         $branchId = $filters['branch_id'] ?? null;
         $locationId = $filters['location_id'] ?? null;
 
@@ -33,13 +36,16 @@ class GetLibraryBookDetailsQuery
             'authors:id,name',
             'reservations' => function ($q) use ($libraryIds) {
                 $q->when(is_array($libraryIds), fn ($reservationQuery) => $reservationQuery->whereIn('library_id', $libraryIds))
-                    ->with('user:id,name,email,membership_number')
+                    ->with([
+                        'user:id,name,email,membership_number',
+                        'branch:id,name',
+                    ])
                     ->orderBy('reserved_at');
             },
-            'bookCopies' => function ($q) use ($libraryIds, $copyStatus, $copyLifecycle, $branchId, $locationId) {
+            'bookCopies' => function ($q) use ($libraryIds, $copyStatus, $copyLifecycle, $copySearch, $branchId, $locationId) {
                 $q->when(is_array($libraryIds), fn ($copyQuery) => $copyQuery
-                        ->withoutGlobalScope('library')
-                        ->whereIn('library_id', $libraryIds))
+                    ->withoutGlobalScope('library')
+                    ->whereIn('library_id', $libraryIds))
                     ->when(! empty($copyLifecycle), function ($copyQuery) use ($copyLifecycle) {
                         match ($copyLifecycle) {
                             'aktyvi' => $copyQuery->whereIn('status', ['laisva', 'išduota']),
@@ -49,6 +55,21 @@ class GetLibraryBookDetailsQuery
                         };
                     })
                     ->when(! empty($copyStatus), fn ($copyQuery) => $copyQuery->where('status', $copyStatus))
+                    ->when($copySearch !== '', function ($copyQuery) use ($copySearch) {
+                        $search = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $copySearch).'%';
+
+                        $copyQuery->where(function ($searchQuery) use ($search) {
+                            $searchQuery
+                                ->where('inventory_code', 'like', $search)
+                                ->orWhere('barcode', 'like', $search)
+                                ->orWhere('qr_code', 'like', $search)
+                                ->orWhereHas('branch', fn ($branchQuery) => $branchQuery->where('name', 'like', $search))
+                                ->orWhereHas('location', fn ($locationQuery) => $locationQuery
+                                    ->where('name', 'like', $search)
+                                    ->orWhere('room', 'like', $search)
+                                    ->orWhere('shelf', 'like', $search));
+                        });
+                    })
                     ->when(! empty($branchId), fn ($copyQuery) => $copyQuery->where('branch_id', $branchId))
                     ->when(! empty($locationId), fn ($copyQuery) => $copyQuery->where('location_id', $locationId))
                     ->with([
@@ -72,6 +93,14 @@ class GetLibraryBookDetailsQuery
                     ->orderBy('inventory_code');
             },
         ]);
+
+        $queueService = app(ReservationQueueService::class);
+
+        $book->reservations->each(function ($reservation) use ($queueService) {
+            if ($reservation->isPending()) {
+                $reservation->setAttribute('queue_position', $queueService->positionFor($reservation));
+            }
+        });
 
         $book->loadCount([
             'bookCopies as copies_count' => function ($q) use ($libraryIds) {
@@ -97,7 +126,7 @@ class GetLibraryBookDetailsQuery
     private function visibleLibraryIds(?User $user): ?array
     {
         if ($user === null) {
-            return \App\Models\Library::query()
+            return Library::query()
                 ->where('is_active', true)
                 ->where('is_public', true)
                 ->pluck('id')
@@ -118,11 +147,3 @@ class GetLibraryBookDetailsQuery
         return $libraryId ? [(int) $libraryId] : [];
     }
 }
-
-
-
-
-
-
-
-

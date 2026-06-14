@@ -1,15 +1,6 @@
 <x-layouts::app :title="'Pranešimai'">
     @php
-        $categoryMeta = static function ($type): array {
-            return match ($type) {
-                'loan_overdue', 'book_due_soon' => ['label' => 'Priminimas', 'category' => 'reminder', 'badge' => 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300', 'iconWrap' => 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300', 'icon' => 'bell-alert'],
-                'reservation_ready', 'reservation_cancelled', 'reservation_fulfilled' => ['label' => 'Rezervacija', 'category' => 'reservation', 'badge' => 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300', 'iconWrap' => 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300', 'icon' => 'folder-git-2'],
-                'book_returned' => ['label' => 'Informacija', 'category' => 'info', 'badge' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300', 'iconWrap' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300', 'icon' => 'book-open-text'],
-                'system', 'new_user', 'qr_scan' => ['label' => 'Sistemos', 'category' => 'system', 'badge' => 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300', 'iconWrap' => 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300', 'icon' => 'cog-6-tooth'],
-                'report_ready', 'issuance_summary' => ['label' => 'Ataskaita', 'category' => 'report', 'badge' => 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300', 'iconWrap' => 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300', 'icon' => 'clipboard-document'],
-                default => ['label' => 'Kiti', 'category' => 'other', 'badge' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300', 'iconWrap' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300', 'icon' => 'ellipsis-horizontal-circle'],
-            };
-        };
+        $notificationUi = static fn ($notification): array => \App\Support\Notifications\NotificationUiConfig::for($notification->data['kind'] ?? $notification->type);
     @endphp
 
     <x-ui.page class="max-w-none overflow-x-hidden px-3 py-0 sm:px-6 lg:px-8">
@@ -46,7 +37,7 @@
                     <div class="rounded-[22px] border border-zinc-200 bg-white px-5 py-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                         <div class="flex items-start gap-3">
                             <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
-                                <flux:icon.bell-alert class="size-5" />
+                                <x-ui.notification-icon icon="info" class="size-5" />
                             </span>
                             <div>
                                 <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Neskaityti</div>
@@ -58,35 +49,35 @@
                     <div class="rounded-[22px] border border-zinc-200 bg-white px-5 py-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                         <div class="flex items-start gap-3">
                             <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
-                                <flux:icon.cog-6-tooth class="size-5" />
+                                <x-ui.notification-icon icon="info" class="size-5" />
                             </span>
                             <div>
-                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Sistemos</div>
-                                <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $systemCount }}</div>
+                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Informaciniai</div>
+                                <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $infoCount }}</div>
                             </div>
                         </div>
                     </div>
 
                     <div class="rounded-[22px] border border-zinc-200 bg-white px-5 py-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                         <div class="flex items-start gap-3">
-                            <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
-                                <flux:icon.bell class="size-5" />
+                            <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
+                                <x-ui.notification-icon icon="bookmark" class="size-5" />
                             </span>
                             <div>
-                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Priminimai</div>
-                                <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $reminderCount }}</div>
+                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Rezervacijos</div>
+                                <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $reservationCount }}</div>
                             </div>
                         </div>
                     </div>
 
                     <div class="rounded-[22px] border border-zinc-200 bg-white px-5 py-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                         <div class="flex items-start gap-3">
-                            <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                                <flux:icon.ellipsis-horizontal-circle class="size-5" />
+                            <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300">
+                                <x-ui.notification-icon icon="schedule" class="size-5" />
                             </span>
                             <div>
-                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Kiti</div>
-                                <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $otherCount }}</div>
+                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Paskolos</div>
+                                <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $loanCount }}</div>
                             </div>
                         </div>
                     </div>
@@ -99,12 +90,13 @@
                                 <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Kategorija</label>
                                 <select name="category" class="app-input h-10 rounded-xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
                                     <option value="all" @selected(($filters['category'] ?? 'all') === 'all')>Visos kategorijos</option>
-                                    <option value="system" @selected(($filters['category'] ?? '') === 'system')>Sistemos</option>
-                                    <option value="reminder" @selected(($filters['category'] ?? '') === 'reminder')>Priminimai</option>
+                                    <option value="info" @selected(($filters['category'] ?? '') === 'info')>Informaciniai</option>
+                                    <option value="success" @selected(($filters['category'] ?? '') === 'success')>Atlikta</option>
+                                    <option value="warning" @selected(($filters['category'] ?? '') === 'warning')>Perspėjimai</option>
+                                    <option value="error" @selected(($filters['category'] ?? '') === 'error')>Klaidos</option>
+                                    <option value="book" @selected(($filters['category'] ?? '') === 'book')>Knygos</option>
                                     <option value="reservation" @selected(($filters['category'] ?? '') === 'reservation')>Rezervacijos</option>
-                                    <option value="warning" @selected(($filters['category'] ?? '') === 'warning')>Įspėjimai</option>
-                                    <option value="info" @selected(($filters['category'] ?? '') === 'info')>Informacija</option>
-                                    <option value="report" @selected(($filters['category'] ?? '') === 'report')>Ataskaitos</option>
+                                    <option value="loan" @selected(($filters['category'] ?? '') === 'loan')>Paskolos</option>
                                 </select>
                             </div>
 
@@ -149,37 +141,20 @@
                                     $title = $data['title'] ?? 'Naujas pranešimas';
                                     $message = $data['message'] ?? '';
                                     $url = $data['url'] ?? route('notifications.index');
-                                    $meta = $categoryMeta($kind);
+                                    $ui = $notificationUi($notification);
+                                    $webUi = $ui['web'];
                                 @endphp
 
                                 <article class="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/50">
                                     <div class="flex items-start gap-3">
-                                        <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl {{ $meta['iconWrap'] }}">
-                                            @switch($meta['icon'])
-                                                @case('bell-alert')
-                                                    <flux:icon.bell-alert class="size-5" />
-                                                    @break
-                                                @case('folder-git-2')
-                                                    <flux:icon.folder-git-2 class="size-5" />
-                                                    @break
-                                                @case('book-open-text')
-                                                    <flux:icon.book-open-text class="size-5" />
-                                                    @break
-                                                @case('cog-6-tooth')
-                                                    <flux:icon.cog-6-tooth class="size-5" />
-                                                    @break
-                                                @case('clipboard-document')
-                                                    <flux:icon.clipboard-document class="size-5" />
-                                                    @break
-                                                @default
-                                                    <flux:icon.ellipsis-horizontal-circle class="size-5" />
-                                            @endswitch
+                                        <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl {{ $webUi['icon_wrap'] }}">
+                                            <x-ui.notification-icon :icon="$webUi['icon']" class="size-5" />
                                         </span>
 
                                         <div class="min-w-0 flex-1">
                                             <div class="flex flex-wrap items-center gap-2">
-                                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $meta['badge'] }}">
-                                                    {{ $meta['label'] }}
+                                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $webUi['badge'] }}">
+                                                    {{ $ui['category'] }}
                                                 </span>
                                                 @if($notification->read_at)
                                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
@@ -236,7 +211,8 @@
                                             $title = $data['title'] ?? 'Naujas pranešimas';
                                             $message = $data['message'] ?? '';
                                             $url = $data['url'] ?? route('notifications.index');
-                                            $meta = $categoryMeta($kind);
+                                            $ui = $notificationUi($notification);
+                                            $webUi = $ui['web'];
                                         @endphp
                                         <tr class="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40">
                                             <td class="px-4 py-4 align-top">
@@ -247,26 +223,8 @@
                                             </td>
                                             <td class="px-4 py-4 align-top">
                                                 <div class="flex items-start gap-3">
-                                                    <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl {{ $meta['iconWrap'] }}">
-                                                        @switch($meta['icon'])
-                                                            @case('bell-alert')
-                                                                <flux:icon.bell-alert class="size-5" />
-                                                                @break
-                                                            @case('folder-git-2')
-                                                                <flux:icon.folder-git-2 class="size-5" />
-                                                                @break
-                                                            @case('book-open-text')
-                                                                <flux:icon.book-open-text class="size-5" />
-                                                                @break
-                                                            @case('cog-6-tooth')
-                                                                <flux:icon.cog-6-tooth class="size-5" />
-                                                                @break
-                                                            @case('clipboard-document')
-                                                                <flux:icon.clipboard-document class="size-5" />
-                                                                @break
-                                                            @default
-                                                                <flux:icon.ellipsis-horizontal-circle class="size-5" />
-                                                        @endswitch
+                                                    <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl {{ $webUi['icon_wrap'] }}">
+                                                        <x-ui.notification-icon :icon="$webUi['icon']" class="size-5" />
                                                     </span>
                                                     <div class="min-w-0">
                                                         <div class="text-sm font-semibold text-zinc-950 dark:text-white">{{ $title }}</div>
@@ -275,8 +233,8 @@
                                                 </div>
                                             </td>
                                             <td class="px-4 py-4 align-top">
-                                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $meta['badge'] }}">
-                                                    {{ $meta['label'] }}
+                                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $webUi['badge'] }}">
+                                                    {{ $ui['category'] }}
                                                 </span>
                                             </td>
                                             <td class="px-4 py-4 align-top text-sm text-zinc-600 dark:text-zinc-400">
@@ -315,7 +273,7 @@
                         </div>
 
                         <div class="flex flex-col gap-4 border-t border-zinc-200 px-5 py-4 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-400 sm:flex-row sm:items-center sm:justify-between">
-                            <div>Rodoma {{ $notifications->firstItem() }}-{{ $notifications->lastItem() }} is {{ $notifications->total() }}</div>
+                            <div>Rodoma {{ $notifications->firstItem() }}-{{ $notifications->lastItem() }} iš {{ $notifications->total() }}</div>
                             <div>{{ $notifications->links() }}</div>
                         </div>
                     @else
@@ -331,10 +289,3 @@
         </div>
     </x-ui.page>
 </x-layouts::app>
-
-
-
-
-
-
-

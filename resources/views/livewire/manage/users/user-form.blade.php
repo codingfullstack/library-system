@@ -57,6 +57,21 @@
             </div>
         @endif
 
+        @if($role === 'darbuotojas')
+            <div>
+                <label for="branchId" class="app-label">Filialas</label>
+                <select id="branchId" wire:model="branchId" class="app-input" required>
+                    <option value="">Pasirinkti filialą</option>
+                    @foreach($branches as $branch)
+                        <option value="{{ $branch->id }}">
+                            {{ $branch->name }}{{ $branch->code ? ' ('.$branch->code.')' : '' }}
+                        </option>
+                    @endforeach
+                </select>
+                @error('branchId') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+            </div>
+        @endif
+
         <div>
             <label for="phone" class="app-label">Telefonas</label>
             <input id="phone" type="text" wire:model="phone" class="app-input">

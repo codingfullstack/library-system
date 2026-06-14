@@ -11,6 +11,45 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 
 class BookCopyFactory extends Factory
 {
+    public function configure(): static
+    {
+        return $this->afterMaking(function (BookCopy $copy) {
+            if (! $copy->library_id) {
+                return;
+            }
+
+            $branch = $copy->branch_id
+                ? Branch::query()->find($copy->branch_id)
+                : null;
+
+            if (! $branch || (int) $branch->library_id !== (int) $copy->library_id) {
+                $branch = Branch::query()
+                    ->where('library_id', $copy->library_id)
+                    ->orderBy('id')
+                    ->first()
+                    ?: Branch::factory()->create([
+                        'library_id' => $copy->library_id,
+                    ]);
+
+                $copy->branch_id = $branch->id;
+                $copy->location_id = null;
+            }
+
+            $location = $copy->location_id
+                ? Location::query()->find($copy->location_id)
+                : null;
+
+            if (! $location || (int) $location->library_id !== (int) $copy->library_id || (int) $location->branch_id !== (int) $copy->branch_id) {
+                $location = Location::factory()->create([
+                    'library_id' => $copy->library_id,
+                    'branch_id' => $copy->branch_id,
+                ]);
+
+                $copy->location_id = $location->id;
+            }
+        });
+    }
+
     public function definition(): array
     {
         $library = Library::factory()->create();

@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Reservation;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class CreateReservationRequest extends FormRequest
 {
@@ -15,6 +17,8 @@ class CreateReservationRequest extends FormRequest
     {
         $rules = [
             'book_id' => ['required', 'integer', 'exists:books,id'],
+            'scope' => ['nullable', Rule::in([Reservation::SCOPE_BRANCH, Reservation::SCOPE_LIBRARY])],
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ];
 

@@ -52,6 +52,7 @@ class BookController extends Controller
     ): View {
         $actor = $request->user();
         $book = $getLibraryBookDetailsQuery->handle($actor, $book, [
+            'copy_search' => $request->query('copy_search'),
             'copy_lifecycle' => $request->query('copy_lifecycle'),
             'copy_status' => $request->query('copy_status'),
             'branch_id' => $request->query('branch_id'),

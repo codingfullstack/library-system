@@ -45,11 +45,18 @@ class UserController extends Controller
     ): View {
         $actor = $request->user();
         $this->ensureVisible($actor, $user);
-        $user = $getManagedUserDetailsQuery->handle($user);
+        $user = $getManagedUserDetailsQuery->handle($user, $actor);
 
         return view('manage.users.show', [
             'managedUser' => $user,
             'recentLoans' => $user->loans()
+                ->when($actor->role === User::ROLE_STAFF, function ($query) use ($actor) {
+                    $branchId = $actor->assignedBranchId($actor->activeLibraryId());
+
+                    $query->whereHas('bookCopy', fn ($copyQuery) => $branchId
+                        ? $copyQuery->where('branch_id', $branchId)
+                        : $copyQuery->whereRaw('1 = 0'));
+                })
                 ->with('bookCopy.book:id,slug,title')
                 ->latest('borrowed_at')
                 ->paginate(5, ['*'], 'user-loans-page')

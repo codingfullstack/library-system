@@ -4,6 +4,7 @@ namespace App\Actions\Notifications;
 
 use App\Models\User;
 use App\Notifications\LibraryNotification;
+use App\Support\Notifications\NotificationUiConfig;
 use Illuminate\Notifications\DatabaseNotification;
 
 class CreateUserNotificationAction
@@ -21,6 +22,7 @@ class CreateUserNotificationAction
         ?string $relatedType = null,
         ?int $relatedId = null
     ): ?DatabaseNotification {
+        $ui = NotificationUiConfig::for($type);
         $existing = null;
 
         if ($relatedType && $relatedId) {
@@ -33,10 +35,15 @@ class CreateUserNotificationAction
 
         $payload = [
             'kind' => $type,
+            'type' => $ui['type'],
             'title' => $title,
             'message' => $message,
             'url' => (string) ($metadata['url'] ?? route('notifications.index', absolute: false)),
             'created_at' => now()->toIso8601String(),
+            'ui' => $ui,
+            'category' => $ui['category'],
+            'icon' => $ui['icon'],
+            'color' => $ui['color'],
             'related_type' => $relatedType,
             'related_id' => $relatedId,
             'metadata' => $metadata,
@@ -76,11 +83,3 @@ class CreateUserNotificationAction
         return null;
     }
 }
-
-
-
-
-
-
-
-

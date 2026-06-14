@@ -59,9 +59,20 @@ const escapeHtml = (value) => String(value ?? '')
 const normaliseNotification = (notification) => ({
     id: notification.id,
     kind: notification.kind || notification.type,
-    title: notification.title || 'Naujas pranesimas',
+    title: notification.title || 'Naujas pranešimas',
     message: notification.message || '',
     url: notification.url || '/notifications',
+    ui: notification.ui || {
+        category: notification.category || 'Informacinis',
+        icon: notification.icon || 'info',
+        color: notification.color || 'Blue',
+        web: {
+            icon_svg: '',
+            icon_wrap: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300',
+            unread: 'bg-sky-50/45 dark:bg-sky-500/10',
+            dot: 'bg-sky-500',
+        },
+    },
     read_at: notification.read_at || null,
     created_at: notification.created_at || new Date().toISOString(),
 });
@@ -84,25 +95,28 @@ const renderDropdown = () => {
     }
 
     if (state.items.length === 0) {
-        list.innerHTML = '<div class="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">Pranesimu nera</div>';
+        list.innerHTML = '<div class="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">Pranešimų nėra</div>';
         return;
     }
 
-    list.innerHTML = state.items.map((item) => `
-        <div class="group border-b border-zinc-100 px-4 py-3 last:border-b-0 dark:border-zinc-800 ${item.read_at ? '' : 'bg-emerald-50/45 dark:bg-emerald-500/10'}" data-notification-item="${item.id}">
+    list.innerHTML = state.items.map((item) => {
+        const webUi = item.ui.web || {};
+
+        return `
+        <div class="group border-b border-zinc-100 px-4 py-3 last:border-b-0 dark:border-zinc-800 ${item.read_at ? '' : escapeHtml(webUi.unread || '')}" data-notification-item="${item.id}">
             <div class="flex items-start gap-3">
-                <span class="mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${item.read_at ? 'bg-zinc-300 dark:bg-zinc-700' : 'bg-emerald-500'}"></span>
+                <span class="mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${item.read_at ? 'bg-zinc-300 dark:bg-zinc-700' : escapeHtml(webUi.dot || 'bg-sky-500')}"></span>
                 <div class="min-w-0 flex-1">
                     <a href="${escapeHtml(item.url)}" class="block truncate text-sm font-semibold text-zinc-950 hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">${escapeHtml(item.title)}</a>
                     <p class="mt-1 line-clamp-2 text-xs leading-5 text-zinc-600 dark:text-zinc-400">${escapeHtml(item.message)}</p>
                     <div class="mt-2 flex items-center justify-between gap-3">
                         <span class="text-[11px] text-zinc-500 dark:text-zinc-500">${formatTime(item.created_at)}</span>
-                        ${item.read_at ? '' : `<button type="button" class="text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 dark:text-emerald-300" data-mark-notification-read="${item.id}">Pazymeti kaip perskaityta</button>`}
+                        ${item.read_at ? '' : `<button type="button" class="text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 dark:text-emerald-300" data-mark-notification-read="${item.id}">Pažymėti kaip perskaitytą</button>`}
                     </div>
                 </div>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 };
 
 const showToast = (notification) => {
@@ -113,11 +127,12 @@ const showToast = (notification) => {
     }
 
     const toast = document.createElement('div');
+    const webUi = notification.ui.web || {};
     toast.className = 'pointer-events-auto w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-zinc-200 bg-white p-4 shadow-lg ring-1 ring-black/5 transition dark:border-zinc-700 dark:bg-zinc-900';
     toast.innerHTML = `
         <div class="flex gap-3">
-            <span class="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5m6 0a3 3 0 0 1-6 0" /></svg>
+            <span class="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${escapeHtml(webUi.icon_wrap || 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300')}">
+                ${webUi.icon_svg || ''}
             </span>
             <div class="min-w-0">
                 <p class="text-sm font-semibold text-zinc-950 dark:text-white">${escapeHtml(notification.title)}</p>

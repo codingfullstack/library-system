@@ -15,11 +15,6 @@
                             <flux:icon.arrow-down-tray class="size-4" />
                             Eksportuoti
                         </a>
-
-                        <button type="button" class="inline-flex h-11 items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
-                            <flux:icon.funnel class="size-4" />
-                            Filtruoti
-                        </button>
                     </div>
                 </div>
 

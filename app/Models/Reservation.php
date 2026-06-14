@@ -12,14 +12,23 @@ class Reservation extends Model
     use BelongsToLibrary, HasFactory;
 
     public const STATUS_RESERVED = 'rezervuota';
+
     public const STATUS_FULFILLED = 'įvykdyta';
+
     public const STATUS_CANCELLED = 'atšaukta';
+
     public const STATUS_EXPIRED = 'pasibaigusi';
+
+    public const SCOPE_BRANCH = 'branch';
+
+    public const SCOPE_LIBRARY = 'library';
 
     protected $fillable = [
         'library_id',
         'book_id',
         'user_id',
+        'scope',
+        'branch_id',
         'status',
         'reserved_at',
         'expires_at',
@@ -50,6 +59,16 @@ class Reservation extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    public function isBranchScoped(): bool
+    {
+        return $this->scope === self::SCOPE_BRANCH;
+    }
+
     public function scopePending(Builder $query): Builder
     {
         return $query
@@ -71,6 +90,22 @@ class Reservation extends Model
     {
         return $this->scopePending($query)
             ->whereNotNull('expires_at');
+    }
+
+    public function scopeExpired(Builder $query): Builder
+    {
+        return $query->where(function (Builder $expiredQuery) {
+            $expiredQuery
+                ->where('status', self::STATUS_EXPIRED)
+                ->orWhere(function (Builder $reservedQuery) {
+                    $reservedQuery
+                        ->where('status', self::STATUS_RESERVED)
+                        ->whereNull('fulfilled_at')
+                        ->whereNull('cancelled_at')
+                        ->whereNotNull('expires_at')
+                        ->where('expires_at', '<=', now());
+                });
+        });
     }
 
     public function isPending(): bool
@@ -115,14 +150,10 @@ class Reservation extends Model
 
     public function statusLabel(): string
     {
+        if ($this->status === self::STATUS_RESERVED && ! $this->isPending()) {
+            return self::statusLabels()[self::STATUS_EXPIRED];
+        }
+
         return self::statusLabels()[$this->status] ?? (string) $this->status;
     }
 }
-
-
-
-
-
-
-
-

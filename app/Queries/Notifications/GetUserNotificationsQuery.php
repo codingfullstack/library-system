@@ -3,6 +3,7 @@
 namespace App\Queries\Notifications;
 
 use App\Models\User;
+use App\Support\Notifications\NotificationUiConfig;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,19 +19,11 @@ class GetUserNotificationsQuery
             ->where('notifiable_type', $user->getMorphClass())
             ->where('notifiable_id', $user->getKey())
             ->when(($filters['category'] ?? 'all') !== 'all', function (Builder $builder) use ($filters) {
-                $types = match ($filters['category']) {
-                    'system' => ['system', 'new_user', 'qr_scan'],
-                    'reminder' => ['loan_overdue', 'book_due_soon', 'reservation_ready'],
-                    'reservation' => ['reservation_ready', 'reservation_cancelled', 'reservation_fulfilled'],
-                    'warning' => ['loan_overdue', 'reservation_cancelled'],
-                    'info' => ['book_returned'],
-                    'report' => ['report_ready', 'issuance_summary'],
-                    default => [],
-                };
+                $types = NotificationUiConfig::typesForCategory((string) $filters['category']);
 
-                if ($types !== []) {
-                    $builder->whereIn('type', $types);
-                }
+                $types === []
+                    ? $builder->whereRaw('1 = 0')
+                    : $builder->whereIn('type', $types);
             })
             ->when(($filters['status'] ?? 'all') !== 'all', function (Builder $builder) use ($filters) {
                 if ($filters['status'] === 'unread') {
@@ -55,10 +48,3 @@ class GetUserNotificationsQuery
         return $query->paginate($perPage)->withQueryString();
     }
 }
-
-
-
-
-
-
-

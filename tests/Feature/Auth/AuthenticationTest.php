@@ -57,7 +57,6 @@ test('users can not authenticate with invalid password', function () {
 
 test('users with two factor enabled are redirected to two factor challenge', function () {
     $this->skipUnlessFortifyHas(Features::twoFactorAuthentication());
-    $this->markTestSkipped('User factory neturi withTwoFactor state šiame projekte.');
 
     Features::twoFactorAuthentication([
         'confirm' => true,
@@ -84,8 +83,3 @@ test('users can logout', function () {
 
     $this->assertGuest();
 });
-
-
-
-
-

@@ -4,10 +4,15 @@ namespace App\Livewire\Reservations;
 
 use App\Actions\Reservations\CreateReservationAction;
 use App\Models\Book;
+use App\Models\BookCopy;
+use App\Models\Branch;
 use App\Models\Reservation;
 use App\Models\User;
 use App\Queries\Users\SearchLibraryMembersQuery;
+use App\Services\ReservationQueueService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
@@ -23,6 +28,10 @@ class CreateReservationForm extends Component
 
     public ?array $selectedMember = null;
 
+    public string $scope = Reservation::SCOPE_LIBRARY;
+
+    public int|string|null $branchId = null;
+
     public ?string $expiresAt = null;
 
     public string $notes = '';
@@ -33,6 +42,28 @@ class CreateReservationForm extends Component
     {
         $this->bookId = $book->id;
         $this->bookTitle = $book->title;
+
+        $actor = Auth::user();
+
+        if ($actor?->role === User::ROLE_STAFF && $actor->assignedBranchId()) {
+            $this->scope = Reservation::SCOPE_BRANCH;
+            $this->branchId = $actor->assignedBranchId();
+        }
+    }
+
+    public function updatedScope(): void
+    {
+        $actor = Auth::user();
+
+        if ($this->scope === Reservation::SCOPE_LIBRARY) {
+            $this->branchId = null;
+
+            return;
+        }
+
+        if ($actor?->role === User::ROLE_STAFF) {
+            $this->branchId = $actor->assignedBranchId($actor->activeLibraryId());
+        }
     }
 
     public function selectMember(int $memberId): void
@@ -53,7 +84,7 @@ class CreateReservationForm extends Component
                     ->where('library_id', $libraryId)
                     ->where('is_active', true));
             })
-            ->where('role', 'narys')
+            ->where('role', User::ROLE_MEMBER)
             ->where('is_active', true)
             ->first();
 
@@ -91,8 +122,11 @@ class CreateReservationForm extends Component
         }
 
         $this->validate($this->rulesFor($actor), [
-            'selectedMemberId.required' => 'Pasirinkite narį.',
-            'expiresAt.after' => 'Galiojimo data turi būti ateityje.',
+            'selectedMemberId.required' => 'Pasirinkite nari.',
+            'scope.required' => 'Pasirinkite rezervacijos apimti.',
+            'scope.in' => 'Pasirinkite galiojancia rezervacijos apimti.',
+            'branchId.required_if' => 'Pasirinkite filiala.',
+            'expiresAt.after' => 'Galiojimo data turi buti ateityje.',
             'notes.max' => 'Pastabos negali virsyti 1000 simboliu.',
         ]);
 
@@ -100,6 +134,8 @@ class CreateReservationForm extends Component
             app(CreateReservationAction::class)->handle($actor, [
                 'book_id' => $this->bookId,
                 'user_id' => $this->selectedMemberId,
+                'scope' => $this->scope,
+                'branch_id' => $this->selectedScopeBranchId($actor),
                 'expires_at' => $this->hasQueueAhead() ? null : $this->expiresAt,
                 'notes' => $this->notes,
             ]);
@@ -114,7 +150,7 @@ class CreateReservationForm extends Component
         $this->clearMember();
         $this->expiresAt = null;
         $this->notes = '';
-        $this->successMessage = 'Rezervacija sėkmingai sukurta.';
+        $this->successMessage = 'Rezervacija sekmingai sukurta.';
 
         $this->dispatch('reservation-created', bookId: $this->bookId);
 
@@ -140,12 +176,16 @@ class CreateReservationForm extends Component
             'usesMemberSearch' => $actor ? $this->usesMemberSearch($actor) : false,
             'hasQueueAhead' => $this->hasQueueAhead(),
             'selectedLibraryName' => $this->selectedLibraryName($actor),
+            'branchOptions' => $this->branchOptions($actor),
+            'staffBranchName' => $this->staffBranchName($actor),
         ]);
     }
 
     private function rulesFor(User $actor): array
     {
         $rules = [
+            'scope' => ['required', Rule::in([Reservation::SCOPE_BRANCH, Reservation::SCOPE_LIBRARY])],
+            'branchId' => ['required_if:scope,'.Reservation::SCOPE_BRANCH, 'nullable', 'integer'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ];
 
@@ -159,7 +199,7 @@ class CreateReservationForm extends Component
 
     private function usesMemberSearch(User $actor): bool
     {
-        return $actor->hasAnyEffectiveRole(['superadministratorius', 'administratorius', 'darbuotojas']);
+        return $actor->hasAnyEffectiveRole([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_STAFF]);
     }
 
     private function hasQueueAhead(): bool
@@ -167,14 +207,12 @@ class CreateReservationForm extends Component
         $actor = Auth::user();
         $libraryId = $actor ? $this->selectedReservationLibraryId($actor) : null;
 
-        if (! $libraryId) {
+        if (! $actor || ! $libraryId) {
             return false;
         }
 
-        return Reservation::query()
-            ->where('library_id', $libraryId)
-            ->where('book_id', $this->bookId)
-            ->pending()
+        return app(ReservationQueueService::class)
+            ->pendingReservationsQuery($libraryId, $this->bookId, $this->scope, $this->selectedScopeBranchId($actor))
             ->exists();
     }
 
@@ -228,6 +266,7 @@ class CreateReservationForm extends Component
         return match ($field) {
             'user_id' => 'selectedMemberId',
             'expires_at' => 'expiresAt',
+            'branch_id' => 'branchId',
             default => $field,
         };
     }
@@ -248,19 +287,21 @@ class CreateReservationForm extends Component
             return false;
         }
 
-        return Book::query()
-            ->whereKey($this->bookId)
-            ->whereHas('bookCopies', function ($query) use ($libraryId) {
-                $query
-                    ->where('library_id', $libraryId)
-                    ->where('status', '!=', 'laisva');
-            })
-            ->whereDoesntHave('bookCopies', function ($query) use ($libraryId) {
-                $query
-                    ->where('library_id', $libraryId)
-                    ->where('status', 'laisva');
-            })
+        $branchId = $this->selectedScopeBranchId($actor);
+
+        $hasCopies = BookCopy::query()
+            ->withoutGlobalScope('library')
+            ->where('library_id', $libraryId)
+            ->where('book_id', $this->bookId)
+            ->when($this->scope === Reservation::SCOPE_BRANCH, fn ($query) => $query->where('branch_id', $branchId))
             ->exists();
+
+        if (! $hasCopies) {
+            return false;
+        }
+
+        return ! app(ReservationQueueService::class)
+            ->hasAvailableCopies($libraryId, $this->bookId, $this->scope, $branchId);
     }
 
     private function isReservationAvailabilityKnown(?User $actor): bool
@@ -288,36 +329,73 @@ class CreateReservationForm extends Component
             return null;
         }
 
-        $hasCopies = Book::query()
-            ->whereKey($this->bookId)
-            ->whereHas('bookCopies', fn ($query) => $query->where('library_id', $libraryId))
+        $branchId = $this->selectedScopeBranchId($actor);
+        $scopeLabel = $this->scope === Reservation::SCOPE_BRANCH ? 'pasirinktame filiale' : 'tavo bibliotekose';
+
+        $hasCopies = BookCopy::query()
+            ->withoutGlobalScope('library')
+            ->where('library_id', $libraryId)
+            ->where('book_id', $this->bookId)
+            ->when($this->scope === Reservation::SCOPE_BRANCH, fn ($query) => $query->where('branch_id', $branchId))
             ->exists();
 
         if (! $hasCopies) {
-            return 'Ši knyga tavo bibliotekose neprieinama.';
+            return 'Si knyga '.$scopeLabel.' neprieinama.';
         }
 
-        $hasAvailableCopy = Book::query()
-            ->whereKey($this->bookId)
-            ->whereHas('bookCopies', function ($query) use ($libraryId) {
-                $query
-                    ->where('library_id', $libraryId)
-                    ->where('status', 'laisva');
-            })
-            ->exists();
-
-        if ($hasAvailableCopy) {
-            return 'Ši knyga šiuo metu prieinama tavo bibliotekose, rezervacija nereikalinga.';
+        if (app(ReservationQueueService::class)->hasAvailableCopies($libraryId, $this->bookId, $this->scope, $branchId)) {
+            return 'Si knyga siuo metu prieinama '.$scopeLabel.', rezervacija nereikalinga.';
         }
 
         return null;
     }
+
+    private function selectedScopeBranchId(?User $actor): ?int
+    {
+        if ($this->scope !== Reservation::SCOPE_BRANCH) {
+            return null;
+        }
+
+        if ($actor?->role === User::ROLE_STAFF) {
+            return $actor->assignedBranchId($actor->activeLibraryId());
+        }
+
+        return $this->branchId ? (int) $this->branchId : null;
+    }
+
+    /**
+     * @return Collection<int, Branch>
+     */
+    private function branchOptions(?User $actor): Collection
+    {
+        if (! $actor) {
+            return collect();
+        }
+
+        $libraryId = $this->selectedReservationLibraryId($actor);
+
+        if (! $libraryId) {
+            return collect();
+        }
+
+        return Branch::query()
+            ->where('library_id', $libraryId)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
+    private function staffBranchName(?User $actor): ?string
+    {
+        if ($actor?->role !== User::ROLE_STAFF) {
+            return null;
+        }
+
+        $branchId = $actor->assignedBranchId($actor->activeLibraryId());
+
+        if (! $branchId) {
+            return null;
+        }
+
+        return Branch::query()->whereKey($branchId)->value('name');
+    }
 }
-
-
-
-
-
-
-
-

@@ -126,6 +126,65 @@
     @endif
 
     @if($actor && $isReservable)
+        <div class="space-y-3">
+            <p class="app-label">Rezervacijos apimtis</p>
+
+            <div class="grid gap-2">
+                <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-200 bg-white p-3 text-sm dark:border-zinc-800 dark:bg-zinc-950/40">
+                    <input
+                        type="radio"
+                        wire:model.live="scope"
+                        value="{{ \App\Models\Reservation::SCOPE_BRANCH }}"
+                        class="mt-1"
+                    >
+                    <span>
+                        <span class="block font-semibold text-zinc-950 dark:text-white">
+                            {{ $actor?->role === \App\Models\User::ROLE_STAFF ? 'Tik mano filiale' : 'Konkretus filialas' }}
+                        </span>
+                        @if($actor?->role === \App\Models\User::ROLE_STAFF && $staffBranchName)
+                            <span class="mt-1 block text-xs text-zinc-500 dark:text-zinc-400">
+                                Filialas: {{ $staffBranchName }}
+                            </span>
+                        @endif
+                    </span>
+                </label>
+
+                @if($scope === \App\Models\Reservation::SCOPE_BRANCH && $actor?->role !== \App\Models\User::ROLE_STAFF)
+                    <div>
+                        <label for="reservation-branch-id" class="sr-only">Filialas</label>
+                        <select id="reservation-branch-id" wire:model.live="branchId" class="app-input">
+                            <option value="">Pasirinkite filiala</option>
+                            @foreach($branchOptions as $branch)
+                                <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('branchId')
+                            <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                        @enderror
+                    </div>
+                @endif
+
+                <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-200 bg-white p-3 text-sm dark:border-zinc-800 dark:bg-zinc-950/40">
+                    <input
+                        type="radio"
+                        wire:model.live="scope"
+                        value="{{ \App\Models\Reservation::SCOPE_LIBRARY }}"
+                        class="mt-1"
+                    >
+                    <span>
+                        <span class="block font-semibold text-zinc-950 dark:text-white">Visoje bibliotekoje</span>
+                        <span class="mt-1 block text-xs text-zinc-500 dark:text-zinc-400">
+                            Skaitytojas gali buti pakviestas pasiimti knyga is bet kurio sios bibliotekos filialo.
+                        </span>
+                    </span>
+                </label>
+            </div>
+
+            @error('scope')
+                <p class="text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+            @enderror
+        </div>
+
         <div>
             <label for="reservation-notes" class="app-label">Pastabos</label>
             <textarea

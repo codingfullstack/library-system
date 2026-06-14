@@ -18,6 +18,8 @@ class ReservationFactory extends Factory
             'library_id' => Library::factory(),
             'book_id' => Book::factory(),
             'user_id' => User::factory(),
+            'scope' => Reservation::SCOPE_LIBRARY,
+            'branch_id' => null,
             'status' => fake()->randomElement([
                 Reservation::STATUS_RESERVED,
                 Reservation::STATUS_FULFILLED,

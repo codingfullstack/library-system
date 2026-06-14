@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Branch;
 use App\Models\Library;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -69,11 +70,17 @@ class AuthController extends Controller
         $library = $libraryId
             ? Library::query()->whereKey($libraryId)->first(['id', 'name'])
             : null;
+        $branchId = $libraryId ? $user->assignedBranchId($libraryId) : null;
+        $branch = $branchId
+            ? Branch::query()->whereKey($branchId)->first(['id', 'name'])
+            : null;
 
         return [
             'id' => $user->id,
             'library_id' => $library?->id,
             'library_name' => $library?->name,
+            'branch_id' => $branch?->id,
+            'branch_name' => $branch?->name,
             'name' => $user->name,
             'email' => $user->email,
             'role' => $user->role,

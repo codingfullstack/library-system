@@ -1,17 +1,23 @@
 <?php
 
-use App\Actions\Loans\BorrowBookCopyAction;
 use App\Actions\BookCopies\ChangeBookCopyStatusAction;
+use App\Actions\Loans\BorrowBookCopyAction;
+use App\Actions\Loans\ReturnBookCopyAction;
 use App\Actions\Reservations\CancelReservationAction;
+use App\Actions\Reservations\CreateReservationAction;
+use App\Actions\Reservations\SyncReservationQueueAction;
 use App\Livewire\Reservations\CancelReservationForm;
+use App\Models\AuditLog;
 use App\Models\Book;
 use App\Models\BookCopy;
+use App\Models\BookCopyStatusHistory;
 use App\Models\Branch;
 use App\Models\Library;
 use App\Models\Loan;
 use App\Models\Location;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Services\ReservationNotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -204,7 +210,7 @@ it('does not keep a reservation ready when no copy is available after queue sync
         'cancelled_at' => null,
     ]);
 
-    app(\App\Actions\Reservations\SyncReservationQueueAction::class)->handle($library->id, $book->id);
+    app(SyncReservationQueueAction::class)->handle($library->id, $book->id);
 
     expect($reservation->refresh()->expires_at)->toBeNull()
         ->and($reservation->isCurrent())->toBeFalse()
@@ -254,7 +260,7 @@ it('creates an overdue notification when a member is at least one day late', fun
         'status' => BookCopy::STATUS_LOANED,
     ]);
 
-    $loan = \App\Models\Loan::factory()->create([
+    $loan = Loan::factory()->create([
         'library_id' => $library->id,
         'book_copy_id' => $bookCopy->id,
         'user_id' => $member->id,
@@ -289,7 +295,7 @@ it('does not duplicate the same overdue notification on later requests', functio
         'status' => BookCopy::STATUS_LOANED,
     ]);
 
-    $loan = \App\Models\Loan::factory()->create([
+    $loan = Loan::factory()->create([
         'library_id' => $library->id,
         'book_copy_id' => $bookCopy->id,
         'user_id' => $member->id,
@@ -305,7 +311,7 @@ it('does not duplicate the same overdue notification on later requests', functio
     expect(
         $member->notifications()
             ->where('type', 'loan_overdue')
-            ->where('data->related_type', \App\Models\Loan::class)
+            ->where('data->related_type', Loan::class)
             ->where('data->related_id', $loan->id)
             ->count()
     )->toBe(1);
@@ -349,13 +355,19 @@ it('creates a reservation ready notification for the first waiting member', func
         'returned_at' => null,
     ]);
 
-    app(\App\Actions\Loans\ReturnBookCopyAction::class)->handle($staff, $bookCopy);
+    app(ReturnBookCopyAction::class)->handle($staff, $bookCopy);
 
     $this->assertDatabaseHas('notifications', [
         'notifiable_type' => $member->getMorphClass(),
         'notifiable_id' => $member->id,
         'type' => 'reservation_ready',
     ]);
+
+    $readyNotification = $member->notifications()->where('type', 'reservation_ready')->first();
+
+    expect($readyNotification)->not->toBeNull()
+        ->and($readyNotification->data['title'])->toBe('Rezervacija paruošta')
+        ->and($readyNotification->data['message'])->toContain('jau laukia jūsų');
 
     $this->assertDatabaseHas('notifications', [
         'notifiable_type' => $member->getMorphClass(),
@@ -388,9 +400,9 @@ it('does not duplicate return side effects when the same copy is returned twice'
         'returned_at' => null,
     ]);
 
-    app(\App\Actions\Loans\ReturnBookCopyAction::class)->handle($staff, $bookCopy);
+    app(ReturnBookCopyAction::class)->handle($staff, $bookCopy);
 
-    expect(fn () => app(\App\Actions\Loans\ReturnBookCopyAction::class)->handle($staff, $bookCopy->fresh()))
+    expect(fn () => app(ReturnBookCopyAction::class)->handle($staff, $bookCopy->fresh()))
         ->toThrow(ValidationException::class);
 
     expect($loan->fresh()->returned_at)->not->toBeNull()
@@ -402,13 +414,13 @@ it('does not duplicate return side effects when the same copy is returned twice'
         ->where('data->related_id', $loan->id)
         ->count())->toBe(1);
 
-    expect(\App\Models\AuditLog::query()
+    expect(AuditLog::query()
         ->where('action', 'loan_returned')
         ->where('auditable_type', Loan::class)
         ->where('auditable_id', $loan->id)
         ->count())->toBe(1);
 
-    expect(\App\Models\BookCopyStatusHistory::query()
+    expect(BookCopyStatusHistory::query()
         ->where('book_copy_id', $bookCopy->id)
         ->where('to_status', BookCopy::STATUS_AVAILABLE)
         ->count())->toBe(1);
@@ -480,7 +492,8 @@ it('rolls back issued loan and reservation fulfillment if copy status update fai
         'cancelled_at' => null,
     ]);
 
-    app()->bind(ChangeBookCopyStatusAction::class, fn () => new class extends ChangeBookCopyStatusAction {
+    app()->bind(ChangeBookCopyStatusAction::class, fn () => new class extends ChangeBookCopyStatusAction
+    {
         public function handle(
             BookCopy $bookCopy,
             string $toStatus,
@@ -558,6 +571,207 @@ it('allows issuing an available copy to the member who is first in reservation q
     ]);
 });
 
+it('notifies the member with queue position and due date after a reservation is created', function () {
+    $library = Library::factory()->create();
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create(['title' => 'Queue info book']);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $bookCopy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_LOANED,
+    ]);
+
+    Loan::factory()->create([
+        'library_id' => $library->id,
+        'book_copy_id' => $bookCopy->id,
+        'user_id' => User::factory()->member()->create(['library_id' => $library->id])->id,
+        'issued_by' => $staff->id,
+        'status' => Loan::STATUS_ACTIVE,
+        'due_at' => '2026-06-20',
+        'returned_at' => null,
+    ]);
+
+    app(CreateReservationAction::class)->handle($member, [
+        'book_id' => $book->id,
+    ]);
+
+    $notification = $member->notifications()->where('type', 'reservation_created')->first();
+
+    expect($notification)->not->toBeNull()
+        ->and($notification->data['title'])->toBe('Rezervacija sukurta')
+        ->and($notification->data['metadata']['queue_position'])->toBe(1)
+        ->and($notification->data['metadata']['due_at'])->toBe('2026-06-20')
+        ->and($notification->data['message'])->toContain('Jūs sėkmingai rezervavote knygą')
+        ->and($notification->data['message'])->toContain('Jūsų vieta eilėje: 1')
+        ->and($notification->data['message'])->toContain('Šiuo metu knyga paskolinta kitam skaitytojui iki 2026-06-20.');
+});
+
+it('notifies the next waiting member when the first reservation is cancelled', function () {
+    $library = Library::factory()->create();
+    $firstMember = User::factory()->member()->create(['library_id' => $library->id]);
+    $secondMember = User::factory()->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create(['title' => 'Moving queue book']);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $bookCopy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_LOANED,
+    ]);
+
+    Loan::factory()->create([
+        'library_id' => $library->id,
+        'book_copy_id' => $bookCopy->id,
+        'user_id' => User::factory()->member()->create(['library_id' => $library->id])->id,
+        'status' => Loan::STATUS_ACTIVE,
+        'due_at' => '2026-06-20',
+        'returned_at' => null,
+    ]);
+
+    $firstReservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $firstMember->id,
+        'status' => Reservation::STATUS_RESERVED,
+        'reserved_at' => now()->subHours(2),
+        'expires_at' => null,
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+    $secondReservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $secondMember->id,
+        'status' => Reservation::STATUS_RESERVED,
+        'reserved_at' => now()->subHour(),
+        'expires_at' => null,
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+
+    app(ReservationNotificationService::class)->notifyCreated($firstReservation);
+    app(ReservationNotificationService::class)->notifyCreated($secondReservation);
+
+    app(CancelReservationAction::class)->handle($firstMember, $firstReservation);
+
+    $notification = $secondMember->notifications()->where('type', 'reservation_queue_changed')->first();
+
+    expect($notification)->not->toBeNull()
+        ->and($notification->data['title'])->toBe('Rezervacijos eilė pasikeitė')
+        ->and($notification->data['metadata']['old_position'])->toBe(2)
+        ->and($notification->data['metadata']['new_position'])->toBe(1)
+        ->and($notification->data['metadata']['due_at'])->toBe('2026-06-20')
+        ->and($notification->data['message'])->toContain('Jūsų rezervacijos eilė pasikeitė')
+        ->and($notification->data['message'])->toContain('Dabartinis skaitytojas turi grąžinti knygą iki 2026-06-20.');
+});
+
+it('does not create a queue changed notification when the position did not change', function () {
+    $library = Library::factory()->create();
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create(['title' => 'Stable queue book']);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+
+    BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_LOANED,
+    ]);
+
+    $reservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $member->id,
+        'status' => Reservation::STATUS_RESERVED,
+        'reserved_at' => now()->subHour(),
+        'expires_at' => null,
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+
+    app(ReservationNotificationService::class)->notifyCreated($reservation);
+    app(SyncReservationQueueAction::class)->handle($library->id, $book->id);
+
+    expect($member->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(0);
+});
+
+it('does not move reservation queue notifications across library boundaries', function () {
+    $firstLibrary = Library::factory()->create();
+    $secondLibrary = Library::factory()->create();
+    $firstMember = User::factory()->member()->create(['library_id' => $firstLibrary->id]);
+    $secondMember = User::factory()->member()->create(['library_id' => $firstLibrary->id]);
+    $otherLibraryMember = User::factory()->member()->create(['library_id' => $secondLibrary->id]);
+    $book = Book::factory()->create(['title' => 'Shared catalog book']);
+    $firstBranch = Branch::factory()->create(['library_id' => $firstLibrary->id]);
+    $firstLocation = Location::factory()->create(['library_id' => $firstLibrary->id, 'branch_id' => $firstBranch->id]);
+    $secondBranch = Branch::factory()->create(['library_id' => $secondLibrary->id]);
+    $secondLocation = Location::factory()->create(['library_id' => $secondLibrary->id, 'branch_id' => $secondBranch->id]);
+
+    BookCopy::factory()->create([
+        'library_id' => $firstLibrary->id,
+        'book_id' => $book->id,
+        'branch_id' => $firstBranch->id,
+        'location_id' => $firstLocation->id,
+        'status' => BookCopy::STATUS_LOANED,
+    ]);
+    BookCopy::factory()->create([
+        'library_id' => $secondLibrary->id,
+        'book_id' => $book->id,
+        'branch_id' => $secondBranch->id,
+        'location_id' => $secondLocation->id,
+        'status' => BookCopy::STATUS_LOANED,
+    ]);
+
+    $firstReservation = Reservation::factory()->create([
+        'library_id' => $firstLibrary->id,
+        'book_id' => $book->id,
+        'user_id' => $firstMember->id,
+        'status' => Reservation::STATUS_RESERVED,
+        'reserved_at' => now()->subHours(2),
+        'expires_at' => null,
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+    $secondReservation = Reservation::factory()->create([
+        'library_id' => $firstLibrary->id,
+        'book_id' => $book->id,
+        'user_id' => $secondMember->id,
+        'status' => Reservation::STATUS_RESERVED,
+        'reserved_at' => now()->subHour(),
+        'expires_at' => null,
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+    $otherLibraryReservation = Reservation::factory()->create([
+        'library_id' => $secondLibrary->id,
+        'book_id' => $book->id,
+        'user_id' => $otherLibraryMember->id,
+        'status' => Reservation::STATUS_RESERVED,
+        'reserved_at' => now()->subMinutes(30),
+        'expires_at' => null,
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+
+    app(ReservationNotificationService::class)->notifyCreated($firstReservation);
+    app(ReservationNotificationService::class)->notifyCreated($secondReservation);
+    app(ReservationNotificationService::class)->notifyCreated($otherLibraryReservation);
+
+    app(CancelReservationAction::class)->handle($firstMember, $firstReservation);
+
+    expect($secondMember->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(1)
+        ->and($otherLibraryMember->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(0);
+});
+
 it('does not create a second active loan when the same copy is borrowed twice', function () {
     $library = Library::factory()->create();
     $staff = User::factory()->staff()->create(['library_id' => $library->id]);
@@ -594,8 +808,3 @@ it('does not create a second active loan when the same copy is borrowed twice', 
         ->count())->toBe(1)
         ->and($bookCopy->fresh()->status)->toBe(BookCopy::STATUS_LOANED);
 });
-
-
-
-
-

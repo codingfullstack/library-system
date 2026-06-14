@@ -1,7 +1,7 @@
 <div class="pt-2">
     @if($canBorrow)
         <div class="space-y-3">
-            @if($canIssuePreferred && $preferredReservation)
+            @if($canIssuePreferred && $preferredReservation && ! $compactPreferredActions)
                 <div class="app-priority-banner">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div class="space-y-3">
@@ -51,9 +51,23 @@
             @endif
 
             @if(! $isOpen)
-                <button type="button" wire:click="open" class="app-button-secondary">
-                    {{ $canIssuePreferred ? 'Išduoti kitam nariui' : 'Išduoti' }}
-                </button>
+                <div class="flex flex-wrap items-center gap-2">
+                    @if($canIssuePreferred && $preferredReservation && $compactPreferredActions)
+                        <button
+                            type="button"
+                            wire:click="issuePreferred"
+                            wire:loading.attr="disabled"
+                            class="app-button-primary"
+                        >
+                            <span wire:loading.remove wire:target="issuePreferred">Išduoti jam</span>
+                            <span wire:loading wire:target="issuePreferred">Išduodama...</span>
+                        </button>
+                    @endif
+
+                    <button type="button" wire:click="open" class="app-button-secondary">
+                        {{ $canIssuePreferred ? 'Išduoti kitam nariui' : 'Išduoti' }}
+                    </button>
+                </div>
             @else
                 <div class="fixed inset-0 z-50 bg-zinc-950/50" wire:key="borrow-modal-{{ $bookCopy->id }}">
                     <button type="button" wire:click="close" class="absolute inset-0 cursor-default" aria-label="Uždaryti"></button>
@@ -247,7 +261,12 @@
             @endif
         </div>
     @else
-        <button type="button" class="app-button-secondary opacity-60" disabled>
+        <button
+            type="button"
+            class="app-button-secondary opacity-60"
+            @if($borrowUnavailableTitle) title="{{ $borrowUnavailableTitle }}" @endif
+            disabled
+        >
             {{ $bookCopy->activeLoan ? 'Šiuo metu išduota' : 'Išduoti negalima' }}
         </button>
     @endif
