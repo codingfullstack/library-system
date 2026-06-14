@@ -89,7 +89,6 @@ Route::middleware(['auth', 'overdue.notifications', 'verified', 'library.context
         Route::post('books', [ManageBookController::class, 'store'])->name('books.store');
         Route::get('books/{book:id}/edit', [ManageBookController::class, 'edit'])->name('books.edit');
         Route::put('books/{book:id}', [ManageBookController::class, 'update'])->name('books.update');
-        Route::patch('books/{book:id}', [ManageBookController::class, 'update'])->name('books.update');
         Route::delete('books/{book:id}', [ManageBookController::class, 'destroy'])->name('books.destroy');
         Route::resource('authors', ManageAuthorController::class)->except('show');
         Route::resource('branches', ManageBranchController::class)->except('show');
