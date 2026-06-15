@@ -31,9 +31,11 @@ class BookCopyController extends Controller
         FindBookCopyByQrQuery $findBookCopyByQrQuery,
         ?string $qrCode = null
     ): JsonResponse {
-        $qrCode = trim((string) ($qrCode ?: $request->query('qr_code', '')));
+        $qrCode = $this->extractSystemBookCopyCode(
+            trim((string) ($qrCode ?: $request->query('qr_code', '')))
+        );
 
-        if ($qrCode === '' || strlen($qrCode) > 128 || ! str_starts_with($qrCode, 'QR-')) {
+        if ($qrCode === '' || strlen($qrCode) > 128 || ! $this->isSystemBookCopyCode($qrCode)) {
             return response()->json([
                 'message' => 'Neatpažintas QR kodas. Nuskenuokite šios sistemos sugeneruotą knygos QR kodą.',
             ], 422);
@@ -59,6 +61,29 @@ class BookCopyController extends Controller
         return response()->json(
             (new BookCopyDetailsResource($copy, $request->user()->can('update', $copy)))->resolve()
         );
+    }
+
+    private function isSystemBookCopyCode(string $qrCode): bool
+    {
+        return str_starts_with($qrCode, 'QR-')
+            || preg_match('/^[A-Z0-9]+-(QR|BC)-[A-Z0-9-]+$/i', $qrCode) === 1;
+    }
+
+    private function extractSystemBookCopyCode(string $qrCode): string
+    {
+        if ($qrCode === '' || $this->isSystemBookCopyCode($qrCode)) {
+            return $qrCode;
+        }
+
+        if (preg_match('/(?:^|[^A-Z0-9])([A-Z0-9]+-(?:QR|BC)-[A-Z0-9-]+)(?:$|[^A-Z0-9-])/i', $qrCode, $matches) === 1) {
+            return $matches[1];
+        }
+
+        if (preg_match('/(?:^|[^A-Z0-9])(QR-[A-Z0-9-]+)(?:$|[^A-Z0-9-])/i', $qrCode, $matches) === 1) {
+            return $matches[1];
+        }
+
+        return $qrCode;
     }
 
     public function updateLifecycle(

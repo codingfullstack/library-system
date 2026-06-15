@@ -14,7 +14,10 @@ class FindBookCopyByQrQuery
     {
         $query = BookCopy::query()
             ->with($relations)
-            ->where('qr_code', $qrCode);
+            ->where(function ($query) use ($qrCode) {
+                $query->where('qr_code', $qrCode)
+                    ->orWhere('barcode', $qrCode);
+            });
 
         if (! $user->isSuperAdmin()) {
             $query->where('library_id', $user->activeLibraryId());
