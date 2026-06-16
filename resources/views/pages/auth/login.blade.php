@@ -6,7 +6,7 @@
     </head>
     <body class="min-h-screen bg-white text-slate-950 antialiased dark:bg-zinc-950 dark:text-white">
         <div class="min-h-screen bg-white dark:bg-zinc-950">
-            <div class="mx-auto grid min-h-screen w-full max-w-[1780px] overflow-hidden bg-white lg:grid-cols-[minmax(0,0.5fr)_minmax(0,0.5fr)] dark:bg-zinc-950">
+            <div class="auth-layout mx-auto grid min-h-screen w-full max-w-[1780px] overflow-hidden bg-white dark:bg-zinc-950">
                 <x-partials.auth-brand-panel
                     title="Sveiki sugrįžę!"
                     description="Prisijunkite prie savo paskyros ir tęskite darbą su bibliotekos sistema."
@@ -15,7 +15,7 @@
                     bottom-text="Gaukite svarbią informaciją apie savo bibliotekos veiklą."
                 />
 
-                <main class="flex min-h-screen flex-col bg-white px-8 py-10 lg:px-12 xl:px-16 dark:bg-zinc-950">
+                <main class="flex min-h-screen flex-col overflow-y-auto bg-white px-6 py-8 sm:px-8 lg:px-10 xl:px-16 dark:bg-zinc-950">
                     <a href="{{ route('home') }}" class="mb-8 inline-flex items-center gap-3 self-start text-emerald-700 lg:hidden dark:text-emerald-300" wire:navigate>
                         <x-app-logo-icon class="size-10 fill-current" />
                         <span class="leading-tight">
@@ -25,7 +25,7 @@
                     </a>
 
                     <div class="flex flex-1 items-center justify-center">
-                        <section class="w-full max-w-[560px] rounded-xl border border-slate-200 bg-white px-10 py-12 shadow-[0_24px_70px_rgba(15,23,42,0.10)] sm:px-16 dark:border-zinc-800 dark:bg-zinc-900">
+                        <section class="auth-card w-full max-w-[560px] rounded-xl border border-slate-200 bg-white px-8 py-10 shadow-[0_24px_70px_rgba(15,23,42,0.10)] sm:px-12 lg:px-14 xl:px-16 xl:py-12 dark:border-zinc-800 dark:bg-zinc-900">
                             <div class="text-center">
                                 <x-app-logo-icon class="mx-auto size-12 fill-current text-emerald-700 dark:text-emerald-300" />
                                 <h1 class="mt-7 text-3xl font-extrabold tracking-normal text-slate-950 dark:text-white">Prisijunkite prie paskyros</h1>

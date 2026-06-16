@@ -189,6 +189,194 @@ select:focus[data-flux-control] {
     .dashboard-surface {
         @apply rounded-3xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900;
     }
+
+    @media (min-width: 1024px) {
+        .auth-layout {
+            grid-template-columns: minmax(420px, 0.44fr) minmax(0, 0.56fr);
+        }
+    }
+
+    @media (min-width: 1024px) and (max-width: 1279px) {
+        .auth-layout {
+            grid-template-columns: minmax(420px, 0.44fr) minmax(0, 0.56fr);
+        }
+
+        .auth-layout > main {
+            padding-left: 1.5rem !important;
+            padding-right: 1.5rem !important;
+        }
+
+        .auth-brand-curve {
+            display: none !important;
+        }
+
+        .auth-card {
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
+        }
+
+        .auth-card h1 {
+            font-size: 1.625rem !important;
+            line-height: 1.2 !important;
+        }
+    }
+
+    @media (min-width: 1536px) {
+        .auth-layout {
+            grid-template-columns: minmax(0, 0.5fr) minmax(0, 0.5fr);
+        }
+    }
+
+    @media (min-width: 1024px) and (max-width: 1279px) {
+        .auth-brand-logo {
+            left: 2.5rem !important;
+        }
+
+        .auth-brand-content {
+            left: 2.5rem !important;
+            top: 9.5rem !important;
+            width: 23rem !important;
+        }
+
+        .auth-brand-content h1 {
+            font-size: 2rem !important;
+        }
+
+        .auth-brand-content p {
+            width: 22rem !important;
+            margin-top: 1rem !important;
+            line-height: 1.55 !important;
+        }
+
+        .auth-brand-features {
+            width: 22rem !important;
+            margin-top: 1.75rem !important;
+        }
+
+        .auth-brand-features > div {
+            grid-template-columns: 3rem minmax(0, 1fr) !important;
+            gap: 1rem !important;
+        }
+
+        .auth-brand-features > :not(:last-child) {
+            margin-bottom: 1.25rem !important;
+        }
+
+        .auth-brand-image {
+            left: 1.5rem !important;
+            height: 13rem !important;
+            width: 28rem !important;
+            display: none !important;
+        }
+    }
+
+    @media (min-width: 1024px) and (max-width: 1279px) and (max-height: 780px) {
+        .auth-brand-content {
+            top: 7.5rem !important;
+        }
+
+        .auth-brand-features {
+            margin-top: 1.25rem !important;
+        }
+
+        .auth-brand-features > :not(:last-child) {
+            margin-bottom: 1rem !important;
+        }
+
+        .auth-brand-features p {
+            line-height: 1.4 !important;
+        }
+
+        .auth-brand-image {
+            display: none !important;
+        }
+
+        .auth-card {
+            padding-top: 2rem !important;
+            padding-bottom: 2rem !important;
+        }
+    }
+
+    @media (min-width: 1280px) and (max-width: 1535px) and (min-height: 821px) {
+        .auth-brand-content {
+            top: 11.25rem !important;
+        }
+
+        .auth-brand-image {
+            height: 16.25rem !important;
+            width: 34.25rem !important;
+        }
+    }
+
+    @media (min-width: 1280px) and (max-height: 860px) {
+        .auth-brand-logo {
+            top: 2rem !important;
+        }
+
+        .auth-brand-content {
+            top: 9.25rem !important;
+        }
+
+        .auth-brand-content h1 {
+            font-size: 2rem !important;
+        }
+
+        .auth-brand-content p {
+            margin-top: 1rem !important;
+            line-height: 1.55 !important;
+        }
+
+        .auth-brand-features {
+            margin-top: 1.75rem !important;
+        }
+
+        .auth-brand-features > :not(:last-child) {
+            margin-bottom: 1.25rem !important;
+        }
+
+        .auth-brand-image {
+            height: 15rem !important;
+            width: 32rem !important;
+        }
+    }
+
+    @media (min-width: 1280px) and (max-height: 820px) {
+        .auth-brand-content {
+            left: 5.25rem !important;
+            top: 7rem !important;
+        }
+
+        .auth-brand-features {
+            margin-top: 1.25rem !important;
+        }
+
+        .auth-brand-features > div {
+            gap: 1rem !important;
+        }
+
+        .auth-brand-features > :not(:last-child) {
+            margin-bottom: 1rem !important;
+        }
+
+        .auth-brand-features p {
+            line-height: 1.45 !important;
+        }
+
+        .auth-brand-image {
+            display: none !important;
+        }
+
+        .auth-card {
+            padding-top: 2rem !important;
+            padding-bottom: 2rem !important;
+        }
+    }
+
+    @media (min-width: 1280px) and (max-height: 680px) {
+        .auth-brand-content {
+            top: 7rem !important;
+        }
+    }
 }
 
 /* \[:where(&)\]:size-4 {
