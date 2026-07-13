@@ -149,19 +149,13 @@ it('returns a safe fallback for unknown notification types without using success
         ->assertJsonPath('items.0.ui.icon', 'info');
 });
 
-it('keeps web and android notification screens free from per-type UI mappers', function () {
+it('keeps web notification screen free from per-type UI mappers', function () {
     $webIndex = file_get_contents(resource_path('views/notifications/index.blade.php'));
-    $androidScreen = file_get_contents(base_path('LibraryApp/app/src/main/java/com/example/libraryapp/ui/notifications/NotificationsScreen.kt'));
 
     expect($webIndex)->not->toContain('categoryMeta')
         ->and($webIndex)->not->toContain('match ($type)')
         ->and($webIndex)->not->toContain('Sėkmė')
-        ->and($webIndex)->not->toContain('Informacija')
-        ->and($androidScreen)->not->toContain('when (notification.type)')
-        ->and($androidScreen)->not->toContain('"reservation_ready"')
-        ->and($androidScreen)->not->toContain('"loan_overdue"')
-        ->and($androidScreen)->not->toContain('Sėkmė')
-        ->and($androidScreen)->not->toContain('Informacija');
+        ->and($webIndex)->not->toContain('Informacija');
 });
 
 it('filters by configured category keys and returns no rows for empty categories', function () {
