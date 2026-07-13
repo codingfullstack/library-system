@@ -23,6 +23,7 @@ yarn-error.log
 /.vscode
 /.zed
 /LibraryApp/
+/android-library-app/
 
 # Laravel 4 specific
 bootstrap/compiled.php
