@@ -1,0 +1,4 @@
+[submodule "android-library-app"]
+	path = android-library-app
+	url = https://github.com/codingfullstack/android-library-app.git
+	branch = main
