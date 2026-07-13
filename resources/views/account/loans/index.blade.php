@@ -129,7 +129,6 @@
                                         <th class="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Paimta</th>
                                         <th class="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Grąžinti iki</th>
                                         <th class="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Būsena</th>
-                                        <th class="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Veiksmai</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -160,11 +159,6 @@
                                                 <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $loan->is_overdue ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300' : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' }}">
                                                     {{ $loan->is_overdue ? 'Vėluoja '.$loan->overdue_days.' d.' : 'Aktyvi' }}
                                                 </span>
-                                            </td>
-                                            <td class="px-4 py-4 align-middle">
-                                                <a href="{{ $book ? route('books.show', $book) : '#' }}" title="Peržiūrėti knygą" aria-label="Peržiūrėti knygą" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-500 transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:text-white">
-                                                    <flux:icon.eye class="size-4" />
-                                                </a>
                                             </td>
                                         </tr>
                                     @endforeach

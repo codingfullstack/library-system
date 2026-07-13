@@ -134,7 +134,9 @@
                                         <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Rezervacijos</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Būsena</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Pask. atnaujinta</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Veiksmai</th>
+                                        @if($canEditBooks)
+                                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Veiksmai</th>
+                                        @endif
                                     </tr>
                                 </thead>
 
@@ -193,13 +195,9 @@
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-600 dark:text-zinc-400">
                                                 {{ $book->updated_at?->format('Y-m-d') ?: '-' }}
                                             </td>
-                                            <td class="px-4 py-4 align-middle">
-                                                <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-                                                    <a href="{{ route('books.show', $book) }}" title="Peržiūrėti knygą" aria-label="Peržiūrėti knygą" class="transition hover:text-zinc-900 dark:hover:text-white">
-                                                        <flux:icon.eye class="size-4" />
-                                                    </a>
-
-                                                    @if($canEditBooks)
+                                            @if($canEditBooks)
+                                                <td class="px-4 py-4 align-middle">
+                                                    <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
                                                         <a href="{{ route('manage.books.edit', $book) }}" title="Redaguoti knygą" aria-label="Redaguoti knygą" class="transition hover:text-zinc-900 dark:hover:text-white">
                                                             <flux:icon.pencil-square class="size-4" />
                                                         </a>
@@ -211,9 +209,9 @@
                                                                 <flux:icon.trash class="size-4" />
                                                             </button>
                                                         </form>
-                                                    @endif
-                                                </div>
-                                            </td>
+                                                    </div>
+                                                </td>
+                                            @endif
                                         </tr>
                                     @endforeach
                                 </tbody>

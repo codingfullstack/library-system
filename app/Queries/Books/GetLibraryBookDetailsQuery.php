@@ -4,6 +4,7 @@ namespace App\Queries\Books;
 
 use App\Models\Book;
 use App\Models\Library;
+use App\Models\Reservation;
 use App\Models\User;
 use App\Services\ReservationQueueService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -34,15 +35,38 @@ class GetLibraryBookDetailsQuery
             'publisher:id,name',
             'categories:id,name',
             'authors:id,name',
-            'reservations' => function ($q) use ($libraryIds) {
+            'reservations' => function ($q) use ($libraryIds, $user) {
                 $q->when(is_array($libraryIds), fn ($reservationQuery) => $reservationQuery->whereIn('library_id', $libraryIds))
+                    ->when($user?->role === User::ROLE_STAFF, function ($reservationQuery) use ($user) {
+                        $branchId = $user->assignedBranchId($user->activeLibraryId());
+
+                        $reservationQuery->where(function ($scopeQuery) use ($branchId) {
+                            $scopeQuery
+                                ->where(function ($libraryScopeQuery) {
+                                    $libraryScopeQuery
+                                        ->where('scope', Reservation::SCOPE_LIBRARY)
+                                        ->whereNull('branch_id');
+                                })
+                                ->orWhere(function ($branchScopeQuery) use ($branchId) {
+                                    if ($branchId === null) {
+                                        $branchScopeQuery->whereRaw('1 = 0');
+
+                                        return;
+                                    }
+
+                                    $branchScopeQuery
+                                        ->where('scope', Reservation::SCOPE_BRANCH)
+                                        ->where('branch_id', $branchId);
+                                });
+                        });
+                    })
                     ->with([
                         'user:id,name,email,membership_number',
                         'branch:id,name',
                     ])
                     ->orderBy('reserved_at');
             },
-            'bookCopies' => function ($q) use ($libraryIds, $copyStatus, $copyLifecycle, $copySearch, $branchId, $locationId) {
+            'bookCopies' => function ($q) use ($libraryIds, $copyStatus, $copyLifecycle, $copySearch, $branchId, $locationId, $user) {
                 $q->when(is_array($libraryIds), fn ($copyQuery) => $copyQuery
                     ->withoutGlobalScope('library')
                     ->whereIn('library_id', $libraryIds))
@@ -76,16 +100,25 @@ class GetLibraryBookDetailsQuery
                         'branch:id,name',
                         'library:id,name,code,address,city',
                         'location:id,name,room,shelf',
-                        'activeLoan' => function ($loanQuery) {
+                        'activeLoan' => function ($loanQuery) use ($user) {
                             $loanQuery->select([
                                 'id',
+                                'library_id',
                                 'book_copy_id',
                                 'user_id',
                                 'status',
                                 'due_at',
                                 'borrowed_at',
                                 'returned_at',
-                            ])->with([
+                            ])
+                            ->when($user?->role === User::ROLE_STAFF, function ($staffLoanQuery) use ($user) {
+                                $branchId = $user->assignedBranchId($user->activeLibraryId());
+
+                                $staffLoanQuery->whereHas('bookCopy', fn ($copyQuery) => $branchId
+                                    ? $copyQuery->where('branch_id', $branchId)
+                                    : $copyQuery->whereRaw('1 = 0'));
+                            })
+                            ->with([
                                 'user:id,name,email,membership_number',
                             ]);
                         },

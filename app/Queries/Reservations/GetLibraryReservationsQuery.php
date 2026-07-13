@@ -78,6 +78,31 @@ class GetLibraryReservationsQuery
 
         return Reservation::query()
             ->when(! empty($libraryId), fn ($builder) => $builder->where('library_id', $libraryId))
+            ->when($user->role === User::ROLE_STAFF, function (Builder $builder) use ($user, $libraryId) {
+                $branchId = $user->assignedBranchId($libraryId);
+
+                $builder->where(function (Builder $scopeQuery) use ($branchId) {
+                    if ($branchId === null) {
+                        $scopeQuery
+                            ->where('scope', Reservation::SCOPE_LIBRARY)
+                            ->whereNull('branch_id');
+
+                        return;
+                    }
+
+                    $scopeQuery
+                        ->where(function (Builder $branchScopeQuery) use ($branchId) {
+                            $branchScopeQuery
+                                ->where('scope', Reservation::SCOPE_BRANCH)
+                                ->where('branch_id', $branchId);
+                        })
+                        ->orWhere(function (Builder $libraryScopeQuery) {
+                            $libraryScopeQuery
+                                ->where('scope', Reservation::SCOPE_LIBRARY)
+                                ->whereNull('branch_id');
+                        });
+                });
+            })
             ->when(! empty($status), fn ($builder) => $this->applyStatusFilter($builder, (string) $status))
             ->when($reservationDateRange, fn ($builder) => $builder->whereBetween('reserved_at', $reservationDateRange))
             ->when($search !== '', function (Builder $query) use ($search) {

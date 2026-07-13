@@ -5,8 +5,10 @@ namespace App\Http\Requests;
 use App\Models\BookCopy;
 use App\Models\Branch;
 use App\Models\Location;
+use App\Services\BookCopyBranchTransferService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ManageBookCopyRequest extends FormRequest
 {
@@ -29,15 +31,13 @@ class ManageBookCopyRequest extends FormRequest
 
     public function rules(): array
     {
-        $libraryId = $this->user()?->isSuperAdmin()
-            ? $this->input('library_id')
-            : $this->user()?->activeLibraryId();
+        $libraryId = $this->libraryId();
         $bookCopyId = $this->currentBookCopyId();
 
         return [
             'book_id' => ['required', 'integer', 'exists:books,id'],
             'library_id' => [
-                Rule::requiredIf(fn () => $this->user()?->isSuperAdmin()),
+                Rule::requiredIf(fn () => $this->user()?->isSuperAdmin() && ! $this->currentBookCopy()),
                 'nullable',
                 'integer',
                 'exists:libraries,id',
@@ -68,28 +68,35 @@ class ManageBookCopyRequest extends FormRequest
                     ->where(fn ($query) => $query->where('library_id', $libraryId))
                     ->ignore($bookCopyId),
             ],
-            'status' => ['required', Rule::in(['laisva', 'išduota', 'prarasta', 'sugadinta', 'tvarkoma', 'nurašyta'])],
+            'status' => ['required', Rule::in(array_keys(BookCopy::statusLabels()))],
             'condition_status' => ['required', Rule::in(['nauja', 'gera', 'padėvėta', 'sugadinta'])],
             'acquired_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
         ];
     }
 
-    private function currentBookCopyId(): int|string|null
-    {
-        $bookCopy = $this->route('book_copy') ?? $this->route('bookCopy');
-
-        if (! $bookCopy) {
-            return null;
-        }
-
-        return is_object($bookCopy) ? $bookCopy->getKey() : $bookCopy;
-    }
-
     public function after(): array
     {
         return [
             function ($validator) {
+                $libraryId = $this->libraryId();
+                $bookCopy = $this->currentBookCopy();
+
+                try {
+                    app(BookCopyBranchTransferService::class)->resolveBranchId(
+                        $this->user(),
+                        $libraryId,
+                        $this->input('branch_id'),
+                        $bookCopy
+                    );
+                } catch (ValidationException $exception) {
+                    foreach ($exception->errors() as $field => $messages) {
+                        foreach ($messages as $message) {
+                            $validator->errors()->add($field, $message);
+                        }
+                    }
+                }
+
                 $branchId = $this->input('branch_id');
                 $locationId = $this->input('location_id');
 
@@ -100,18 +107,39 @@ class ManageBookCopyRequest extends FormRequest
                 $branch = Branch::query()->find($branchId);
                 $location = Location::query()->find($locationId);
 
-                if (! $branch || ! $location || $location->branch_id !== $branch->id) {
+                if (
+                    ! $branch
+                    || ! $location
+                    || (int) $location->branch_id !== (int) $branch->id
+                    || (int) $location->library_id !== (int) $libraryId
+                ) {
                     $validator->errors()->add('location_id', 'Pasirinkta vieta nepriklauso šiam filialui.');
                 }
             },
         ];
     }
+
+    private function currentBookCopy(): ?BookCopy
+    {
+        $bookCopy = $this->route('book_copy') ?? $this->route('bookCopy');
+
+        return $bookCopy instanceof BookCopy ? $bookCopy : null;
+    }
+
+    private function currentBookCopyId(): int|string|null
+    {
+        $bookCopy = $this->currentBookCopy();
+
+        return $bookCopy?->getKey();
+    }
+
+    private function libraryId(): int
+    {
+        $bookCopy = $this->currentBookCopy();
+        $transferService = app(BookCopyBranchTransferService::class);
+
+        return $bookCopy
+            ? $transferService->libraryIdForUpdate($this->user(), $bookCopy, $this->input('library_id'))
+            : $transferService->libraryIdForCreate($this->user(), $this->input('library_id'));
+    }
 }
-
-
-
-
-
-
-
-

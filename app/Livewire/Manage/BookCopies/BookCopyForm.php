@@ -2,13 +2,15 @@
 
 namespace App\Livewire\Manage\BookCopies;
 
+use App\Actions\AuditLogs\RecordAuditLogAction;
 use App\Actions\BookCopies\ChangeBookCopyStatusAction;
 use App\Models\Book;
 use App\Models\BookCopy;
-use App\Models\Branch;
 use App\Models\Library;
 use App\Models\Location;
 use App\Models\User;
+use App\Services\BookCopyBranchTransferService;
+use App\Support\AuditLogChanges;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -91,6 +93,12 @@ class BookCopyForm extends Component
 
     public function updatedSelectedLibraryId(): void
     {
+        if ($this->isEditing) {
+            $this->selectedLibraryId = $this->bookCopy?->library_id;
+
+            return;
+        }
+
         $actor = Auth::user();
 
         $this->branchId = $actor?->role === User::ROLE_STAFF
@@ -105,7 +113,8 @@ class BookCopyForm extends Component
         $actor = Auth::user();
 
         if ($actor?->role === User::ROLE_STAFF) {
-            $this->branchId = $actor->assignedBranchId($this->selectedLibraryId);
+            $this->branchId = $this->bookCopy?->branch_id
+                ?: $actor->assignedBranchId($this->selectedLibraryId);
         }
 
         $this->locationId = null;
@@ -130,33 +139,24 @@ class BookCopyForm extends Component
             ]);
         }
 
-        $libraryId = $actor->isSuperAdmin()
-            ? $this->selectedLibraryId
-            : $actor->activeLibraryId();
+        $transferService = app(BookCopyBranchTransferService::class);
+        $libraryId = $this->bookCopy
+            ? $transferService->libraryIdForUpdate($actor, $this->bookCopy, $this->selectedLibraryId)
+            : $transferService->libraryIdForCreate($actor, $this->selectedLibraryId);
 
-        if ($actor->role === User::ROLE_STAFF) {
-            $staffBranchId = $actor->assignedBranchId($libraryId);
-
-            if (! $staffBranchId) {
-                throw ValidationException::withMessages([
-                    'branchId' => 'Darbuotojas turi būti priskirtas filialui.',
-                ]);
-            }
-
-            if (filled($this->branchId) && (int) $this->branchId !== (int) $staffBranchId) {
-                throw ValidationException::withMessages([
-                    'branchId' => 'Darbuotojas gali pridėti kopiją tik savo filiale.',
-                ]);
-            }
-
-            $this->branchId = $staffBranchId;
-        }
+        $this->branchId = $transferService->resolveBranchId(
+            $actor,
+            $libraryId,
+            $this->branchId,
+            $this->bookCopy,
+            'branchId'
+        );
 
         $bookCopyId = $this->bookCopy?->id;
 
         $validated = $this->validate([
             'selectedLibraryId' => [
-                Rule::requiredIf(fn () => $actor->isSuperAdmin()),
+                Rule::requiredIf(fn () => $actor->isSuperAdmin() && ! $this->bookCopy),
                 'nullable',
                 'integer',
                 'exists:libraries,id',
@@ -200,7 +200,7 @@ class BookCopyForm extends Component
             'status' => 'pradinė būsena',
             'conditionStatus' => 'fizinė būklė',
             'acquiredAt' => 'isigijimo data',
-            'notes' => 'paštąbos',
+            'notes' => 'pastabos',
         ]);
 
         if ($validated['locationId']) {
@@ -226,7 +226,7 @@ class BookCopyForm extends Component
         ];
 
         if ($this->bookCopy) {
-            $this->bookCopy->update($payload);
+            $this->updateBookCopy($actor, $payload);
 
             return redirect()
                 ->route('book-copies.show', $this->bookCopy)
@@ -254,26 +254,21 @@ class BookCopyForm extends Component
     public function render()
     {
         $actor = Auth::user();
-        $libraryId = $actor?->isSuperAdmin()
+        $libraryId = $this->bookCopy?->library_id ?: ($actor?->isSuperAdmin()
             ? $this->selectedLibraryId
-            : $actor?->activeLibraryId();
+            : $actor?->activeLibraryId());
         $staffBranchId = $actor?->role === User::ROLE_STAFF
             ? $actor->assignedBranchId($libraryId)
             : null;
         $effectiveBranchId = $staffBranchId ?: $this->branchId;
 
-        $libraries = $actor?->isSuperAdmin()
+        $libraries = $actor?->isSuperAdmin() && ! $this->isEditing
             ? Library::query()->orderBy('name')->get(['id', 'name'])
             : collect();
 
-        $branches = Branch::query()
-            ->when($libraryId, fn ($query) => $query->where('library_id', $libraryId))
-            ->when(! $actor?->isSuperAdmin(), fn ($query) => $query->where('library_id', $actor?->activeLibraryId()))
-            ->when($actor?->role === User::ROLE_STAFF, fn ($query) => $staffBranchId
-                ? $query->whereKey($staffBranchId)
-                : $query->whereRaw('1 = 0'))
-            ->orderBy('name')
-            ->get(['id', 'name', 'code']);
+        $branches = $actor
+            ? app(BookCopyBranchTransferService::class)->selectableBranches($actor, $libraryId, $this->bookCopy)
+            : collect();
 
         $locations = Location::query()
             ->when($libraryId, fn ($query) => $query->where('library_id', $libraryId))
@@ -292,6 +287,42 @@ class BookCopyForm extends Component
             'creatableStatusOptions' => $this->creatableStatusOptions(),
             'conditionOptions' => $this->conditionOptions(),
         ]);
+    }
+
+    private function updateBookCopy(User $actor, array $payload): void
+    {
+        $this->bookCopy->loadMissing('branch:id,name');
+
+        $originalBranchId = $this->bookCopy->branch_id ? (int) $this->bookCopy->branch_id : null;
+        $originalBranchName = $this->bookCopy->branch?->name;
+
+        $this->bookCopy->fill($payload);
+        $changedFields = array_keys($this->bookCopy->getDirty());
+        $changeSummary = AuditLogChanges::fromModel($this->bookCopy, $changedFields);
+        $this->bookCopy->save();
+        $this->bookCopy->loadMissing('branch:id,name');
+
+        if (in_array('branch_id', $changedFields, true)) {
+            $changeSummary['transfer'] = [
+                'old_branch_id' => $originalBranchId,
+                'old_branch_name' => $originalBranchName,
+                'new_branch_id' => $this->bookCopy->branch_id ? (int) $this->bookCopy->branch_id : null,
+                'new_branch_name' => $this->bookCopy->branch?->name,
+                'transferred_by' => $actor->id,
+                'transferred_at' => now()->toDateTimeString(),
+            ];
+        }
+
+        app(RecordAuditLogAction::class)->handle(
+            $actor,
+            'book_copy_updated',
+            $this->bookCopy,
+            sprintf('Atnaujinta kopija %s.', $this->bookCopy->inventory_code),
+            array_merge([
+                'inventory_code' => $this->bookCopy->inventory_code,
+            ], $changeSummary),
+            $this->bookCopy->library_id
+        );
     }
 
     private function statusOptions(): array
@@ -334,11 +365,3 @@ class BookCopyForm extends Component
         return $candidate;
     }
 }
-
-
-
-
-
-
-
-

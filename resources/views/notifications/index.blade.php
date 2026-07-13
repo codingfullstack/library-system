@@ -227,7 +227,7 @@
                                                         <x-ui.notification-icon :icon="$webUi['icon']" class="size-5" />
                                                     </span>
                                                     <div class="min-w-0">
-                                                        <div class="text-sm font-semibold text-zinc-950 dark:text-white">{{ $title }}</div>
+                                                        <a href="{{ $url }}" class="text-sm font-semibold text-zinc-950 transition hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">{{ $title }}</a>
                                                         <div class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{{ $message }}</div>
                                                     </div>
                                                 </div>
@@ -256,9 +256,6 @@
                                             </td>
                                             <td class="px-4 py-4 align-top">
                                                 <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-                                                    <a href="{{ $url }}" title="Peržiūrėti pranešimą" aria-label="Peržiūrėti pranešimą" class="transition hover:text-zinc-800 dark:hover:text-zinc-200">
-                                                        <flux:icon.eye class="size-4" />
-                                                    </a>
                                                     @unless($notification->read_at)
                                                         <button type="button" title="Pažymėti kaip perskaitytą" aria-label="Pažymėti kaip perskaitytą" class="transition hover:text-emerald-700 dark:hover:text-emerald-300" data-mark-notification-read="{{ $notification->id }}">
                                                             <flux:icon.check class="size-4" />

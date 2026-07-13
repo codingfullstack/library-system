@@ -31,7 +31,7 @@ class CreateReservationAction
 
         if (! $belongsToLibrary) {
             throw ValidationException::withMessages([
-                'book_id' => 'Si knyga nepriklauso pasirinktai bibliotekai.',
+                'book_id' => 'Ši knyga nepriklauso pasirinktai bibliotekai.',
             ]);
         }
 
@@ -48,7 +48,7 @@ class CreateReservationAction
 
         if ($hasActiveLoan) {
             throw ValidationException::withMessages([
-                'book_id' => 'Sis narys jau turi aktyviai isduota sia knyga.',
+                'book_id' => 'Šis narys jau turi aktyviai išduota šia knyga.',
             ]);
         }
 
@@ -61,7 +61,7 @@ class CreateReservationAction
 
         if ($hasPendingReservation) {
             throw ValidationException::withMessages([
-                'book_id' => 'Sis narys jau turi laukiancia sios knygos rezervacija.',
+                'book_id' => 'Šis narys jau turi laukiancia šios knygos rezervacija.',
             ]);
         }
 
@@ -71,8 +71,8 @@ class CreateReservationAction
         if ($hasAvailableCopy) {
             throw ValidationException::withMessages([
                 'book_id' => $scope === Reservation::SCOPE_BRANCH
-                    ? 'Knyga siuo metu prieinama pasirinktame filiale, rezervacija nereikalinga.'
-                    : 'Knyga siuo metu prieinama pasirinktoje bibliotekoje, rezervacija nereikalinga.',
+                    ? 'Knyga šiuo metu prieinama pasirinktame filiale, rezervacija nereikalinga.'
+                    : 'Knyga šiuo metu prieinama pasirinktoje bibliotekoje, rezervacija nereikalinga.',
             ]);
         }
 
@@ -198,7 +198,7 @@ class CreateReservationAction
 
         if (! in_array($scope, [Reservation::SCOPE_BRANCH, Reservation::SCOPE_LIBRARY], true)) {
             throw ValidationException::withMessages([
-                'scope' => 'Pasirinkite galiojancia rezervacijos apimti.',
+                'scope' => 'Pasirinkite galiojančią rezervacijos apimtį.',
             ]);
         }
 
@@ -215,7 +215,7 @@ class CreateReservationAction
 
             if (! $staffBranchId) {
                 throw ValidationException::withMessages([
-                    'branch_id' => 'Darbuotojas turi buti priskirtas filialui.',
+                    'branch_id' => 'Darbuotojas turi būti priskirtas filialui.',
                 ]);
             }
 
@@ -230,7 +230,7 @@ class CreateReservationAction
 
         if (! $branchId) {
             throw ValidationException::withMessages([
-                'branch_id' => 'Pasirinkite filiala filialo apimties rezervacijai.',
+                'branch_id' => 'Pasirinkite filialą filialo apimties rezervacijai.',
             ]);
         }
 

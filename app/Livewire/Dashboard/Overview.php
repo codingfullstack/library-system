@@ -343,6 +343,13 @@ class Overview extends Component
 
         return Loan::query()
             ->when(! $actor?->isSuperAdmin(), fn ($query) => $query->where('library_id', $actor?->activeLibraryId()))
+            ->when($actor?->role === \App\Models\User::ROLE_STAFF, function ($query) use ($actor) {
+                $branchId = $actor->assignedBranchId($actor->activeLibraryId());
+
+                $query->whereHas('bookCopy', fn ($copyQuery) => $branchId
+                    ? $copyQuery->where('branch_id', $branchId)
+                    : $copyQuery->whereRaw('1 = 0'));
+            })
             ->whereBetween('borrowed_at', [now()->startOfDay(), now()->endOfDay()])
             ->count();
     }
@@ -353,6 +360,13 @@ class Overview extends Component
 
         return Loan::query()
             ->when(! $actor?->isSuperAdmin(), fn ($query) => $query->where('library_id', $actor?->activeLibraryId()))
+            ->when($actor?->role === \App\Models\User::ROLE_STAFF, function ($query) use ($actor) {
+                $branchId = $actor->assignedBranchId($actor->activeLibraryId());
+
+                $query->whereHas('bookCopy', fn ($copyQuery) => $branchId
+                    ? $copyQuery->where('branch_id', $branchId)
+                    : $copyQuery->whereRaw('1 = 0'));
+            })
             ->whereNotNull('returned_at')
             ->whereBetween('returned_at', [now()->startOfDay(), now()->endOfDay()])
             ->count();
@@ -371,7 +385,6 @@ class Overview extends Component
             ->count();
     }
 }
-
 
 
 

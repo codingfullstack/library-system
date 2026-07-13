@@ -117,7 +117,7 @@ it('shows branch restriction hover titles for disabled copy actions', function (
         ->get(route('books.show', $book))
         ->assertOk()
         ->assertSee('Negalima išduoti: kopija priklauso kitam filialui.', false)
-        ->assertSee('Negalima priimti grąžinimo: kopija priklauso kitam filialui.', false);
+        ->assertDontSee('Negalima priimti grąžinimo: kopija priklauso kitam filialui.', false);
 });
 
 it('shows status reason hover title when copy can not be borrowed', function () {

@@ -16,7 +16,7 @@
     </div>
 
     <div class="grid gap-4 lg:grid-cols-2">
-        @if(auth()->user()?->isSuperAdmin())
+        @if(auth()->user()?->isSuperAdmin() && ! $isEditing)
             <div class="lg:col-span-2">
                 <label for="copy-library-id" class="app-label">Biblioteka</label>
                 <select id="copy-library-id" wire:model.live="selectedLibraryId" class="app-input" required>

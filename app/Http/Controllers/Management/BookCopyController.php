@@ -10,6 +10,7 @@ use App\Http\Requests\ManageBookCopyRequest;
 use App\Models\BookCopy;
 use App\Queries\Management\AuditLogs\GetRecentAuditLogsForModelQuery;
 use App\Queries\Management\BookCopies\GetManageBookCopiesQuery;
+use App\Services\BookCopyBranchTransferService;
 use App\Support\AuditLogChanges;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -38,16 +39,19 @@ class BookCopyController extends Controller
         return view('manage.book-copies.create');
     }
 
-    public function store(ManageBookCopyRequest $request, ChangeBookCopyStatusAction $changeBookCopyStatusAction): RedirectResponse
+    public function store(
+        ManageBookCopyRequest $request,
+        ChangeBookCopyStatusAction $changeBookCopyStatusAction,
+        BookCopyBranchTransferService $transferService
+    ): RedirectResponse
     {
-        $libraryId = $request->user()->isSuperAdmin()
-            ? $request->integer('library_id')
-            : $request->user()->activeLibraryId();
+        $libraryId = $transferService->libraryIdForCreate($request->user(), $request->input('library_id'));
+        $branchId = $transferService->resolveBranchId($request->user(), $libraryId, $request->input('branch_id'));
 
         $copy = BookCopy::create([
             'library_id' => $libraryId,
             'book_id' => $request->integer('book_id'),
-            'branch_id' => $request->integer('branch_id'),
+            'branch_id' => $branchId,
             'location_id' => $request->input('location_id') ? $request->integer('location_id') : null,
             'inventory_code' => $request->validated('inventory_code'),
             'qr_code' => $this->generateQrCode($libraryId),
@@ -105,18 +109,25 @@ class BookCopyController extends Controller
         ]);
     }
 
-    public function update(ManageBookCopyRequest $request, BookCopy $bookCopy): RedirectResponse
+    public function update(
+        ManageBookCopyRequest $request,
+        BookCopy $bookCopy,
+        BookCopyBranchTransferService $transferService
+    ): RedirectResponse
     {
         $this->authorize('update', $bookCopy);
 
-        $libraryId = $request->user()->isSuperAdmin()
-            ? $request->integer('library_id')
-            : $request->user()->activeLibraryId();
+        $bookCopy->loadMissing('branch:id,name');
+
+        $originalBranchId = $bookCopy->branch_id ? (int) $bookCopy->branch_id : null;
+        $originalBranchName = $bookCopy->branch?->name;
+        $libraryId = $transferService->libraryIdForUpdate($request->user(), $bookCopy, $request->input('library_id'));
+        $branchId = $transferService->resolveBranchId($request->user(), $libraryId, $request->input('branch_id'), $bookCopy);
 
         $bookCopy->fill([
             'library_id' => $libraryId,
             'book_id' => $request->integer('book_id'),
-            'branch_id' => $request->integer('branch_id'),
+            'branch_id' => $branchId,
             'location_id' => $request->input('location_id') ? $request->integer('location_id') : null,
             'inventory_code' => $request->validated('inventory_code'),
             'barcode' => $request->validated('barcode'),
@@ -128,6 +139,18 @@ class BookCopyController extends Controller
         $changedFields = array_keys($bookCopy->getDirty());
         $changeSummary = AuditLogChanges::fromModel($bookCopy, $changedFields);
         $bookCopy->save();
+        $bookCopy->loadMissing('branch:id,name');
+
+        if (in_array('branch_id', $changedFields, true)) {
+            $changeSummary['transfer'] = [
+                'old_branch_id' => $originalBranchId,
+                'old_branch_name' => $originalBranchName,
+                'new_branch_id' => $bookCopy->branch_id ? (int) $bookCopy->branch_id : null,
+                'new_branch_name' => $bookCopy->branch?->name,
+                'transferred_by' => $request->user()->id,
+                'transferred_at' => now()->toDateTimeString(),
+            ];
+        }
 
         app(RecordAuditLogAction::class)->handle(
             $request->user(),

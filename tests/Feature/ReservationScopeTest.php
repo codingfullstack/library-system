@@ -2,6 +2,7 @@
 
 use App\Actions\Reservations\CreateReservationAction;
 use App\Actions\Reservations\SyncReservationQueueAction;
+use App\Livewire\Reservations\CreateReservationForm;
 use App\Models\Book;
 use App\Models\BookCopy;
 use App\Models\Branch;
@@ -12,6 +13,7 @@ use App\Models\User;
 use App\Services\ReservationQueueService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -282,6 +284,40 @@ it('allows admins to create branch scoped reservations in any branch of their li
 
     expect($reservation->scope)->toBe(Reservation::SCOPE_BRANCH)
         ->and((int) $reservation->branch_id)->toBe((int) $fixture['branchB']->id);
+});
+
+it('lets staff switch to library scope when the book has no copies in their branch', function () {
+    $fixture = reservationScopeFixture();
+    $fixture['copyA']->delete();
+
+    $this->actingAs($fixture['staff'])
+        ->get(route('books.show', ['book' => $fixture['book'], 'tab' => 'reservations']))
+        ->assertOk()
+        ->assertSee('Šios knygos kopijų pasirinktame filiale nėra. Galite rinktis rezervaciją visoje bibliotekoje.')
+        ->assertSee('Visoje bibliotekoje')
+        ->assertSee('Skaitytojas gali būti pakviestas pasiimti knygą iš bet kurio šios bibliotekos filialo.')
+        ->assertSee('name="reservation_scope"', false);
+
+    Livewire::actingAs($fixture['staff'])
+        ->test(CreateReservationForm::class, ['book' => $fixture['book']])
+        ->assertSee('Šios knygos kopijų pasirinktame filiale nėra.')
+        ->assertDontSee('Sukurti rezervaciją')
+        ->set('scope', Reservation::SCOPE_LIBRARY)
+        ->assertSee('Sukurti rezervaciją')
+        ->set('memberSearch', $fixture['member']->email)
+        ->assertSee($fixture['member']->name);
+});
+
+it('shows member search results even when the current reservation scope is blocked', function () {
+    $fixture = reservationScopeFixture();
+    $fixture['copyA']->delete();
+
+    Livewire::actingAs($fixture['staff'])
+        ->test(CreateReservationForm::class, ['book' => $fixture['book']])
+        ->assertSee('Šios knygos kopijų pasirinktame filiale nėra.')
+        ->set('memberSearch', $fixture['member']->name)
+        ->assertSee($fixture['member']->name)
+        ->assertDontSee('Narių pagal šią paiešką nerasta.');
 });
 
 it('shows copy reservation details on the web book details page', function () {

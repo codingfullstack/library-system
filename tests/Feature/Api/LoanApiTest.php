@@ -2,6 +2,7 @@
 
 use App\Models\Book;
 use App\Models\BookCopy;
+use App\Models\Branch;
 use App\Models\Library;
 use App\Models\Loan;
 use App\Models\User;
@@ -11,12 +12,14 @@ uses(RefreshDatabase::class);
 
 it('returns canonical loan status fields from the api', function () {
     $library = Library::factory()->create();
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
     $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create();
     $copy = BookCopy::factory()->create([
         'library_id' => $library->id,
         'book_id' => $book->id,
+        'branch_id' => $branch->id,
     ]);
 
     $loan = Loan::factory()->create([

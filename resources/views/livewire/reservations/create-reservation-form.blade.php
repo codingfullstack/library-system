@@ -54,7 +54,7 @@
                     type="search"
                     wire:model.live.debounce.300ms="memberSearch"
                     class="app-input"
-                    placeholder="Ieškoti pagal vardą, el. paštą, nario numeri arba telefona"
+                    placeholder="Ieškoti pagal vardą, el. paštą, nario numerį arba telefoną"
                     autocomplete="off"
                 >
 
@@ -95,7 +95,7 @@
 
         @if($isReservable && $hasQueueAhead)
             <x-ui.alert type="info" class="mb-0">
-                Šiai knygai jau yra aktyvi rezervacija. Nauja rezervacija bus įtraukta į eilę, o galiojimo terminas bus priskirtas, kai ateis jos eile.
+                Šiai knygai jau yra aktyvi rezervacija. Nauja rezervacija bus įtraukta į eilę, o galiojimo terminas bus priskirtas, kai ateis jos eilė.
             </x-ui.alert>
         @elseif($isReservable)
             <div>
@@ -125,7 +125,7 @@
         />
     @endif
 
-    @if($actor && $isReservable)
+    @if($actor && ($isReservable || $canChooseScope))
         <div class="space-y-3">
             <p class="app-label">Rezervacijos apimtis</p>
 
@@ -133,6 +133,7 @@
                 <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-200 bg-white p-3 text-sm dark:border-zinc-800 dark:bg-zinc-950/40">
                     <input
                         type="radio"
+                        name="reservation_scope"
                         wire:model.live="scope"
                         value="{{ \App\Models\Reservation::SCOPE_BRANCH }}"
                         class="mt-1"
@@ -153,7 +154,7 @@
                     <div>
                         <label for="reservation-branch-id" class="sr-only">Filialas</label>
                         <select id="reservation-branch-id" wire:model.live="branchId" class="app-input">
-                            <option value="">Pasirinkite filiala</option>
+                            <option value="">Pasirinkite filialą</option>
                             @foreach($branchOptions as $branch)
                                 <option value="{{ $branch->id }}">{{ $branch->name }}</option>
                             @endforeach
@@ -167,6 +168,7 @@
                 <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-200 bg-white p-3 text-sm dark:border-zinc-800 dark:bg-zinc-950/40">
                     <input
                         type="radio"
+                        name="reservation_scope"
                         wire:model.live="scope"
                         value="{{ \App\Models\Reservation::SCOPE_LIBRARY }}"
                         class="mt-1"
@@ -174,7 +176,7 @@
                     <span>
                         <span class="block font-semibold text-zinc-950 dark:text-white">Visoje bibliotekoje</span>
                         <span class="mt-1 block text-xs text-zinc-500 dark:text-zinc-400">
-                            Skaitytojas gali buti pakviestas pasiimti knyga is bet kurio sios bibliotekos filialo.
+                            Skaitytojas gali būti pakviestas pasiimti knygą iš bet kurio šios bibliotekos filialo.
                         </span>
                     </span>
                 </label>
@@ -184,7 +186,9 @@
                 <p class="text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
             @enderror
         </div>
+    @endif
 
+    @if($actor && $isReservable)
         <div>
             <label for="reservation-notes" class="app-label">Pastabos</label>
             <textarea

@@ -222,9 +222,6 @@
                                             </td>
                                             <td class="px-4 py-4 align-middle">
                                                 <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-                                                    <a href="{{ $reservation->book ? route('books.show', $reservation->book) : '#' }}" title="Peržiūrėti knygą" aria-label="Peržiūrėti knygą" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
-                                                        <flux:icon.eye class="size-4" />
-                                                    </a>
                                                     <div x-show="! cancelled">
                                                         @if($reservation->isPending())
                                                             <livewire:reservations.cancel-reservation-form :reservation="$reservation" :compact="true" :key="'member-reservation-cancel-'.$reservation->id" />

@@ -295,6 +295,74 @@ class User extends Authenticatable
         return $branchId !== null && (int) $bookCopy->branch_id === $branchId;
     }
 
+    public function canViewSensitiveLoanDetails(Loan $loan): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        if (! $this->belongsToLibrary($loan->library_id)) {
+            return false;
+        }
+
+        if ($this->role === self::ROLE_MEMBER) {
+            return (int) $loan->user_id === (int) $this->id;
+        }
+
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        if ($this->role !== self::ROLE_STAFF) {
+            return false;
+        }
+
+        $branchId = $this->assignedBranchId($loan->library_id);
+
+        if ($branchId === null) {
+            return false;
+        }
+
+        $copyBranchId = $loan->relationLoaded('bookCopy')
+            ? $loan->bookCopy?->branch_id
+            : BookCopy::query()->whereKey($loan->book_copy_id)->value('branch_id');
+
+        return (int) $copyBranchId === (int) $branchId;
+    }
+
+    public function canViewSensitiveReservationDetails(Reservation $reservation): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        if (! $this->belongsToLibrary($reservation->library_id)) {
+            return false;
+        }
+
+        if ((int) $reservation->user_id === (int) $this->id) {
+            return true;
+        }
+
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        if ($this->role !== self::ROLE_STAFF) {
+            return false;
+        }
+
+        $branchId = $this->assignedBranchId($reservation->library_id);
+
+        if (($reservation->scope ?: Reservation::SCOPE_LIBRARY) === Reservation::SCOPE_LIBRARY && $reservation->branch_id === null) {
+            return true;
+        }
+
+        return $branchId !== null
+            && $reservation->scope === Reservation::SCOPE_BRANCH
+            && (int) $reservation->branch_id === (int) $branchId;
+    }
+
     public function libraryRole(int|string|null $libraryId): ?string
     {
         if (empty($libraryId)) {

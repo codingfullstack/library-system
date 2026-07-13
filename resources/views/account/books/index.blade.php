@@ -102,7 +102,6 @@
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Biblioteka</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Būsena</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Pask. atnaujinta</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Veiksmai</th>
                                     </tr>
                                 </thead>
 
@@ -161,11 +160,6 @@
                                             </td>
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-600 dark:text-zinc-400">
                                                 {{ $book->updated_at?->format('Y-m-d') ?: '-' }}
-                                            </td>
-                                            <td class="px-4 py-4 align-middle">
-                                                <a href="{{ route('books.show', $book) }}" title="Peržiūrėti knygą" aria-label="Peržiūrėti knygą" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-500 transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:text-white">
-                                                    <flux:icon.eye class="size-4" />
-                                                </a>
                                             </td>
                                         </tr>
                                     @endforeach

@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\User;
 use App\Models\LibraryMembership;
+use App\Models\Reservation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 
@@ -34,6 +35,40 @@ class UserManagement
                 $builder->whereHas('libraryMemberships', fn (Builder $membershipQuery) => $membershipQuery
                     ->whereIn('library_id', $libraryIds)
                     ->where('is_active', true));
+            })
+            ->when($actor->role === User::ROLE_STAFF, function (Builder $builder) use ($actor) {
+                $libraryId = $actor->activeLibraryId();
+                $branchId = $actor->assignedBranchId($libraryId);
+
+                $builder->where(function (Builder $activityQuery) use ($libraryId, $branchId) {
+                    if ($branchId === null) {
+                        $activityQuery->whereRaw('1 = 0');
+
+                        return;
+                    }
+
+                    $activityQuery
+                        ->whereHas('loans.bookCopy', fn (Builder $copyQuery) => $copyQuery
+                            ->where('library_id', $libraryId)
+                            ->where('branch_id', $branchId))
+                        ->orWhereHas('reservations', function (Builder $reservationQuery) use ($libraryId, $branchId) {
+                            $reservationQuery
+                                ->where('library_id', $libraryId)
+                                ->where(function (Builder $scopeQuery) use ($branchId) {
+                                    $scopeQuery
+                                        ->where(function (Builder $libraryScopeQuery) {
+                                            $libraryScopeQuery
+                                                ->where('scope', Reservation::SCOPE_LIBRARY)
+                                                ->whereNull('branch_id');
+                                        })
+                                        ->orWhere(function (Builder $branchScopeQuery) use ($branchId) {
+                                            $branchScopeQuery
+                                                ->where('scope', Reservation::SCOPE_BRANCH)
+                                                ->where('branch_id', $branchId);
+                                        });
+                                });
+                        });
+                });
             })
             ->whereIn('role', $roles);
     }

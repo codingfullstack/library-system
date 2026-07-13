@@ -12,29 +12,11 @@ class LoanResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
-            'id' => $this->id,
-            'library_id' => $this->library_id,
-            'book_copy_id' => $this->book_copy_id,
-            'user_id' => $this->user_id,
-            'issued_by' => $this->issued_by,
-            'received_by' => $this->received_by,
-            'borrowed_at' => $this->borrowed_at,
-            'due_at' => $this->due_at,
-            'returned_at' => $this->returned_at,
+        $canViewSensitiveDetails = $request->user()?->canViewSensitiveLoanDetails($this->resource) ?? false;
+
+        $safe = [
             'status' => $this->status,
             'status_label' => $this->statusLabel(),
-            'renewal_count' => $this->renewal_count,
-            'notes' => $this->notes,
-            'is_overdue' => $this->is_overdue,
-            'is_due_soon' => $this->isDueSoon(),
-            'overdue_days' => $this->overdue_days,
-            'user' => $this->user ? [
-                'id' => $this->user->id,
-                'name' => $this->user->name,
-                'email' => $this->user->email,
-                'membership_number' => $this->user->membership_number,
-            ] : null,
             'book_copy' => $this->bookCopy ? [
                 'id' => $this->bookCopy->id,
                 'inventory_code' => $this->bookCopy->inventory_code,
@@ -56,6 +38,34 @@ class LoanResource extends JsonResource
                     'shelf' => $this->bookCopy->location->shelf,
                 ] : null,
             ] : null,
+        ];
+
+        if (! $canViewSensitiveDetails) {
+            return $safe;
+        }
+
+        return array_merge([
+            'id' => $this->id,
+            'library_id' => $this->library_id,
+            'book_copy_id' => $this->book_copy_id,
+            'user_id' => $this->user_id,
+            'issued_by' => $this->issued_by,
+            'received_by' => $this->received_by,
+            'borrowed_at' => $this->borrowed_at,
+            'due_at' => $this->due_at,
+            'returned_at' => $this->returned_at,
+            'renewal_count' => $this->renewal_count,
+            'notes' => $this->notes,
+            'is_overdue' => $this->is_overdue,
+            'is_due_soon' => $this->isDueSoon(),
+            'overdue_days' => $this->overdue_days,
+            'user' => $this->user ? [
+                'id' => $this->user->id,
+                'name' => $this->user->name,
+                'email' => $this->user->email,
+                'membership_number' => $this->user->membership_number,
+            ] : null,
+        ], $safe, [
             'issuer' => $this->issuer ? [
                 'id' => $this->issuer->id,
                 'name' => $this->issuer->name,
@@ -64,7 +74,7 @@ class LoanResource extends JsonResource
                 'id' => $this->receiver->id,
                 'name' => $this->receiver->name,
             ] : null,
-        ];
+        ]);
     }
 }
 

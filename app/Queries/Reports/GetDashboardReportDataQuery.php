@@ -26,6 +26,7 @@ class GetDashboardReportDataQuery
     public function handle(User $user, array $filters = []): array
     {
         $libraryId = $user->isSuperAdmin() ? null : $user->activeLibraryId();
+        $staffBranchId = $user->role === User::ROLE_STAFF ? ($user->assignedBranchId($libraryId) ?? 0) : null;
         $dateFrom = $filters['date_from'] ?? null;
         $dateTo = $filters['date_to'] ?? null;
         $periodLabel = $filters['period_label'] ?? 'Visas laikotarpis';
@@ -36,10 +37,12 @@ class GetDashboardReportDataQuery
 
         $loansQuery = Loan::query()
             ->when($libraryId, fn (Builder $query) => $query->where('library_id', $libraryId));
+        $this->applyStaffLoanScope($loansQuery, $staffBranchId);
         $this->applyLoanPeriod($loansQuery, $dateFrom, $dateTo);
 
         $reservationsQuery = Reservation::query()
             ->when($libraryId, fn (Builder $query) => $query->where('library_id', $libraryId));
+        $this->applyStaffReservationScope($reservationsQuery, $staffBranchId);
         $this->applyReservationPeriod($reservationsQuery, $dateFrom, $dateTo);
 
         $membersQuery = User::query()
@@ -51,6 +54,7 @@ class GetDashboardReportDataQuery
                     ->where('is_active', true)),
                 fn (Builder $query) => $query->where('role', 'narys')
             );
+        $this->applyStaffMemberScope($membersQuery, $libraryId, $staffBranchId);
 
         $summary = [
             'book_copies_count' => (clone $copiesQuery)->count(),
@@ -91,7 +95,7 @@ class GetDashboardReportDataQuery
         $popularCategories = $this->getPopularCategories($libraryId, $dateFrom, $dateTo);
         $popularPublishers = $this->getPopularPublishers($libraryId, $dateFrom, $dateTo);
         $popularBookCopies = $this->getPopularBookCopies($libraryId, $dateFrom, $dateTo);
-        $activeMembers = $this->getActiveMembers($libraryId, $dateFrom, $dateTo);
+        $activeMembers = $this->getActiveMembers($libraryId, $dateFrom, $dateTo, $staffBranchId);
         $copiesByStatus = $this->getCopiesByStatus($copiesQuery);
         $copiesByBranch = $this->getCopiesByBranch($libraryId, $dateFrom, $dateTo);
         $activityTimeline = $this->getActivityTimeline($libraryId, $dateFrom, $dateTo);
@@ -358,7 +362,7 @@ class GetDashboardReportDataQuery
             ->get();
     }
 
-    protected function getActiveMembers(?int $libraryId, ?CarbonImmutable $dateFrom, ?CarbonImmutable $dateTo): Collection
+    protected function getActiveMembers(?int $libraryId, ?CarbonImmutable $dateFrom, ?CarbonImmutable $dateTo, ?int $staffBranchId = null): Collection
     {
         return User::query()
             ->select(['users.id', 'users.name', 'users.membership_number'])
@@ -369,6 +373,7 @@ class GetDashboardReportDataQuery
                     ->where('is_active', true)),
                 fn (Builder $query) => $query->where('role', 'narys')
             )
+            ->tap(fn (Builder $query) => $this->applyStaffMemberScope($query, $libraryId, $staffBranchId))
             ->where(function (Builder $query) use ($libraryId, $dateFrom, $dateTo) {
                 $query
                     ->whereHas('loans', function (Builder $loanQuery) use ($libraryId, $dateFrom, $dateTo) {
@@ -621,5 +626,78 @@ class GetDashboardReportDataQuery
         }
 
         return $query->whereBetween('reserved_at', [$dateFrom, $dateTo]);
+    }
+
+    protected function applyStaffLoanScope(Builder $query, ?int $staffBranchId): Builder
+    {
+        if ($staffBranchId === null) {
+            return $query;
+        }
+
+        if ($staffBranchId <= 0) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereHas('bookCopy', fn (Builder $copyQuery) => $copyQuery->where('branch_id', $staffBranchId));
+    }
+
+    protected function applyStaffReservationScope(Builder $query, ?int $staffBranchId): Builder
+    {
+        if ($staffBranchId === null) {
+            return $query;
+        }
+
+        if ($staffBranchId <= 0) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(function (Builder $scopeQuery) use ($staffBranchId) {
+            $scopeQuery
+                ->where(function (Builder $libraryScopeQuery) {
+                    $libraryScopeQuery
+                        ->where('scope', Reservation::SCOPE_LIBRARY)
+                        ->whereNull('branch_id');
+                })
+                ->orWhere(function (Builder $branchScopeQuery) use ($staffBranchId) {
+                    $branchScopeQuery
+                        ->where('scope', Reservation::SCOPE_BRANCH)
+                        ->where('branch_id', $staffBranchId);
+                });
+        });
+    }
+
+    protected function applyStaffMemberScope(Builder $query, ?int $libraryId, ?int $staffBranchId): Builder
+    {
+        if ($staffBranchId === null || $libraryId === null) {
+            return $query;
+        }
+
+        if ($staffBranchId <= 0) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(function (Builder $activityQuery) use ($libraryId, $staffBranchId) {
+            $activityQuery
+                ->whereHas('loans.bookCopy', fn (Builder $copyQuery) => $copyQuery
+                    ->where('library_id', $libraryId)
+                    ->where('branch_id', $staffBranchId))
+                ->orWhereHas('reservations', function (Builder $reservationQuery) use ($libraryId, $staffBranchId) {
+                    $reservationQuery
+                        ->where('library_id', $libraryId)
+                        ->where(function (Builder $scopeQuery) use ($staffBranchId) {
+                            $scopeQuery
+                                ->where(function (Builder $libraryScopeQuery) {
+                                    $libraryScopeQuery
+                                        ->where('scope', Reservation::SCOPE_LIBRARY)
+                                        ->whereNull('branch_id');
+                                })
+                                ->orWhere(function (Builder $branchScopeQuery) use ($staffBranchId) {
+                                    $branchScopeQuery
+                                        ->where('scope', Reservation::SCOPE_BRANCH)
+                                        ->where('branch_id', $staffBranchId);
+                                });
+                        });
+                });
+        });
     }
 }

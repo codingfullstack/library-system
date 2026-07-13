@@ -217,10 +217,6 @@
                                             </td>
                                             <td class="px-4 py-4 align-middle">
                                                 <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-                                                    <a href="{{ route('books.show', $loan->bookCopy->book) }}" title="Peržiūrėti knygą" aria-label="Peržiūrėti knygą" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
-                                                        <flux:icon.eye class="size-4" />
-                                                    </a>
-
                                                     @if(in_array($loan->status, ['aktyvi', 'vėluoja'], true))
                                                         <form method="POST" action="{{ route('loans.return', $loan->bookCopy) }}">
                                                             @csrf

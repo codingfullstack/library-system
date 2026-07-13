@@ -196,9 +196,6 @@
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">{{ $copy->updated_at?->format('Y-m-d') ?? '-' }}</td>
                                             <td class="px-4 py-4 align-middle">
                                                 <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-                                                    <a href="{{ route('book-copies.show', $copy) }}" title="Peržiūrėti kopiją" aria-label="Peržiūrėti kopiją" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
-                                                        <flux:icon.eye class="size-4" />
-                                                    </a>
                                                     @can('update', $copy)
                                                         <a href="{{ route('manage.book-copies.edit', $copy) }}" title="Redaguoti kopiją" aria-label="Redaguoti kopiją" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
                                                             <flux:icon.pencil-square class="size-4" />

@@ -31,6 +31,12 @@ class BookCopyPolicy
         return $user->canManageBookCopy($bookCopy);
     }
 
+    public function transfer(User $user, BookCopy $bookCopy, mixed $targetBranch = null): bool
+    {
+        return app(\App\Services\BookCopyBranchTransferService::class)
+            ->canTransfer($user, $bookCopy, $targetBranch);
+    }
+
     public function delete(User $user, BookCopy $bookCopy): bool
     {
         return $user->canManageBookCopy($bookCopy);

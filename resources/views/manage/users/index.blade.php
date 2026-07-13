@@ -152,7 +152,7 @@
                                                         {{ $managedUser->initials() }}
                                                     </span>
                                                     <div>
-                                                        <div class="font-semibold text-zinc-950 dark:text-white">{{ $managedUser->name }}</div>
+                                                        <a href="{{ route('manage.users.show', $managedUser) }}" class="font-semibold text-zinc-950 transition hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">{{ $managedUser->name }}</a>
                                                     </div>
                                                 </div>
                                             </td>
@@ -168,9 +168,6 @@
                                             </td>
                                             <td class="px-4 py-4 align-middle">
                                                 <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-                                                    <a href="{{ route('manage.users.show', $managedUser) }}" title="Peržiūrėti vartotoją" aria-label="Peržiūrėti vartotoją" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
-                                                        <flux:icon.eye class="size-4" />
-                                                    </a>
                                                     <a href="{{ route('manage.users.edit', $managedUser) }}" title="Redaguoti vartotoją" aria-label="Redaguoti vartotoją" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
                                                         <flux:icon.pencil-square class="size-4" />
                                                     </a>

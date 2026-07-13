@@ -148,6 +148,9 @@ class ReservationHistory extends Component
             ->when(! $actor->isSuperAdmin(), function ($query) use ($actor) {
                 $query->where('library_id', $actor->activeLibraryId());
             })
+            ->when($actor->role === User::ROLE_STAFF, function ($query) use ($actor) {
+                $this->scopeReservationsToStaffBranch($query, $actor);
+            })
             ->with('user:id,name,email,membership_number')
             ->get()
             ->sort(function (Reservation $left, Reservation $right) {
@@ -221,6 +224,9 @@ class ReservationHistory extends Component
             ->when(! $actor->isSuperAdmin(), function ($query) use ($actor) {
                 $query->where('library_id', $actor->activeLibraryId());
             })
+            ->when($actor->role === User::ROLE_STAFF, function ($query) use ($actor) {
+                $this->scopeReservationsToStaffBranch($query, $actor);
+            })
             ->when($bookCopy, function ($query) use ($bookCopy) {
                 $query->where('library_id', $bookCopy->library_id)
                     ->where(function ($scopeQuery) use ($bookCopy) {
@@ -288,5 +294,30 @@ class ReservationHistory extends Component
         }
 
         return 'Šioje bibliotekoje nėra laisvos kopijos išdavimui.';
+    }
+
+    private function scopeReservationsToStaffBranch($query, User $actor): void
+    {
+        $branchId = $actor->assignedBranchId($actor->activeLibraryId());
+
+        $query->where(function ($scopeQuery) use ($branchId) {
+            $scopeQuery
+                ->where(function ($libraryScopeQuery) {
+                    $libraryScopeQuery
+                        ->where('scope', Reservation::SCOPE_LIBRARY)
+                        ->whereNull('branch_id');
+                })
+                ->orWhere(function ($branchScopeQuery) use ($branchId) {
+                    if ($branchId === null) {
+                        $branchScopeQuery->whereRaw('1 = 0');
+
+                        return;
+                    }
+
+                    $branchScopeQuery
+                        ->where('scope', Reservation::SCOPE_BRANCH)
+                        ->where('branch_id', $branchId);
+                });
+        });
     }
 }

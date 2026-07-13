@@ -122,12 +122,12 @@ class CreateReservationForm extends Component
         }
 
         $this->validate($this->rulesFor($actor), [
-            'selectedMemberId.required' => 'Pasirinkite nari.',
-            'scope.required' => 'Pasirinkite rezervacijos apimti.',
-            'scope.in' => 'Pasirinkite galiojancia rezervacijos apimti.',
-            'branchId.required_if' => 'Pasirinkite filiala.',
-            'expiresAt.after' => 'Galiojimo data turi buti ateityje.',
-            'notes.max' => 'Pastabos negali virsyti 1000 simboliu.',
+            'selectedMemberId.required' => 'Pasirinkite narį.',
+            'scope.required' => 'Pasirinkite rezervacijos apimtį.',
+            'scope.in' => 'Pasirinkite galiojančią rezervacijos apimtį.',
+            'branchId.required_if' => 'Pasirinkite filialą.',
+            'expiresAt.after' => 'Galiojimo data turi būti ateityje.',
+            'notes.max' => 'Pastabos negali viršyti 1000 simbolių.',
         ]);
 
         try {
@@ -150,7 +150,7 @@ class CreateReservationForm extends Component
         $this->clearMember();
         $this->expiresAt = null;
         $this->notes = '';
-        $this->successMessage = 'Rezervacija sekmingai sukurta.';
+        $this->successMessage = 'Rezervacija sėkmingai sukurta.';
 
         $this->dispatch('reservation-created', bookId: $this->bookId);
 
@@ -164,7 +164,7 @@ class CreateReservationForm extends Component
         $isReservable = $this->isReservable($actor);
         $reservationBlockedMessage = $this->reservationBlockedMessage($actor);
 
-        if ($actor && $isReservable && $this->usesMemberSearch($actor) && trim($this->memberSearch) !== '') {
+        if ($actor && $this->usesMemberSearch($actor) && trim($this->memberSearch) !== '') {
             $members = $searchLibraryMembersQuery->handle($actor, $this->memberSearch);
         }
 
@@ -172,6 +172,7 @@ class CreateReservationForm extends Component
             'actor' => $actor,
             'members' => $members,
             'isReservable' => $isReservable,
+            'canChooseScope' => $this->canChooseScope($actor),
             'reservationBlockedMessage' => $reservationBlockedMessage,
             'usesMemberSearch' => $actor ? $this->usesMemberSearch($actor) : false,
             'hasQueueAhead' => $this->hasQueueAhead(),
@@ -330,7 +331,7 @@ class CreateReservationForm extends Component
         }
 
         $branchId = $this->selectedScopeBranchId($actor);
-        $scopeLabel = $this->scope === Reservation::SCOPE_BRANCH ? 'pasirinktame filiale' : 'tavo bibliotekose';
+        $scopeLabel = $this->scope === Reservation::SCOPE_BRANCH ? 'pasirinktame filiale' : 'tavo bibliotekoje';
 
         $hasCopies = BookCopy::query()
             ->withoutGlobalScope('library')
@@ -340,14 +341,35 @@ class CreateReservationForm extends Component
             ->exists();
 
         if (! $hasCopies) {
-            return 'Si knyga '.$scopeLabel.' neprieinama.';
+            return $this->scope === Reservation::SCOPE_BRANCH
+                ? 'Šios knygos kopijų pasirinktame filiale nėra. Galite rinktis rezervaciją visoje bibliotekoje.'
+                : 'Šios knygos kopijų tavo bibliotekoje nėra.';
         }
 
         if (app(ReservationQueueService::class)->hasAvailableCopies($libraryId, $this->bookId, $this->scope, $branchId)) {
-            return 'Si knyga siuo metu prieinama '.$scopeLabel.', rezervacija nereikalinga.';
+            return 'Ši knyga šiuo metu prieinama '.$scopeLabel.', rezervacija nereikalinga.';
         }
 
         return null;
+    }
+
+    private function canChooseScope(?User $actor): bool
+    {
+        if (! $actor || ! $this->isReservationAvailabilityKnown($actor)) {
+            return false;
+        }
+
+        $libraryId = $this->selectedReservationLibraryId($actor);
+
+        if (! $libraryId) {
+            return false;
+        }
+
+        return BookCopy::query()
+            ->withoutGlobalScope('library')
+            ->where('library_id', $libraryId)
+            ->where('book_id', $this->bookId)
+            ->exists();
     }
 
     private function selectedScopeBranchId(?User $actor): ?int
