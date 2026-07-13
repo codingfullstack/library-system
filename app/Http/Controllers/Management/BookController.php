@@ -160,7 +160,7 @@ class BookController extends Controller
         $book = $findVisibleManagedBookQuery->handle($request->user(), $book);
 
         if ($book->bookCopies()->exists()) {
-            return back()->with('error', 'Knygos ištrinti negalima, nes ji turi egzempliorių.');
+            return back()->with('error', 'Knygos ištrinti negalima, nes ji turi kopijų.');
         }
 
         if ($book->reservations()->exists()) {

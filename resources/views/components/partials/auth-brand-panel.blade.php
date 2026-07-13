@@ -28,7 +28,7 @@
                 </span>
                 <div>
                     <h2 class="text-base font-bold text-slate-900 dark:text-white">Tvarkykite katalogą</h2>
-                    <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-zinc-300">Lengvai pridėkite ir redaguokite knygas, egzempliorius ir autorius.</p>
+                    <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-zinc-300">Lengvai pridėkite ir redaguokite knygas, kopijas ir autorius.</p>
                 </div>
             </div>
 

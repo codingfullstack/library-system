@@ -125,7 +125,7 @@ class Overview extends Component
 
         return [
             $this->card(
-                'Knygų egzemplioriai',
+                'Knygų kopijos',
                 (int) $report['summary']['book_copies_count'],
                 'Iš viso',
                 'book-open-text',
@@ -213,9 +213,9 @@ class Overview extends Component
                 'accent' => 'emerald',
             ],
             [
-                'label' => 'Nauji egzemplioriai',
+                'label' => 'Naujos kopijos',
                 'value' => (int) $report['summary']['book_copies_count'],
-                'caption' => 'Egzemplioriai',
+                'caption' => 'Kopijos',
                 'accent' => 'sky',
             ],
             [
@@ -271,7 +271,7 @@ class Overview extends Component
     {
         $actions = [
             [
-                'label' => 'Pridėti egzempliorių',
+                'label' => 'Pridėti kopiją',
                 'route' => route('manage.book-copies.create'),
             ],
             [
@@ -371,7 +371,6 @@ class Overview extends Component
             ->count();
     }
 }
-
 
 
 

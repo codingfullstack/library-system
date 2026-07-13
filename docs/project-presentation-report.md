@@ -4,7 +4,7 @@ Parengta profesionaliai produkto, techninei ir prezentacinei medžiagai.
 
 ## 1. Projekto apžvalga
 
-Sistema yra moderni bibliotekų valdymo platforma, sudaryta iš Laravel web sistemos, REST API ir Android aplikacijos. Ji skirta bibliotekoms, kurios nori centralizuotai valdyti knygų katalogą, filialus, fizinius knygų egzempliorius, skolinimus, grąžinimus, rezervacijas, skaitytojus, darbuotojus ir pranešimus.
+Sistema yra moderni bibliotekų valdymo platforma, sudaryta iš Laravel web sistemos, REST API ir Android aplikacijos. Ji skirta bibliotekoms, kurios nori centralizuotai valdyti knygų katalogą, filialus, fizines knygų kopijas, skolinimus, grąžinimus, rezervacijas, skaitytojus, darbuotojus ir pranešimus.
 
 ### Sprendžiama problema
 
@@ -12,9 +12,9 @@ Tipinėse bibliotekose dažnai naudojami atskiri, fragmentuoti procesai: knygų 
 
 Ši sistema problemą sprendžia kaip vientisa platforma:
 
-- vienas katalogas knygoms ir egzemplioriams;
+- vienas katalogas knygoms ir kopijoms;
 - aiškus filialų ir lokacijų modelis;
-- kiekvienas egzempliorius turi inventorinį kodą, QR kodą, būseną ir istoriją;
+- kiekviena kopija turi inventorinį kodą, QR kodą, būseną ir istoriją;
 - nariai gali rezervuoti knygas ir matyti savo paskyrą;
 - darbuotojai gali greitai aptarnauti skaitytojus;
 - vadovai gali matyti statistiką ir audito informaciją;
@@ -30,14 +30,14 @@ Tipinėse bibliotekose dažnai naudojami atskiri, fragmentuoti procesai: knygų 
 
 ### Nauda
 
-Sistema suteikia ne tik knygų registrą, bet ir pilną operacinį bibliotekos valdymą. Ji mažina rankinio darbo kiekį, leidžia greičiau aptarnauti skaitytojus, suteikia realaus laiko informaciją apie egzempliorių būsenas, padeda valdyti rezervacijų eiles ir suteikia saugų vaidmenimis paremtą administravimą.
+Sistema suteikia ne tik knygų registrą, bet ir pilną operacinį bibliotekos valdymą. Ji mažina rankinio darbo kiekį, leidžia greičiau aptarnauti skaitytojus, suteikia realaus laiko informaciją apie kopijų būsenas, padeda valdyti rezervacijų eiles ir suteikia saugų vaidmenimis paremtą administravimą.
 
 ### Kuo sistema skiriasi nuo paprastų bibliotekų sistemų
 
 Paprasta bibliotekų sistema dažnai apsiriboja knygų katalogu ir skolinimų žurnalu. Šis projektas turi platesnę architektūrą:
 
 - multi-tenant modelis: skirtingos bibliotekos izoliuotos viena nuo kitos;
-- atskirti loginiai knygos įrašai ir fiziniai egzemplioriai;
+- atskirti loginiai knygos įrašai ir fizinės kopijos;
 - QR kodų nuskaitymas ir mobili darbo eiga;
 - REST API Android aplikacijai;
 - Sanctum token autentifikacija;
@@ -50,8 +50,8 @@ Paprasta bibliotekų sistema dažnai apsiriboja knygų katalogu ir skolinimų ž
 ### Nauda darbuotojams
 
 - Greitesnis knygų išdavimas ir grąžinimas.
-- Mažiau rankinio tikrinimo, nes egzempliorių būsenos valdomos automatiškai.
-- QR skeneris leidžia rasti egzempliorių be rankinio paieškos darbo.
+- Mažiau rankinio tikrinimo, nes kopijų būsenos valdomos automatiškai.
+- QR skeneris leidžia rasti kopiją be rankinio paieškos darbo.
 - Rezervacijų eilė parodo, kam pirmiausia turi būti išduota knyga.
 - Narių paieška leidžia greitai identifikuoti skaitytoją.
 
@@ -108,7 +108,7 @@ Sprendžiama problema: vien katalogo nepakanka, kai knygos yra skirtinguose fili
 
 Paskirtis: valdyti lentynas, kambarius, sales ar kitas vietas filialuose.
 
-Nauda: darbuotojas žino, kur fiziškai yra egzempliorius.
+Nauda: darbuotojas žino, kur fiziškai yra kopija.
 
 Sprendžiama problema: mažėja paieškos laikas ir painiava fonde.
 
@@ -118,7 +118,7 @@ Paskirtis: saugoti knygos pavadinimą, subtitrą, ISBN, aprašymą, leidėją, k
 
 Nauda: skaitytojai ir darbuotojai turi centralizuotą paieškos vietą.
 
-Sprendžiama problema: knygos informacija nebedubliuojama kiekvienam fiziniam egzemplioriui.
+Sprendžiama problema: knygos informacija nebedubliuojama kiekvienai fizinei kopijai.
 
 ### 7. Autorių valdymas
 
@@ -144,25 +144,25 @@ Nauda: papildomas bibliografinis tikslumas.
 
 Sprendžiama problema: leidėjo informacija nėra rašoma laisvu tekstu kiekvienoje knygoje.
 
-### 10. Knygų egzemplioriai
+### 10. Knygų kopijos
 
 Paskirtis: valdyti fizines knygų kopijas su biblioteka, filialu, lokacija, inventoriniu kodu, QR kodu, brūkšniniu kodu, būsena ir pastabomis.
 
-Nauda: viena knyga gali turėti daug egzempliorių skirtingose bibliotekose ir filialuose.
+Nauda: viena knyga gali turėti daug kopijų skirtingose bibliotekose ir filialuose.
 
 Sprendžiama problema: katalogas nebesupainioja knygos aprašo su realia fizine kopija.
 
-### 11. Egzemplioriaus būsenų gyvavimo ciklas
+### 11. Kopijos būsenų gyvavimo ciklas
 
-Paskirtis: keisti egzemplioriaus būsenas: laisva, išduota, prarasta, sugadinta, tvarkoma, nurašyta.
+Paskirtis: keisti kopijos būsenas: laisva, išduota, prarasta, sugadinta, tvarkoma, nurašyta.
 
 Nauda: fondas matomas realiu laiku.
 
 Sprendžiama problema: darbuotojai žino, ar knyga išduodama, remontuojama, prarasta ar nurašyta.
 
-### 12. Egzemplioriaus būsenų istorija
+### 12. Kopijos būsenų istorija
 
-Paskirtis: saugoti, kada ir kas pakeitė egzemplioriaus būseną.
+Paskirtis: saugoti, kada ir kas pakeitė kopijos būseną.
 
 Nauda: atsiranda atsekamumas.
 
@@ -170,7 +170,7 @@ Sprendžiama problema: galima paaiškinti, kodėl kopija tapo neaktyvi, sugadint
 
 ### 13. Knygos išdavimas
 
-Paskirtis: darbuotojas ar administratorius išduoda laisvą egzempliorių nariui.
+Paskirtis: darbuotojas ar administratorius išduoda laisvą kopiją nariui.
 
 Nauda: sukuriamas paskolos įrašas, kopija pažymima kaip išduota, registruojamas auditas.
 
@@ -178,7 +178,7 @@ Sprendžiama problema: išdavimai nebevyksta rankiniu žurnalu ir nebelieka neai
 
 ### 14. Knygos grąžinimas
 
-Paskirtis: užbaigti aktyvią paskolą ir grąžinti egzempliorių į laisvą fondą.
+Paskirtis: užbaigti aktyvią paskolą ir grąžinti kopiją į laisvą fondą.
 
 Nauda: sistema automatiškai atnaujina kopijos būseną ir praneša vartotojui.
 
@@ -194,7 +194,7 @@ Sprendžiama problema: darbuotojams nereikia rankiniu būdu tikrinti terminų.
 
 ### 16. Rezervacijos
 
-Paskirtis: narys arba darbuotojas gali rezervuoti knygą, kai nėra laisvo egzemplioriaus.
+Paskirtis: narys arba darbuotojas gali rezervuoti knygą, kai nėra laisvos kopijos.
 
 Nauda: skaitytojas patenka į eilę ir gauna pranešimą, kai knyga paruošta.
 
@@ -242,7 +242,7 @@ Sprendžiama problema: nereikia rankiniu būdu ieškoti nario pagal vardą ar el
 
 ### 22. Knygos kopijos QR kodas
 
-Paskirtis: kiekvienas egzempliorius turi QR kodą.
+Paskirtis: kiekviena kopija turi QR kodą.
 
 Nauda: darbuotojas telefonu ar web gali greitai atidaryti kopijos informaciją.
 
@@ -274,7 +274,7 @@ Sprendžiama problema: svarbi informacija pasiekia vartotoją ne tik prisijungus
 
 ### 26. Audito žurnalas
 
-Paskirtis: saugoti svarbius administravimo, knygų, egzempliorių, paskolų, rezervacijų ir vartotojų veiksmus.
+Paskirtis: saugoti svarbius administravimo, knygų, kopijų, paskolų, rezervacijų ir vartotojų veiksmus.
 
 Nauda: vadovas gali matyti atsakomybę ir pokyčių istoriją.
 
@@ -380,8 +380,8 @@ Sprendžiama problema: viena biblioteka negali matyti ar keisti kitos biblioteko
 | Autorių valdymas | Taip | Taip | Taip | Ne |
 | Filialų valdymas | Taip | Taip | Taip | Ne |
 | Lokacijų valdymas | Taip | Taip | Taip | Ne |
-| Egzempliorių valdymas | Taip | Taip | Taip | Ne |
-| Egzemplioriaus būsenos keitimas | Taip | Taip | Taip | Ne |
+| Kopijų valdymas | Taip | Taip | Taip | Ne |
+| Kopijos būsenos keitimas | Taip | Taip | Taip | Ne |
 | Knygos išdavimas | Taip | Taip | Taip | Ne |
 | Knygos grąžinimas | Taip | Taip | Taip | Ne |
 | Aktyvių paskolų sąrašas bibliotekoje | Taip | Taip | Taip | Ne |
@@ -647,7 +647,7 @@ Paskirtis: loginis knygos įrašas.
 
 Svarbiausi laukai: `title`, `slug`, `subtitle`, `isbn`, `description`, `publisher_id`, `category_id`, `publication_year`, `language`, `page_count`, `edition`, `cover_image`.
 
-Ryšiai: priklauso leidėjui ir kategorijai, turi daug autorių, daug kategorijų, daug egzempliorių, rezervacijų ir paskolų per egzempliorius.
+Ryšiai: priklauso leidėjui ir kategorijai, turi daug autorių, daug kategorijų, daug kopijų, rezervacijų ir paskolų per kopijas.
 
 Naudojimo scenarijai: katalogas, paieška, knygos detalė, rezervacijos.
 
@@ -679,7 +679,7 @@ Svarbiausi laukai: `library_id`, `name`, `code`, `address`, `city`.
 
 Ryšiai: priklauso bibliotekai, turi lokacijas ir knygų kopijas.
 
-Naudojimo scenarijai: filialų struktūra, egzempliorių vieta.
+Naudojimo scenarijai: filialų struktūra, kopijų vieta.
 
 ### `locations`
 
@@ -693,7 +693,7 @@ Naudojimo scenarijai: lentynos, kambariai, fondų vietos.
 
 ### `book_copies`
 
-Paskirtis: fiziniai knygų egzemplioriai.
+Paskirtis: fizinės knygų kopijos.
 
 Svarbiausi laukai: `library_id`, `book_id`, `branch_id`, `location_id`, `inventory_code`, `qr_code`, `barcode`, `status`, `condition_status`, `acquired_at`, `notes`.
 
@@ -703,7 +703,7 @@ Naudojimo scenarijai: išdavimas, grąžinimas, QR nuskaitymas, inventorizacija,
 
 ### `book_copy_status_histories`
 
-Paskirtis: egzemplioriaus būsenų keitimo istorija.
+Paskirtis: kopijos būsenų keitimo istorija.
 
 Svarbiausi laukai: `book_copy_id`, `changed_by`, `from_status`, `to_status`, `reason_code`, `reason_notes`, `changed_at`.
 
@@ -873,7 +873,7 @@ AuditLog N -- 1 auditable polymorphic model
 
 Kas vyksta:
 
-1. Darbuotojas pasirenka arba nuskenuoja knygos egzempliorių.
+1. Darbuotojas pasirenka arba nuskenuoja knygos kopiją.
 2. Sistema patikrina, ar vartotojas turi teisę atnaujinti kopiją per `BookCopyPolicy`.
 3. `BorrowBookCopyAction` pradeda duomenų bazės transakciją.
 4. Kopija užrakinama `lockForUpdate`, kad tuo pačiu metu nebūtų išduota du kartus.
@@ -1060,7 +1060,7 @@ Darbuotojas:
 
 1. Prisijungia.
 2. Atidaro QR skenerį.
-3. Nuskenuoja knygos egzempliorių.
+3. Nuskenuoja knygos kopiją.
 4. Mato kopijos būseną, vietą, aktyvią paskolą ir galimus veiksmus.
 5. Išduoda knygą nariui arba priima grąžinimą.
 6. Gali pakeisti kopijos būseną į sugadinta, tvarkoma, prarasta ar nurašyta.
@@ -1223,7 +1223,7 @@ SEO strategija šiam projektui logiška: indeksuojami tik reprezentaciniai vieš
 |---|---|---|
 | Bibliotekų skaičius | Dažnai viena biblioteka | Kelios bibliotekos su izoliacija |
 | Filialai | Ribotas palaikymas | Filialai ir lokacijos |
-| Egzemplioriai | Dažnai supaprastinta | Pilnas fizinės kopijos modelis |
+| Kopijos | Dažnai supaprastinta | Pilnas fizinės kopijos modelis |
 | QR | Nebūtinai yra | Integruotas QR skenavimas |
 | Mobilumas | Dažnai nėra | Android aplikacija |
 | API | Ribota arba nėra | REST API |
@@ -1373,21 +1373,21 @@ Sistema kuria vertę trimis lygiais:
 
 ### 30 sekundžių pristatymas
 
-Tai moderni bibliotekų valdymo platforma, kuri sujungia web sistemą, REST API ir Android aplikaciją. Ji leidžia valdyti kelias bibliotekas, filialus, knygų katalogą, fizinius egzempliorius, skolinimus, grąžinimus, rezervacijas, vartotojus ir pranešimus. Sistema išsiskiria multi-tenant architektūra, QR kodų nuskaitymu, saugia rolėmis pagrįsta prieiga ir mobiliu darbuotojų bei skaitytojų aptarnavimu.
+Tai moderni bibliotekų valdymo platforma, kuri sujungia web sistemą, REST API ir Android aplikaciją. Ji leidžia valdyti kelias bibliotekas, filialus, knygų katalogą, fizines kopijas, skolinimus, grąžinimus, rezervacijas, vartotojus ir pranešimus. Sistema išsiskiria multi-tenant architektūra, QR kodų nuskaitymu, saugia rolėmis pagrįsta prieiga ir mobiliu darbuotojų bei skaitytojų aptarnavimu.
 
 ### 2 minučių pristatymas
 
-Bibliotekos kasdien susiduria su tais pačiais iššūkiais: kur tiksliai yra knyga, ar egzempliorius laisvas, kas jį turi, kas laukia eilėje, ar skaitytojas priklauso šiai bibliotekai, kas atliko pakeitimą. Ši sistema šiuos procesus sujungia į vieną platformą.
+Bibliotekos kasdien susiduria su tais pačiais iššūkiais: kur tiksliai yra knyga, ar kopija laisva, kas ją turi, kas laukia eilėje, ar skaitytojas priklauso šiai bibliotekai, kas atliko pakeitimą. Ši sistema šiuos procesus sujungia į vieną platformą.
 
-Laravel web dalis leidžia administruoti bibliotekas, filialus, lokacijas, katalogą, autorius, kategorijas, leidėjus, vartotojus, egzempliorius ir audito informaciją. REST API suteikia saugią prieigą Android aplikacijai. Android aplikacija leidžia prisijungti, naršyti katalogą, skenuoti QR kodus, išduoti ir grąžinti knygas, matyti rezervacijas, paskolas ir pranešimus.
+Laravel web dalis leidžia administruoti bibliotekas, filialus, lokacijas, katalogą, autorius, kategorijas, leidėjus, vartotojus, kopijas ir audito informaciją. REST API suteikia saugią prieigą Android aplikacijai. Android aplikacija leidžia prisijungti, naršyti katalogą, skenuoti QR kodus, išduoti ir grąžinti knygas, matyti rezervacijas, paskolas ir pranešimus.
 
 Svarbiausia, kad sistema yra multi-tenant: kelios bibliotekos gali naudoti tą pačią platformą, bet jų duomenys izoliuojami. Super administratorius mato visą platformą, o administratoriai ir darbuotojai dirba tik savo bibliotekos kontekste. Tai leidžia sistemą diegti ne tik vienoje bibliotekoje, bet ir visame bibliotekų tinkle.
 
 ### 5 minučių pristatymas
 
-Ši platforma sprendžia bibliotekų skaitmenizacijos problemą. Daug bibliotekų turi katalogą, bet neturi modernaus, mobilaus, kelioms bibliotekoms pritaikyto operacinio valdymo. Čia kiekviena knyga turi bibliografinį įrašą, o kiekvienas fizinis egzempliorius turi savo inventorinį kodą, QR kodą, filialą, lokaciją, būseną ir istoriją.
+Ši platforma sprendžia bibliotekų skaitmenizacijos problemą. Daug bibliotekų turi katalogą, bet neturi modernaus, mobilaus, kelioms bibliotekoms pritaikyto operacinio valdymo. Čia kiekviena knyga turi bibliografinį įrašą, o kiekviena fizinė kopija turi savo inventorinį kodą, QR kodą, filialą, lokaciją, būseną ir istoriją.
 
-Darbuotojo darbas tampa paprastesnis: jis gali nuskenuoti QR kodą, pamatyti kopijos būseną, išduoti knygą nariui, priimti grąžinimą arba pažymėti egzempliorių kaip sugadintą, prarastą ar nurašytą. Sistema transakcijose saugo išdavimus ir grąžinimus, todėl sumažėja klaidų rizika.
+Darbuotojo darbas tampa paprastesnis: jis gali nuskenuoti QR kodą, pamatyti kopijos būseną, išduoti knygą nariui, priimti grąžinimą arba pažymėti kopiją kaip sugadintą, prarastą ar nurašytą. Sistema transakcijose saugo išdavimus ir grąžinimus, todėl sumažėja klaidų rizika.
 
 Skaitytojui sistema suteikia savitarną: jis gali prisijungti, matyti savo paskolas, rezervacijas, gauti pranešimus ir jungtis prie viešų bibliotekų. Rezervacijų eilė valdoma automatiškai: kai atsiranda laisva kopija, pirmas eilėje esantis skaitytojas gauna atsiėmimo terminą ir pranešimą.
 
@@ -1399,11 +1399,11 @@ Tai nėra tik katalogas. Tai platforma, kuri gali augti į savivaldybės, mokykl
 
 Pradžioje verta parodyti problemą: bibliotekos turi daug fizinių objektų, daug skaitytojų, kelis filialus ir daug kasdienių operacijų. Jei visa tai valdoma rankiniu būdu arba keliose atskirose sistemose, atsiranda klaidos, prarandama kontrolė, sunku greitai aptarnauti skaitytoją.
 
-Šis projektas pateikia vientisą sprendimą. Pagrindas yra Laravel web sistema. Ji valdo viešą portalą, administracinę dalį, bibliotekas, filialus, lokacijas, katalogą, autorius, kategorijas, leidėjus, vartotojus, narystes, paskolas, rezervacijas, pranešimus ir auditą. Duomenų bazėje aiškiai atskiriama knyga ir jos fiziniai egzemplioriai. Tai leidžia realiai valdyti fondą: ta pati knyga gali būti keliose bibliotekose, keliuose filialuose ir skirtingose lentynose.
+Šis projektas pateikia vientisą sprendimą. Pagrindas yra Laravel web sistema. Ji valdo viešą portalą, administracinę dalį, bibliotekas, filialus, lokacijas, katalogą, autorius, kategorijas, leidėjus, vartotojus, narystes, paskolas, rezervacijas, pranešimus ir auditą. Duomenų bazėje aiškiai atskiriama knyga ir jos fizinės kopijos. Tai leidžia realiai valdyti fondą: ta pati knyga gali būti keliose bibliotekose, keliuose filialuose ir skirtingose lentynose.
 
 Antras sluoksnis yra REST API. API leidžia Android aplikacijai dirbti su tais pačiais duomenimis: prisijungti, gauti katalogą, matyti knygos detales, nuskaityti QR, išduoti, grąžinti, kurti rezervacijas, matyti aktyvias paskolas ir pranešimus. API apsaugota Sanctum tokenais ir throttle taisyklėmis.
 
-Trečias sluoksnis yra Android aplikacija. Ji suteikia mobilumą, kuris bibliotekos darbuotojui yra labai praktiškas. Darbuotojas gali su telefonu nueiti prie lentynos, nuskenuoti egzempliorių ir atlikti veiksmą vietoje. Skaitytojas gali matyti savo paskolas, rezervacijas ir gauti push pranešimus.
+Trečias sluoksnis yra Android aplikacija. Ji suteikia mobilumą, kuris bibliotekos darbuotojui yra labai praktiškas. Darbuotojas gali su telefonu nueiti prie lentynos, nuskenuoti kopiją ir atlikti veiksmą vietoje. Skaitytojas gali matyti savo paskolas, rezervacijas ir gauti push pranešimus.
 
 Svarbi architektūrinė idėja yra multi-tenant modelis. Kiekviena biblioteka turi savo kontekstą. `LibraryContext` nustato aktyvią biblioteką, o `BelongsToLibrary` automatiškai filtruoja duomenis. Policy klasės užtikrina, kad darbuotojas nematytų kitos bibliotekos duomenų. Super administratorius yra išimtinis platformos valdytojas.
 
@@ -1422,7 +1422,7 @@ Pabaigoje galima akcentuoti ateities kelią: RFID, savitarna, AI rekomendacijos,
 | 5 | Pagrindinės rolės | Rolių lentelė | Super Admin, Admin, Darbuotojas, Narys | Valdymo meniu |
 | 6 | Knygų katalogas | Katalogo vaizdas | Knygos aprašas atskirtas nuo kopijų | Knygų sąrašas |
 | 7 | Knygos detalė | Knygos puslapis su kopijomis | Matoma prieinamumas, autoriai, kategorijos, kopijos | Knygos detalė |
-| 8 | Egzemplioriai | Kopijų lentelė | Kiekviena fizinė kopija turi statusą, filialą, lokaciją, QR | Egzemplioriaus detalė |
+| 8 | Kopijos | Kopijų lentelė | Kiekviena fizinė kopija turi statusą, filialą, lokaciją, QR | Kopijos detalė |
 | 9 | Išdavimas | Išdavimo forma | Darbuotojas išduoda kopiją nariui, sistema tikrina rezervacijas | Borrow dialog/form |
 | 10 | Grąžinimas | Grąžinimo veiksmas | Aktyvi paskola uždaroma, kopija tampa laisva | Return mygtukas |
 | 11 | Rezervacijos | Rezervacijų sąrašas | Eilė valdoma automatiškai | Rezervacijų puslapis |
@@ -1470,13 +1470,13 @@ Ką sakyti: „Katalogas yra bendra bibliografinė bazė, bet prieinamumas skai�
 
 Ką spausti: atidaryti konkrečią knygą.
 
-Ką rodyti: autorius, kategorijas, leidėją, egzempliorius.
+Ką rodyti: autorius, kategorijas, leidėją, kopijas.
 
-Ką sakyti: „Čia matome skirtumą tarp knygos kaip kūrinio ir egzempliorių kaip realių fizinių objektų.“
+Ką sakyti: „Čia matome skirtumą tarp knygos kaip kūrinio ir kopijų kaip realių fizinių objektų.“
 
 ### 5. Knygos išdavimas
 
-Ką spausti: pasirinkti laisvą egzempliorių, išduoti nariui.
+Ką spausti: pasirinkti laisvą kopiją, išduoti nariui.
 
 Ką rodyti: nario paiešką, terminą, patvirtinimą.
 
@@ -1492,7 +1492,7 @@ Ką sakyti: „Rezervacija patenka į eilę. Kai kopija grąžinama, sistema aut
 
 ### 7. Grąžinimas
 
-Ką spausti: grąžinti išduotą egzempliorių.
+Ką spausti: grąžinti išduotą kopiją.
 
 Ką rodyti: statuso pasikeitimą į laisvą, pranešimą, rezervacijos eilės atsinaujinimą.
 
@@ -1500,7 +1500,7 @@ Ką sakyti: „Grąžinimas ne tik uždaro paskolą, bet ir gali automatiškai a
 
 ### 8. QR kodas web
 
-Ką spausti: atidaryti egzemplioriaus QR puslapį.
+Ką spausti: atidaryti kopijos QR puslapį.
 
 Ką rodyti: QR kodą ir kopijos identifikaciją.
 
@@ -1541,7 +1541,7 @@ Ką sakyti: „Administravimas užbaigia platformos ciklą: valdome ne tik knyga
 ## 17. Galimi auditorijos klausimai ir atsakymai
 
 1. Klausimas: Kokią pagrindinę problemą sprendžia sistema?
-   Atsakymas: Ji sujungia bibliotekos katalogą, fizinių egzempliorių valdymą, skolinimus, grąžinimus, rezervacijas, vartotojus ir mobilią prieigą į vieną saugią platformą.
+   Atsakymas: Ji sujungia bibliotekos katalogą, fizinių kopijų valdymą, skolinimus, grąžinimus, rezervacijas, vartotojus ir mobilią prieigą į vieną saugią platformą.
 
 2. Klausimas: Ar sistema skirta vienai bibliotekai?
    Atsakymas: Ne tik. Ji turi multi-tenant architektūrą, todėl gali aptarnauti kelias bibliotekas ir jų filialus.
@@ -1561,8 +1561,8 @@ Ką sakyti: „Administravimas užbaigia platformos ciklą: valdome ne tik knyga
 7. Klausimas: Ką gali Narys?
    Atsakymas: Narys gali matyti katalogą, savo paskolas, rezervacijas, pranešimus, jungtis prie viešų bibliotekų ir kurti savo rezervacijas.
 
-8. Klausimas: Ar knyga ir egzempliorius yra tas pats?
-   Atsakymas: Ne. Knyga yra bibliografinis įrašas, o egzempliorius yra fizinė kopija su inventoriniu kodu, QR kodu, filialu, lokacija ir būsena.
+8. Klausimas: Ar knyga ir kopija yra tas pats?
+   Atsakymas: Ne. Knyga yra bibliografinis įrašas, o kopija yra fizinė kopija su inventoriniu kodu, QR kodu, filialu, lokacija ir būsena.
 
 9. Klausimas: Kodėl toks atskyrimas svarbus?
    Atsakymas: Nes ta pati knyga gali turėti daug fizinių kopijų skirtinguose filialuose ir kiekviena kopija gali turėti skirtingą būseną.

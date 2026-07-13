@@ -1,11 +1,11 @@
-<x-layouts::app :title="'Egzemplioriai'">
+<x-layouts::app :title="'Kopijos'">
     <x-ui.page class="max-w-none px-4 py-0 sm:px-6 lg:px-8">
         <div class="bg-[#f7f8fa] py-8 dark:bg-zinc-950">
             <div class="mx-auto max-w-[1500px] space-y-6">
                 <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div>
-                        <h1 class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">Egzemplioriai</h1>
-                        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Peržiūrėkite ir tvarkykite bibliotekos knygų egzempliorius</p>
+                        <h1 class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">Kopijos</h1>
+                        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Peržiūrėkite ir tvarkykite bibliotekos knygų kopijas</p>
                     </div>
 
                     <div class="flex flex-wrap items-center gap-3">
@@ -16,7 +16,7 @@
 
                         <a href="{{ route('manage.book-copies.create') }}" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600">
                             <flux:icon.plus class="size-4" />
-                            Pridėti egzempliorių
+                            Pridėti kopiją
                             <flux:icon.chevron-down class="size-4" />
                         </a>
                     </div>
@@ -37,7 +37,7 @@
                                 <flux:icon.squares-plus class="size-5" />
                             </span>
                             <div>
-                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Visi egzemplioriai</div>
+                                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Visos kopijos</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['total'] }}</div>
                                 <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Iš viso</div>
                             </div>
@@ -196,19 +196,19 @@
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">{{ $copy->updated_at?->format('Y-m-d') ?? '-' }}</td>
                                             <td class="px-4 py-4 align-middle">
                                                 <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
-                                                    <a href="{{ route('book-copies.show', $copy) }}" title="Peržiūrėti egzempliorių" aria-label="Peržiūrėti egzempliorių" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
+                                                    <a href="{{ route('book-copies.show', $copy) }}" title="Peržiūrėti kopiją" aria-label="Peržiūrėti kopiją" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
                                                         <flux:icon.eye class="size-4" />
                                                     </a>
                                                     @can('update', $copy)
-                                                        <a href="{{ route('manage.book-copies.edit', $copy) }}" title="Redaguoti egzempliorių" aria-label="Redaguoti egzempliorių" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
+                                                        <a href="{{ route('manage.book-copies.edit', $copy) }}" title="Redaguoti kopiją" aria-label="Redaguoti kopiją" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-white">
                                                             <flux:icon.pencil-square class="size-4" />
                                                         </a>
                                                     @endcan
                                                     @can('delete', $copy)
-                                                        <form method="POST" action="{{ route('manage.book-copies.destroy', $copy) }}" onsubmit="return confirm('Ar tikrai nori ištrinti šį egzempliorių?')">
+                                                        <form method="POST" action="{{ route('manage.book-copies.destroy', $copy) }}" onsubmit="return confirm('Ar tikrai nori ištrinti šią kopiją?')">
                                                             @csrf
                                                             @method('DELETE')
-                                                            <button type="submit" title="Ištrinti egzempliorių" aria-label="Ištrinti egzempliorių" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-red-600 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-red-300">
+                                                            <button type="submit" title="Ištrinti kopiją" aria-label="Ištrinti kopiją" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white transition hover:text-red-600 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:text-red-300">
                                                                 <flux:icon.trash class="size-4" />
                                                             </button>
                                                         </form>
@@ -227,7 +227,7 @@
                         </div>
                     @else
                         <div class="p-6">
-                            <x-ui.empty-state title="Egzempliorių nerasta" description="Pabandykite pakeisti paiešką arba pridėti naują egzempliorių." />
+                            <x-ui.empty-state title="Kopijų nerasta" description="Pabandykite pakeisti paiešką arba pridėti naują kopiją." />
                         </div>
                     @endif
                 </section>

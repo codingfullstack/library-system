@@ -44,7 +44,7 @@
                             class="app-button-primary shrink-0 sm:min-w-36"
                         >
                             <span wire:loading.remove wire:target="issuePreferred">Išduoti jam</span>
-                            <span wire:loading wire:target="issuePreferred">Isduodama...</span>
+                            <span wire:loading wire:target="issuePreferred">Išduodama...</span>
                         </button>
                     </div>
                 </div>
@@ -75,7 +75,7 @@
                     <form wire:submit="save" class="absolute inset-y-0 right-0 z-10 flex h-full w-96 max-w-[calc(100vw-1rem)] flex-col overflow-hidden border-l border-zinc-200 bg-white shadow-2xl sm:w-[32rem] dark:border-zinc-800 dark:bg-zinc-900">
                         <div class="flex items-start justify-between gap-3 border-b border-zinc-200 px-6 py-5 dark:border-zinc-800">
                             <div>
-                                <h4 class="text-lg font-semibold text-zinc-950 dark:text-white">Išduoti kopija</h4>
+                                <h4 class="text-lg font-semibold text-zinc-950 dark:text-white">Išduoti kopiją</h4>
                                 <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
                                     {{ $bookCopy->inventory_code ?: ('Kopija #'.$bookCopy->id) }} bus priskirta pasirinktam nariui.
                                 </p>
@@ -252,8 +252,8 @@
                             </button>
 
                             <button type="submit" class="app-button-primary" wire:loading.attr="disabled">
-                                <span wire:loading.remove wire:target="save">Išduoti kopija</span>
-                                <span wire:loading wire:target="save">Isduodama...</span>
+                                <span wire:loading.remove wire:target="save">Išduoti kopiją</span>
+                                <span wire:loading wire:target="save">Išduodama...</span>
                             </button>
                         </div>
                     </form>
@@ -264,7 +264,7 @@
         <button
             type="button"
             class="app-button-secondary opacity-60"
-            @if($borrowUnavailableTitle) title="{{ $borrowUnavailableTitle }}" @endif
+            title="{{ $borrowUnavailableTitle ?? 'Negalima išduoti: kopija neatitinka išdavimo sąlygų.' }}"
             disabled
         >
             {{ $bookCopy->activeLoan ? 'Šiuo metu išduota' : 'Išduoti negalima' }}

@@ -80,7 +80,7 @@ it('hides first-in-queue issue button for staff when own branch has no available
     Livewire::actingAs($fixture['staff'])
         ->test(ReservationHistory::class, ['book' => $fixture['book']])
         ->assertDontSee('issueFirstInQueue', false)
-        ->assertSee('Jūsų filiale nėra laisvo egzemplioriaus išdavimui.');
+        ->assertSee('Jūsų filiale nėra laisvos kopijos išdavimui.');
 });
 
 it('prevents staff from issuing an available copy from another branch', function () {

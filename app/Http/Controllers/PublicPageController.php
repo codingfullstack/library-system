@@ -121,7 +121,7 @@ class PublicPageController extends Controller
         $faq = [
             ['question' => 'Kodėl nematau katalogo?', 'answer' => 'Katalogas šioje sistemoje pasiekiamas prisijungusiems naudotojams, nes matomumas priklauso nuo bibliotekos ir rolės teisių.'],
             ['question' => 'Kas gali išduoti arba grąžinti knygą?', 'answer' => 'Šiuos veiksmus atlieka darbuotojai, administratoriai arba superadministratoriai pagal savo bibliotekos teises.'],
-            ['question' => 'Kaip veikia rezervacijų eilė?', 'answer' => 'Rezervacija priklauso knygai. Kai atsiranda laisvas egzempliorius, sistema gali aptarnauti eilę pagal aktyvias rezervacijas.'],
+            ['question' => 'Kaip veikia rezervacijų eilė?', 'answer' => 'Rezervacija priklauso knygai. Kai atsiranda laisva kopija, sistema gali aptarnauti eilę pagal aktyvias rezervacijas.'],
             ['question' => 'Kur kreiptis dėl paskyros?', 'answer' => 'Dėl paskyros duomenų, bibliotekos priskyrimo ar rolės pakeitimo kreipkitės į savo bibliotekos administratorių.'],
         ];
 

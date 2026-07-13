@@ -87,7 +87,7 @@ class ListExportController extends Controller
 
         return $this->csvResponse(
             'knygos',
-            ['Pavadinimas', 'Paantraštė', 'ISBN', 'Autoriai', 'Kategorijos', 'Leidykla', 'Egzemplioriai', 'Laisvi', 'Rezervacijos', 'Būsena', 'Atnaujinta'],
+            ['Pavadinimas', 'Paantraštė', 'ISBN', 'Autoriai', 'Kategorijos', 'Leidykla', 'Kopijos', 'Laisvi', 'Rezervacijos', 'Būsena', 'Atnaujinta'],
             $rows
         );
     }
@@ -191,7 +191,7 @@ class ListExportController extends Controller
         })->all();
 
         return $this->csvResponse(
-            'egzemplioriai',
+            'kopijos',
             ['Knyga', 'ISBN', 'Inventoriaus kodas', 'Brūkšninis kodas', 'Filialas', 'Vieta', 'Būsena', 'Būklė', 'Atnaujinta'],
             $rows
         );
@@ -225,6 +225,8 @@ class ListExportController extends Controller
 
     private function branchesExport(Request $request, GetManageBranchesQuery $query): Response
     {
+        abort_unless($request->user()->isSuperAdmin() || $request->user()->isAdmin(), 403);
+
         $branches = $query->handle($request->user(), [
             'search' => $request->query('search'),
             'per_page' => 5000,
@@ -242,7 +244,7 @@ class ListExportController extends Controller
 
         return $this->csvResponse(
             'filialai',
-            ['Pavadinimas', 'Kodas', 'Biblioteka', 'Miestas', 'Adresas', 'Vietos', 'Egzemplioriai'],
+            ['Pavadinimas', 'Kodas', 'Biblioteka', 'Miestas', 'Adresas', 'Vietos', 'Kopijos'],
             $rows
         );
     }
@@ -313,7 +315,7 @@ class ListExportController extends Controller
 
         return $this->csvResponse(
             'vietos',
-            ['Pavadinimas', 'Kodas', 'Filialas', 'Biblioteka', 'Kambarys', 'Lentyna', 'Egzemplioriai'],
+            ['Pavadinimas', 'Kodas', 'Filialas', 'Biblioteka', 'Kambarys', 'Lentyna', 'Kopijos'],
             $rows
         );
     }

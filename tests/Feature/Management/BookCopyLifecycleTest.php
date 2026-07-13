@@ -8,6 +8,7 @@ use App\Models\Loan;
 use App\Models\Location;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Livewire\Manage\BookCopies\BookCopyForm;
 use App\Livewire\Manage\BookCopies\CreateBookCopyPage;
 use Livewire\Livewire;
 
@@ -21,7 +22,7 @@ test('book copy creation page selects a book through livewire drawer', function 
     $this->actingAs($staff)
         ->get(route('manage.book-copies.create'))
         ->assertOk()
-        ->assertSee('Pridėti egzempliorių')
+        ->assertSee('Pridėti kopiją')
         ->assertSee('Bendras katalogas')
         ->assertSee('wire:click="selectBook', false);
 
@@ -33,6 +34,38 @@ test('book copy creation page selects a book through livewire drawer', function 
         ->assertSee('Livewire pasirinkta knyga')
         ->call('closeDrawer')
         ->assertSet('selectedBookId', null);
+});
+
+test('staff creates book copy only in assigned branch', function () {
+    $library = Library::factory()->create();
+    $ownBranch = Branch::factory()->create(['library_id' => $library->id, 'name' => 'Darbuotojo filialas']);
+    $otherBranch = Branch::factory()->create(['library_id' => $library->id, 'name' => 'Kitas filialas']);
+    $ownLocation = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $ownBranch->id]);
+    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $staff->libraryMemberships()->where('library_id', $library->id)->update(['branch_id' => $ownBranch->id]);
+    $book = Book::factory()->create(['title' => 'Filialo kopijos knyga']);
+
+    Livewire::actingAs($staff)
+        ->test(BookCopyForm::class, ['selectedBook' => $book])
+        ->assertSet('branchId', $ownBranch->id)
+        ->assertSee('Darbuotojo filialas')
+        ->assertDontSee('Kitas filialas')
+        ->set('branchId', $otherBranch->id)
+        ->assertSet('branchId', $ownBranch->id)
+        ->set('locationId', $ownLocation->id)
+        ->set('inventoryCode', 'STAFF-BRANCH-001')
+        ->call('save')
+        ->assertRedirect();
+
+    $this->assertDatabaseHas('book_copies', [
+        'inventory_code' => 'STAFF-BRANCH-001',
+        'branch_id' => $ownBranch->id,
+    ]);
+
+    $this->assertDatabaseMissing('book_copies', [
+        'inventory_code' => 'STAFF-BRANCH-001',
+        'branch_id' => $otherBranch->id,
+    ]);
 });
 
 test('staff can change book copy lifecycle and see status history', function () {

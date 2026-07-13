@@ -21,7 +21,7 @@
                     <div class="mt-2 text-2xl font-bold text-slate-950 dark:text-white">{{ $library->code }}</div>
                 </div>
                 <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                    <div class="text-sm font-semibold text-slate-500 dark:text-zinc-400">Knygu egzemplioriai</div>
+                    <div class="text-sm font-semibold text-slate-500 dark:text-zinc-400">Knygu kopijos</div>
                     <div class="mt-2 text-2xl font-bold text-slate-950 dark:text-white">{{ number_format($library->book_copies_count) }}</div>
                 </div>
                 <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">

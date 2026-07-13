@@ -79,7 +79,7 @@ class ReservationHistory extends Component
         $bookCopy = $this->firstAvailableCopy();
 
         if (! $bookCopy) {
-            $this->addError('reservation', 'Nėra laisvo egzemplioriaus, kurį galėtumėte išduoti.');
+            $this->addError('reservation', 'Nėra laisvos kopijos, kurią galėtumėte išduoti.');
 
             return null;
         }
@@ -89,7 +89,7 @@ class ReservationHistory extends Component
         $reservation = $this->currentReservation($bookCopy);
 
         if (! $reservation) {
-            $this->addError('reservation', 'Nėra rezervacijos, kurią būtų galima išduoti šiam egzemplioriui.');
+            $this->addError('reservation', 'Nėra rezervacijos, kurią būtų galima išduoti šiai kopijai.');
 
             return null;
         }
@@ -284,9 +284,9 @@ class ReservationHistory extends Component
         $actor = Auth::user();
 
         if ($actor?->role === User::ROLE_STAFF) {
-            return 'Jūsų filiale nėra laisvo egzemplioriaus išdavimui.';
+            return 'Jūsų filiale nėra laisvos kopijos išdavimui.';
         }
 
-        return 'Šioje bibliotekoje nėra laisvo egzemplioriaus išdavimui.';
+        return 'Šioje bibliotekoje nėra laisvos kopijos išdavimui.';
     }
 }

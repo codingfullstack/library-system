@@ -6,7 +6,7 @@
             <aside class="absolute inset-y-0 right-0 z-10 flex h-full w-96 max-w-[calc(100vw-1rem)] flex-col overflow-hidden border-l border-zinc-200 bg-white shadow-2xl sm:w-[32rem] dark:border-zinc-800 dark:bg-zinc-900">
                 <div class="flex items-start justify-between gap-4 border-b border-zinc-200 px-6 py-5 dark:border-zinc-800">
                     <div>
-                        <h2 class="text-xl font-bold text-zinc-950 dark:text-white">Pridėti egzempliorių</h2>
+                        <h2 class="text-xl font-bold text-zinc-950 dark:text-white">Pridėti kopiją</h2>
                         <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Nauja kopija bus pridėta prie pasirinktos knygos.</p>
                     </div>
 

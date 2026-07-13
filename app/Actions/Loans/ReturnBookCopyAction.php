@@ -35,7 +35,7 @@ class ReturnBookCopyAction
     {
         if (! $authUser->canManageBookCopy($bookCopy)) {
             throw ValidationException::withMessages([
-                'book_copy' => ['Neturite teisės priimti kito filialo egzemplioriaus grąžinimo.'],
+                'book_copy' => ['Neturite teisės priimti kito filialo kopijos grąžinimo.'],
             ]);
         }
 
@@ -62,7 +62,7 @@ class ReturnBookCopyAction
                 'book_returned',
                 'Knyga grąžinta',
                 sprintf(
-                    'Knygos "%s" egzempliorius %s sėkmingai grąžintas.',
+                    'Knygos "%s" kopija %s sėkmingai grąžinta.',
                     $bookCopy->book?->title ?: 'nežinoma knyga',
                     $bookCopy->inventory_code ?: ('#'.$bookCopy->id)
                 ),
@@ -93,7 +93,7 @@ class ReturnBookCopyAction
             'loan_returned',
             $activeLoan,
             sprintf(
-                'Egzempliorius %s grąžintas iš nario %s.',
+                'Kopija %s grąžinta iš nario %s.',
                 $bookCopy->inventory_code,
                 $activeLoan->user?->name ?: 'nežinomas narys'
             ),

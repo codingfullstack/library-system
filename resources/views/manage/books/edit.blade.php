@@ -15,7 +15,7 @@
             </x-ui.panel>
 
             @if(auth()->user()?->isSuperAdmin())
-                <x-ui.panel title="Veiksmų istorija" description="Knygos, rezervacijų, išdavimų ir egzempliorių istorija vienoje vietoje.">
+                <x-ui.panel title="Veiksmų istorija" description="Knygos, rezervacijų, išdavimų ir kopijų istorija vienoje vietoje.">
                     @include('manage.audit-logs._list', [
                         'auditLogs' => $auditLogs,
                         'emptyTitle' => 'Veiksmų dar nėra',

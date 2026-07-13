@@ -244,10 +244,29 @@ class BorrowBookCopyForm extends Component
             && $actor->belongsToLibrary($this->bookCopy->library_id)
             && ! $actor->canManageBookCopy($this->bookCopy)
         ) {
-            return 'Negalima išduoti: egzempliorius priklauso kitam filialui.';
+            return 'Negalima išduoti: kopija priklauso kitam filialui.';
         }
 
-        return null;
+        if ($this->bookCopy->activeLoan !== null) {
+            return 'Negalima išduoti: kopija šiuo metu jau išduota.';
+        }
+
+        if ($this->bookCopy->status !== BookCopy::STATUS_AVAILABLE) {
+            return match ($this->bookCopy->status) {
+                BookCopy::STATUS_LOANED => 'Negalima išduoti: kopija šiuo metu jau išduota.',
+                BookCopy::STATUS_LOST => 'Negalima išduoti: kopija pažymėta kaip prarasta.',
+                BookCopy::STATUS_DAMAGED => 'Negalima išduoti: kopija pažymėta kaip sugadinta.',
+                BookCopy::STATUS_MAINTENANCE => 'Negalima išduoti: kopija šiuo metu tvarkoma.',
+                BookCopy::STATUS_WITHDRAWN => 'Negalima išduoti: kopija nurašyta iš fondo.',
+                default => 'Negalima išduoti: kopijos būsena neleidžia išdavimo.',
+            };
+        }
+
+        if (! Gate::allows('borrow', $this->bookCopy)) {
+            return 'Negalima išduoti: neturite teisės išduoti šios kopijos.';
+        }
+
+        return 'Negalima išduoti: kopija neatitinka išdavimo sąlygų.';
     }
 
     private function canIssuePreferred(): bool

@@ -91,7 +91,7 @@ class ReturnBookCopyForm extends Component
             && $actor->belongsToLibrary($this->bookCopy->library_id)
             && ! $actor->canManageBookCopy($this->bookCopy)
         ) {
-            return 'Negalima priimti grąžinimo: egzempliorius priklauso kitam filialui.';
+            return 'Negalima priimti grąžinimo: kopija priklauso kitam filialui.';
         }
 
         return null;

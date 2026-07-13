@@ -234,7 +234,7 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 $this->createCopy($library, $witcher, $mainBranch, $fantasyLocation, 'KAL-RAG-001', 'QR-KAL-RAG-001', '9786090404251', BookCopy::STATUS_MAINTENANCE, 'sugadinta', '2024-01-15', 'Lūžta nugarėlė, išsiųsta tvarkymui.'),
                 $this->createCopy($library, $witcher, $mainBranch, $fantasyLocation, 'KAL-RAG-002', 'QR-KAL-RAG-002', '9786090404252', BookCopy::STATUS_AVAILABLE, 'gera', '2024-01-15', null),
                 $this->createCopy($library, $altoriu, $mainBranch, $classicLocation, 'KAL-ALT-001', 'QR-KAL-ALT-001', '9799955000351', BookCopy::STATUS_DAMAGED, 'sugadinta', '2021-11-20', 'Apiplyšęs viršelis.'),
-                $this->createCopy($library, $altoriu, $mainBranch, $classicLocation, 'KAL-ALT-002', 'QR-KAL-ALT-002', '9799955000352', BookCopy::STATUS_AVAILABLE, 'padėvėta', '2019-03-14', 'Senesnis egzempliorius.'),
+                $this->createCopy($library, $altoriu, $mainBranch, $classicLocation, 'KAL-ALT-002', 'QR-KAL-ALT-002', '9799955000352', BookCopy::STATUS_AVAILABLE, 'padėvėta', '2019-03-14', 'Senesnis kopija.'),
                 $this->createCopy($library, $dievuMiskas, $mainBranch, $classicLocation, 'KAL-DM-001', 'QR-KAL-DM-001', 'KAL-PRV-001', BookCopy::STATUS_LOST, 'gera', '2020-10-01', 'Nerastas po inventorizacijos.'),
                 $this->createCopy($library, $faultInOurStars, $childrenBranch, $childrenLocation, 'KAL-YA-001', 'QR-KAL-YA-001', '9786094799711', BookCopy::STATUS_WITHDRAWN, 'padėvėta', '2018-04-04', 'Per daug susidėvėjęs, nurašytas.'),
                 $this->createCopy($library, $faultInOurStars, $childrenBranch, $childrenLocation, 'KAL-YA-002', 'QR-KAL-YA-002', '9786094799712', BookCopy::STATUS_AVAILABLE, 'gera', '2024-02-10', 'Laisva kopija, skirta greitam išdavimui rezervacijos eilėje.'),
@@ -285,7 +285,7 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 'expires_at' => $now->addDays(3),
                 'fulfilled_at' => null,
                 'cancelled_at' => null,
-                'notes' => 'Laukia laisvo egzemplioriaus jaunimo skyriuje.',
+                'notes' => 'Laukia laisvos kopijos jaunimo skyriuje.',
             ]);
 
             Reservation::create([
@@ -300,17 +300,17 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 'notes' => 'Atšaukta demonstracinė rezervacija.',
             ]);
 
-            $this->recordHistory($copies[0], $staffA, null, BookCopy::STATUS_AVAILABLE, 'created', 'Egzempliorius sukurtas sistemoje.', CarbonImmutable::parse('2025-05-12 09:00:00'));
-            $this->recordHistory($copies[0], $staffA, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_LOANED, 'issued', 'Egzempliorius šiandien išduotas skaitytojui.', $now->subHours(2));
-            $this->recordHistory($copies[2], $staffB, null, BookCopy::STATUS_AVAILABLE, 'created', 'Egzempliorius sukurtas sistemoje.', CarbonImmutable::parse('2025-08-14 10:00:00'));
+            $this->recordHistory($copies[0], $staffA, null, BookCopy::STATUS_AVAILABLE, 'created', 'Kopija sukurta sistemoje.', CarbonImmutable::parse('2025-05-12 09:00:00'));
+            $this->recordHistory($copies[0], $staffA, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_LOANED, 'issued', 'Kopija šiandien išduota skaitytojui.', $now->subHours(2));
+            $this->recordHistory($copies[2], $staffB, null, BookCopy::STATUS_AVAILABLE, 'created', 'Kopija sukurta sistemoje.', CarbonImmutable::parse('2025-08-14 10:00:00'));
             $this->recordHistory($copies[2], $staffB, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_MAINTENANCE, 'sent_to_maintenance', 'Išsiųstas tvarkyti dėl pažeidimų.', $now->subDays(11));
-            $this->recordHistory($copies[4], $staffA, null, BookCopy::STATUS_AVAILABLE, 'created', 'Egzempliorius sukurtas sistemoje.', CarbonImmutable::parse('2025-07-03 14:00:00'));
+            $this->recordHistory($copies[4], $staffA, null, BookCopy::STATUS_AVAILABLE, 'created', 'Kopija sukurta sistemoje.', CarbonImmutable::parse('2025-07-03 14:00:00'));
             $this->recordHistory($copies[4], $staffA, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_DAMAGED, 'marked_damaged', 'Apžiūros metu pažymėta kaip sugadinta.', $now->subMonths(2)->subDays(4));
-            $this->recordHistory($copies[6], $admin, null, BookCopy::STATUS_AVAILABLE, 'created', 'Egzempliorius sukurtas sistemoje.', CarbonImmutable::parse('2025-06-06 11:00:00'));
-            $this->recordHistory($copies[6], $admin, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_LOST, 'marked_lost', 'Inventorizacijos metu egzempliorius nerastas.', $now->subMonths(5));
-            $this->recordHistory($copies[7], $admin, null, BookCopy::STATUS_AVAILABLE, 'created', 'Egzempliorius sukurtas sistemoje.', CarbonImmutable::parse('2025-05-28 12:30:00'));
+            $this->recordHistory($copies[6], $admin, null, BookCopy::STATUS_AVAILABLE, 'created', 'Kopija sukurta sistemoje.', CarbonImmutable::parse('2025-06-06 11:00:00'));
+            $this->recordHistory($copies[6], $admin, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_LOST, 'marked_lost', 'Inventorizacijos metu kopija nerasta.', $now->subMonths(5));
+            $this->recordHistory($copies[7], $admin, null, BookCopy::STATUS_AVAILABLE, 'created', 'Kopija sukurta sistemoje.', CarbonImmutable::parse('2025-05-28 12:30:00'));
             $this->recordHistory($copies[7], $admin, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_WITHDRAWN, 'nurašyta', 'Nurašyta dėl susidėvėjimo.', $now->subMonths(7));
-            $this->recordHistory($copies[8], $staffA, null, BookCopy::STATUS_AVAILABLE, 'created', 'Egzempliorius sukurtas sistemoje.', CarbonImmutable::parse('2025-09-01 09:15:00'));
+            $this->recordHistory($copies[8], $staffA, null, BookCopy::STATUS_AVAILABLE, 'created', 'Kopija sukurta sistemoje.', CarbonImmutable::parse('2025-09-01 09:15:00'));
 
             $this->seedHistoricalLoans($library, $copies->slice(9)->values(), $allMembers, $employees, $now);
             $this->seedHistoricalReservations($library, collect([

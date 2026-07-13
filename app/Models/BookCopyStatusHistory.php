@@ -40,9 +40,9 @@ class BookCopyStatusHistory extends Model
     public static function reasonLabels(): array
     {
         return [
-            'created' => 'Sukurtas egzempliorius',
-            'issued' => 'Egzempliorius išduotas',
-            'grąžinta' => 'Egzempliorius grąžintas',
+            'created' => 'Sukurta kopija',
+            'issued' => 'Kopija išduota',
+            'grąžinta' => 'Kopija grąžinta',
             'marked_lost' => 'Pažymėtas kaip prarastas',
             'marked_damaged' => 'Pažymėtas kaip sugadintas',
             'sent_to_maintenance' => 'Išsiųstas tvarkymui',

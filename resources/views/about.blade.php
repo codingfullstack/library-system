@@ -8,11 +8,11 @@
         @php
             $summaryStats = [
                 ['value' => number_format($publicStats['libraries'] ?? 0), 'label' => 'aktyvių bibliotekų'],
-                ['value' => number_format($publicStats['copies'] ?? 0), 'label' => 'egzempliorių fonde'],
+                ['value' => number_format($publicStats['copies'] ?? 0), 'label' => 'kopijų fonde'],
             ];
 
             $sections = [
-                ['icon' => 'book-open-text', 'title' => 'Katalogas ir egzemplioriai', 'text' => 'Knygos, jų egzemplioriai, kategorijos, leidyklos, filialai ir vietos valdomi vienoje struktūroje.'],
+                ['icon' => 'book-open-text', 'title' => 'Katalogas ir kopijos', 'text' => 'Knygos, jų kopijos, kategorijos, leidyklos, filialai ir vietos valdomi vienoje struktūroje.'],
                 ['icon' => 'calendar-days', 'title' => 'Išdavimai ir rezervacijos', 'text' => 'Sistema palaiko išdavimus, grąžinimus, rezervacijų eiles ir darbuotojų override sprendimus.'],
                 ['icon' => 'users', 'title' => 'Rolės ir matomumas', 'text' => 'Superadministratorius, administratorius, darbuotojas ir narys mato tik tai, kas jiems aktualu pagal bibliotekos teises.'],
                 ['icon' => 'clipboard-document', 'title' => 'Istorija ir ataskaitos', 'text' => 'Veiksmų istorija, dashboard metrikos, eksportai ir filtrai padeda sekti bibliotekos darbą.'],
@@ -20,8 +20,8 @@
 
             $workflow = [
                 'Narys suranda knygą kataloge ir pateikia rezervaciją.',
-                'Darbuotojas mato eilę, patikrina egzempliorių ir išduoda knygą.',
-                'Grąžinimo metu atnaujinamas egzemplioriaus statusas ir rezervacijų eilė.',
+                'Darbuotojas mato eilę, patikrina kopiją ir išduoda knygą.',
+                'Grąžinimo metu atnaujinamas kopijos statusas ir rezervacijų eilė.',
                 'Svarbūs veiksmai įrašomi į audit log istoriją.',
             ];
         @endphp
@@ -38,7 +38,7 @@
                                 Pilna bibliotekos darbo valdymo aplinka
                             </h1>
                             <p class="mt-6 text-lg leading-8 text-slate-600 dark:text-zinc-300">
-                                Bibliotekos sistema sujungia viešą katalogą, narių savitarną, darbuotojų įrankius ir administravimo procesus. Ji skirta kasdieniam bibliotekos darbui, kuriame svarbu greitai rasti informaciją, aiškiai valdyti egzempliorius ir matyti veiksmų istoriją.
+                                Bibliotekos sistema sujungia viešą katalogą, narių savitarną, darbuotojų įrankius ir administravimo procesus. Ji skirta kasdieniam bibliotekos darbui, kuriame svarbu greitai rasti informaciją, aiškiai valdyti kopijas ir matyti veiksmų istoriją.
                             </p>
                         </div>
 

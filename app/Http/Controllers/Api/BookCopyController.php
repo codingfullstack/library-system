@@ -54,7 +54,7 @@ class BookCopyController extends Controller
 
         if (! $copy) {
             return response()->json([
-                'message' => 'Egzempliorius nerastas',
+                'message' => 'Kopija nerasta',
             ], 404);
         }
 
@@ -95,7 +95,7 @@ class BookCopyController extends Controller
 
         if ($bookCopy->activeLoan()->exists()) {
             return response()->json([
-                'message' => 'Negalima keisti egzemplioriaus gyvavimo ciklo, kol jis yra aktyviai išduotas.',
+                'message' => 'Negalima keisti kopijos gyvavimo ciklo, kol ji yra aktyviai išduota.',
             ], 422);
         }
 
@@ -130,7 +130,7 @@ class BookCopyController extends Controller
         );
 
         return response()->json([
-            'message' => 'Egzemplioriaus būsena atnaujinta.',
+            'message' => 'Kopijos būsena atnaujinta.',
             'book_copy' => (new BookCopyDetailsResource($copy, $request->user()->can('update', $copy)))->resolve(),
         ]);
     }

@@ -26,7 +26,7 @@
         $copyStatusLabels = \App\Models\BookCopy::statusLabels();
         $copyLifecycleLabels = [
             'aktyvi' => 'Aktyvus fondas',
-            'issues' => 'Probleminiai egzemplioriai',
+            'issues' => 'Probleminės kopijos',
             'removed' => 'Nurašytas fondas',
         ];
 
@@ -254,7 +254,7 @@
                                 : 'border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'"
                             class="inline-flex h-12 items-center border-b-2 px-2 text-sm font-semibold transition"
                         >
-                            Egzemplioriai
+                            Kopijos
                         </button>
                         <button
                             type="button"
@@ -280,7 +280,7 @@
                         @endif
                     </div>
 
-                    <section id="egzemplioriai" x-show="activeTab === 'copies'" x-cloak class="overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                    <section id="kopijos" x-show="activeTab === 'copies'" x-cloak class="overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                     <div class="border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
                         <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                             <div>
@@ -290,7 +290,7 @@
 
                             @if(in_array($authUser?->role, ['superadministratorius', 'administratorius', 'darbuotojas'], true))
                                 <button type="button" x-on:click="Livewire.dispatch('open-book-copy-create-drawer')" class="inline-flex h-11 items-center justify-center rounded-2xl bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600">
-                                    Pridėti egzempliorių
+                                    Pridėti kopiją
                                 </button>
                             @endif
                         </div>
@@ -675,8 +675,8 @@
                                                     <td class="px-4 py-4 text-sm font-medium">
                                                         <a
                                                             href="{{ route('book-copies.show', $copy->id) }}"
-                                                            title="Peržiūrėti kopija {{ $copy->inventory_code }}"
-                                                            aria-label="Peržiūrėti kopija {{ $copy->inventory_code }}"
+                                                            title="Peržiūrėti kopiją {{ $copy->inventory_code }}"
+                                                            aria-label="Peržiūrėti kopiją {{ $copy->inventory_code }}"
                                                             class="text-zinc-950 transition hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300"
                                                         >
                                                             {{ $copy->inventory_code ?: '-' }}
@@ -844,7 +844,7 @@
                         <section id="veiksmų-istorija" x-show="activeTab === 'audit'" x-cloak class="overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                             <div class="border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
                                 <h2 class="text-lg font-semibold text-zinc-950 dark:text-white">Veiksmų istorija</h2>
-                                <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Vienoje vietoje matysi knygos, jos egzempliorių, rezervacijų ir išdavimų veiksmų istorija.</p>
+                                <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Vienoje vietoje matysi knygos, jos kopijų, rezervacijų ir išdavimų veiksmų istorija.</p>
                             </div>
 
                             <div class="p-5">
@@ -862,5 +862,4 @@
         </div>
     </x-ui.page>
 </x-layouts::app>
-
 

@@ -3,13 +3,13 @@
         <div class="mx-auto max-w-[1500px] space-y-6">
             <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div>
-                    <h1 class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">Pridėti egzempliorių</h1>
+                    <h1 class="text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">Pridėti kopiją</h1>
                     <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Raskite bendro katalogo knygą ir pridėkite savo bibliotekos fizinę kopiją.</p>
                 </div>
 
                 <a href="{{ route('manage.book-copies.index') }}" wire:navigate class="inline-flex h-11 items-center gap-2 self-start rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
                     <flux:icon.squares-plus class="size-4" />
-                    Visi egzemplioriai
+                    Visos kopijos
                 </a>
             </div>
 
@@ -108,7 +108,7 @@
             <aside class="absolute inset-y-0 right-0 z-10 flex h-full w-96 max-w-[calc(100vw-1rem)] flex-col overflow-hidden border-l border-zinc-200 bg-white shadow-2xl sm:w-[32rem] dark:border-zinc-800 dark:bg-zinc-900">
                 <div class="flex items-start justify-between gap-4 border-b border-zinc-200 px-6 py-5 dark:border-zinc-800">
                     <div>
-                        <h2 class="text-xl font-bold text-zinc-950 dark:text-white">Pridėti egzempliorių</h2>
+                        <h2 class="text-xl font-bold text-zinc-950 dark:text-white">Pridėti kopiją</h2>
                         <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Nauja kopija bus pridėta prie pasirinktos knygos.</p>
                     </div>
 

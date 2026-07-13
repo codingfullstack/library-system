@@ -1,8 +1,8 @@
-<x-layouts::app :title="'Redaguoti egzempliorių'">
+<x-layouts::app :title="'Redaguoti kopiją'">
     <x-ui.page>
         <x-ui.page-header
             eyebrow="Valdymas"
-            title="Redaguoti egzempliorių"
+            title="Redaguoti kopiją"
             :description="$bookCopy->book?->title ?: 'Kopijos duomenys'"
         />
 
@@ -16,7 +16,7 @@
                     @include('manage.audit-logs._list', [
                         'auditLogs' => $auditLogs,
                         'emptyTitle' => 'Veiksmų dar nėra',
-                        'emptyDescription' => 'Šiam egzemplioriui audito įrašų dar nesukaupta.',
+                        'emptyDescription' => 'Šiai kopijai audito įrašų dar nesukaupta.',
                     ])
                 </x-ui.panel>
             @endif

@@ -91,7 +91,6 @@ Route::middleware(['auth', 'overdue.notifications', 'verified', 'library.context
         Route::put('books/{book:id}', [ManageBookController::class, 'update'])->name('books.update');
         Route::delete('books/{book:id}', [ManageBookController::class, 'destroy'])->name('books.destroy');
         Route::resource('authors', ManageAuthorController::class)->except('show');
-        Route::resource('branches', ManageBranchController::class)->except('show');
         Route::resource('locations', ManageLocationController::class)->except('show');
         Route::resource('users', ManageUserController::class)->except(['store', 'update']);
         Route::patch('users/{user}/toggle-active', [ManageUserController::class, 'toggleActive'])->name('users.toggle-active');
@@ -118,6 +117,13 @@ Route::middleware(['auth', 'overdue.notifications', 'verified', 'library.context
         Route::delete('libraries/{library}/staff/{user}', [ManageLibraryController::class, 'destroyStaff'])->name('libraries.staff.destroy');
         Route::resource('categories', ManageCategoryController::class)->except('show');
         Route::resource('publishers', ManagePublisherController::class)->except('show');
+    });
+
+Route::middleware(['auth', 'overdue.notifications', 'verified', 'library.context', 'role:superadministratorius,administratorius'])
+    ->prefix('manage')
+    ->as('manage.')
+    ->group(function () {
+        Route::resource('branches', ManageBranchController::class)->except('show');
     });
 
 require __DIR__.'/settings.php';

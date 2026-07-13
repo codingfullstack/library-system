@@ -116,8 +116,23 @@ it('shows branch restriction hover titles for disabled copy actions', function (
     $this->actingAs($staff)
         ->get(route('books.show', $book))
         ->assertOk()
-        ->assertSee('Negalima išduoti: egzempliorius priklauso kitam filialui.', false)
-        ->assertSee('Negalima priimti grąžinimo: egzempliorius priklauso kitam filialui.', false);
+        ->assertSee('Negalima išduoti: kopija priklauso kitam filialui.', false)
+        ->assertSee('Negalima priimti grąžinimo: kopija priklauso kitam filialui.', false);
+});
+
+it('shows status reason hover title when copy can not be borrowed', function () {
+    $library = Library::factory()->create();
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    assignStaffBranch($staff, $library, $branch);
+    $book = Book::factory()->create();
+    branchCopy($book, $library, $branch, BookCopy::STATUS_LOST);
+
+    $this->actingAs($staff)
+        ->get(route('books.show', $book))
+        ->assertOk()
+        ->assertSee('Išduoti negalima')
+        ->assertSee('Negalima išduoti: kopija pažymėta kaip prarasta.', false);
 });
 
 it('blocks staff from borrowing another branch copy', function () {

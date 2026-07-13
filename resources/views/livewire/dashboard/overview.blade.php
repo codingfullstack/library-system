@@ -112,7 +112,7 @@
 
                         <section class="overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                             <div class="border-b border-zinc-200/80 px-5 py-4 dark:border-zinc-700">
-                                <h2 class="text-lg font-semibold text-zinc-950 dark:text-white">Egzempliorių būsenos</h2>
+                                <h2 class="text-lg font-semibold text-zinc-950 dark:text-white">Kopijų būsenos</h2>
                             </div>
 
                             <div class="grid gap-6 px-5 py-5 xl:grid-cols-[220px_minmax(0,1fr)]">

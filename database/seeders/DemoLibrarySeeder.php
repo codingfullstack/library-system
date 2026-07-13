@@ -790,7 +790,7 @@ class DemoLibrarySeeder extends Seeder
                 ]);
 
                 $copies->push($copy);
-                $this->recordCopyHistory($copy, $employees->first(), 'created', BookCopy::STATUS_AVAILABLE, 'Egzempliorius įtrauktas į bibliotekos fondą.');
+                $this->recordCopyHistory($copy, $employees->first(), 'created', BookCopy::STATUS_AVAILABLE, 'Kopija įtrauktas į bibliotekos fondą.');
 
                 if ($targetStatus === BookCopy::STATUS_LOANED) {
                     $this->seedLoanForCopy($copy, $members->random(), $employees->random(), false);
@@ -805,10 +805,10 @@ class DemoLibrarySeeder extends Seeder
                 $copy->update(['status' => $targetStatus]);
 
                 [$reasonCode, $notes] = match ($targetStatus) {
-                    BookCopy::STATUS_MAINTENANCE => ['sent_to_maintenance', 'Egzempliorius laikinai perduotas tvarkymui.'],
+                    BookCopy::STATUS_MAINTENANCE => ['sent_to_maintenance', 'Kopija laikinai perduotas tvarkymui.'],
                     BookCopy::STATUS_DAMAGED => ['marked_damaged', 'Apžiūros metu nustatyti fiziniai pažeidimai.'],
-                    BookCopy::STATUS_LOST => ['marked_lost', 'Egzempliorius nerastas po inventorizacijos.'],
-                    BookCopy::STATUS_WITHDRAWN => ['nurašyta', 'Egzempliorius nurašytas dėl nusidėvėjimo.'],
+                    BookCopy::STATUS_LOST => ['marked_lost', 'Kopija nerasta po inventorizacijos.'],
+                    BookCopy::STATUS_WITHDRAWN => ['nurašyta', 'Kopija nurašytas dėl nusidėvėjimo.'],
                     default => ['status_adjusted', 'Statusas atnaujintas demo duomenims.'],
                 };
 
@@ -851,11 +851,11 @@ class DemoLibrarySeeder extends Seeder
         ]);
 
         $copy->update(['status' => BookCopy::STATUS_LOANED]);
-        $this->recordCopyHistory($copy, $employee, 'issued', BookCopy::STATUS_LOANED, 'Egzempliorius išduotas skaitytojui.');
+        $this->recordCopyHistory($copy, $employee, 'issued', BookCopy::STATUS_LOANED, 'Kopija išduota skaitytojui.');
 
         if ($returned) {
             $copy->update(['status' => BookCopy::STATUS_AVAILABLE]);
-            $this->recordCopyHistory($copy, $employee, 'grąžinta', BookCopy::STATUS_AVAILABLE, 'Egzempliorius grąžintas laiku ir vėl prieinamas fonde.');
+            $this->recordCopyHistory($copy, $employee, 'grąžinta', BookCopy::STATUS_AVAILABLE, 'Kopija grąžinta laiku ir vėl prieinamas fonde.');
         }
     }
 
@@ -1003,8 +1003,8 @@ class DemoLibrarySeeder extends Seeder
                     'auditable_type' => $copy->getMorphClass(),
                     'auditable_id' => $copy->id,
                     'description' => $step % 2 === 0
-                        ? sprintf('Egzemplioriaus %s statusas pakeistas.', $copy->inventory_code)
-                        : sprintf('Atnaujinta egzemplioriaus %s informacija.', $copy->inventory_code),
+                        ? sprintf('Kopijos %s statusas pakeistas.', $copy->inventory_code)
+                        : sprintf('Atnaujinta kopijos %s informacija.', $copy->inventory_code),
                     'metadata' => [
                         'inventory_code' => $copy->inventory_code,
                         'target_status_label' => BookCopy::statusLabels()[$copy->status] ?? $copy->status,

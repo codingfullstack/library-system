@@ -42,7 +42,7 @@ it('sends an internal notification when staff cancels a reservation with a reaso
         'cancelled_at' => null,
     ]);
 
-    app(CancelReservationAction::class)->handle($staff, $reservation, 'Nėradome tinkamo egzemplioriaus šiandien.');
+    app(CancelReservationAction::class)->handle($staff, $reservation, 'Nėradome tinkamo kopijos šiandien.');
 
     $this->assertDatabaseHas('notifications', [
         'notifiable_type' => $member->getMorphClass(),

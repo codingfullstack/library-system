@@ -8,6 +8,7 @@ use App\Models\BookCopy;
 use App\Models\Branch;
 use App\Models\Library;
 use App\Models\Location;
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -82,17 +83,31 @@ class BookCopyForm extends Component
         $this->selectedLibraryId = $actor->isSuperAdmin()
             ? $selectedLibraryId
             : $actor->activeLibraryId();
+
+        if ($actor->role === User::ROLE_STAFF) {
+            $this->branchId = $actor->assignedBranchId($this->selectedLibraryId);
+        }
     }
 
     public function updatedSelectedLibraryId(): void
     {
-        $this->branchId = null;
+        $actor = Auth::user();
+
+        $this->branchId = $actor?->role === User::ROLE_STAFF
+            ? $actor->assignedBranchId($this->selectedLibraryId)
+            : null;
         $this->locationId = null;
         $this->resetErrorBag(['branchId', 'locationId']);
     }
 
     public function updatedBranchId(): void
     {
+        $actor = Auth::user();
+
+        if ($actor?->role === User::ROLE_STAFF) {
+            $this->branchId = $actor->assignedBranchId($this->selectedLibraryId);
+        }
+
         $this->locationId = null;
         $this->resetErrorBag('locationId');
     }
@@ -118,6 +133,24 @@ class BookCopyForm extends Component
         $libraryId = $actor->isSuperAdmin()
             ? $this->selectedLibraryId
             : $actor->activeLibraryId();
+
+        if ($actor->role === User::ROLE_STAFF) {
+            $staffBranchId = $actor->assignedBranchId($libraryId);
+
+            if (! $staffBranchId) {
+                throw ValidationException::withMessages([
+                    'branchId' => 'Darbuotojas turi būti priskirtas filialui.',
+                ]);
+            }
+
+            if (filled($this->branchId) && (int) $this->branchId !== (int) $staffBranchId) {
+                throw ValidationException::withMessages([
+                    'branchId' => 'Darbuotojas gali pridėti kopiją tik savo filiale.',
+                ]);
+            }
+
+            $this->branchId = $staffBranchId;
+        }
 
         $bookCopyId = $this->bookCopy?->id;
 
@@ -197,7 +230,7 @@ class BookCopyForm extends Component
 
             return redirect()
                 ->route('book-copies.show', $this->bookCopy)
-                ->with('success', 'Egzempliorius atnaujintas.');
+                ->with('success', 'Kopija atnaujinta.');
         }
 
         $payload['qr_code'] = $this->generateQrCode((int) $libraryId);
@@ -210,12 +243,12 @@ class BookCopyForm extends Component
             $validated['status'],
             $actor,
             'created',
-            $validated['notes'] ?: 'Egzempliorius sukurtas sistemoje.'
+            $validated['notes'] ?: 'Kopija sukurta sistemoje.'
         );
 
         return redirect()
             ->route('book-copies.show', $copy)
-            ->with('success', 'Egzempliorius sėkmingai pridėtas prie esamos knygos.');
+            ->with('success', 'Kopija sėkmingai pridėta prie esamos knygos.');
     }
 
     public function render()
@@ -224,6 +257,10 @@ class BookCopyForm extends Component
         $libraryId = $actor?->isSuperAdmin()
             ? $this->selectedLibraryId
             : $actor?->activeLibraryId();
+        $staffBranchId = $actor?->role === User::ROLE_STAFF
+            ? $actor->assignedBranchId($libraryId)
+            : null;
+        $effectiveBranchId = $staffBranchId ?: $this->branchId;
 
         $libraries = $actor?->isSuperAdmin()
             ? Library::query()->orderBy('name')->get(['id', 'name'])
@@ -232,12 +269,15 @@ class BookCopyForm extends Component
         $branches = Branch::query()
             ->when($libraryId, fn ($query) => $query->where('library_id', $libraryId))
             ->when(! $actor?->isSuperAdmin(), fn ($query) => $query->where('library_id', $actor?->activeLibraryId()))
+            ->when($actor?->role === User::ROLE_STAFF, fn ($query) => $staffBranchId
+                ? $query->whereKey($staffBranchId)
+                : $query->whereRaw('1 = 0'))
             ->orderBy('name')
             ->get(['id', 'name', 'code']);
 
         $locations = Location::query()
             ->when($libraryId, fn ($query) => $query->where('library_id', $libraryId))
-            ->when($this->branchId, fn ($query) => $query->where('branch_id', $this->branchId))
+            ->when($effectiveBranchId, fn ($query) => $query->where('branch_id', $effectiveBranchId))
             ->when(! $actor?->isSuperAdmin(), fn ($query) => $query->where('library_id', $actor?->activeLibraryId()))
             ->with('branch:id,name')
             ->orderBy('name')
@@ -247,6 +287,7 @@ class BookCopyForm extends Component
             'libraries' => $libraries,
             'branches' => $branches,
             'locations' => $locations,
+            'staffBranch' => $actor?->role === User::ROLE_STAFF ? $branches->first() : null,
             'statusOptions' => $this->statusOptions(),
             'creatableStatusOptions' => $this->creatableStatusOptions(),
             'conditionOptions' => $this->conditionOptions(),
@@ -274,8 +315,8 @@ class BookCopyForm extends Component
         return [
             'nauja' => 'Nauja',
             'gera' => 'Gera',
-            'padėvėta' => 'Padeveta',
-            'sugadinta' => 'Pazeista',
+            'padėvėta' => 'Padėvėta',
+            'sugadinta' => 'Pažeista',
         ];
     }
 

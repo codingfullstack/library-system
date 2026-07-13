@@ -122,7 +122,7 @@ class LibraryController extends Controller
         abort_unless($request->user()?->isSuperAdmin(), 403);
 
         if ($this->hasBlockingRelations($library)) {
-            return back()->with('error', 'Bibliotekos ištrinti negalima, nes ji turi filialų, vietų, egzempliorių, vartotojų arba veiklos įrašų.');
+            return back()->with('error', 'Bibliotekos ištrinti negalima, nes ji turi filialų, vietų, kopijų, vartotojų arba veiklos įrašų.');
         }
 
         app(RecordAuditLogAction::class)->handle(

@@ -31,14 +31,24 @@
 
         <div>
             <label for="branch_id" class="app-label">Filialas</label>
-            <select id="branch_id" wire:model.live="branchId" class="app-input" required>
-                <option value="">Pasirinkti filialą</option>
-                @foreach($branches as $branch)
-                    <option value="{{ $branch->id }}">
-                        {{ $branch->name }}{{ $branch->code ? ' ('.$branch->code.')' : '' }}
-                    </option>
-                @endforeach
-            </select>
+            @if(auth()->user()?->role === \App\Models\User::ROLE_STAFF)
+                <div id="branch_id" class="app-input flex items-center bg-zinc-50 text-zinc-700 dark:bg-zinc-950/40 dark:text-zinc-300">
+                    @if($staffBranch)
+                        {{ $staffBranch->name }}{{ $staffBranch->code ? ' ('.$staffBranch->code.')' : '' }}
+                    @else
+                        Filialas nepriskirtas
+                    @endif
+                </div>
+            @else
+                <select id="branch_id" wire:model.live="branchId" class="app-input" required>
+                    <option value="">Pasirinkti filialą</option>
+                    @foreach($branches as $branch)
+                        <option value="{{ $branch->id }}">
+                            {{ $branch->name }}{{ $branch->code ? ' ('.$branch->code.')' : '' }}
+                        </option>
+                    @endforeach
+                </select>
+            @endif
             @error('branchId') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
         </div>
 
@@ -128,7 +138,7 @@
 
     <div class="{{ $isEditing ? 'flex flex-col gap-3 sm:flex-row' : 'sticky bottom-0 -mx-6 mt-6 flex flex-col gap-3 border-t border-zinc-200 bg-white px-6 py-4 sm:flex-row sm:justify-end dark:border-zinc-800 dark:bg-zinc-950' }}">
         <button type="submit" class="app-button-primary" wire:loading.attr="disabled">
-            <span wire:loading.remove wire:target="save">{{ $isEditing ? 'Išsaugoti pakeitimus' : 'Pridėti egzempliorių' }}</span>
+            <span wire:loading.remove wire:target="save">{{ $isEditing ? 'Išsaugoti pakeitimus' : 'Pridėti kopiją' }}</span>
             <span wire:loading wire:target="save">{{ $isEditing ? 'Saugoma...' : 'Pridedama...' }}</span>
         </button>
 

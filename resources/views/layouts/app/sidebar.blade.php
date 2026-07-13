@@ -200,17 +200,19 @@
                                 'text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/70 dark:hover:text-white' => ! request()->routeIs('manage.book-copies.*'),
                             ])>
                                 <flux:icon.squares-plus class="size-5 shrink-0" />
-                                <span>{{ __('Egzemplioriai') }}</span>
+                                <span>{{ __('Kopijos') }}</span>
                             </a>
 
-                            <a href="{{ route('manage.branches.index') }}" wire:navigate @click="mobileNavOpen = false" @class([
-                                'flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition',
-                                'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20' => request()->routeIs('manage.branches.*'),
-                                'text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/70 dark:hover:text-white' => ! request()->routeIs('manage.branches.*'),
-                            ])>
-                                <flux:icon.building-library class="size-5 shrink-0" />
-                                <span>{{ __('Filialai') }}</span>
-                            </a>
+                            @if($user?->isSuperAdmin() || $user?->isAdmin())
+                                <a href="{{ route('manage.branches.index') }}" wire:navigate @click="mobileNavOpen = false" @class([
+                                    'flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition',
+                                    'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20' => request()->routeIs('manage.branches.*'),
+                                    'text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/70 dark:hover:text-white' => ! request()->routeIs('manage.branches.*'),
+                                ])>
+                                    <flux:icon.building-library class="size-5 shrink-0" />
+                                    <span>{{ __('Filialai') }}</span>
+                                </a>
+                            @endif
 
                             <a href="{{ route('manage.locations.index') }}" wire:navigate @click="mobileNavOpen = false" @class([
                                 'flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition',
@@ -370,7 +372,7 @@
                 @if($canManageLibrary)
                     <flux:sidebar.group :heading="__('Valdymas')" class="mt-6 grid gap-1">
                         <flux:sidebar.item icon="squares-plus" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('manage.book-copies.index')" :current="request()->routeIs('manage.book-copies.*')" wire:navigate>
-                            {{ __('Egzemplioriai') }}
+                            {{ __('Kopijos') }}
                         </flux:sidebar.item>
 
                         @if($user?->isSuperAdmin())
@@ -387,9 +389,11 @@
                             </flux:sidebar.item>
                         @endif
 
-                        <flux:sidebar.item icon="building-library" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('manage.branches.index')" :current="request()->routeIs('manage.branches.*')" wire:navigate>
-                            {{ __('Filialai') }}
-                        </flux:sidebar.item>
+                        @if($user?->isSuperAdmin() || $user?->isAdmin())
+                            <flux:sidebar.item icon="building-library" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('manage.branches.index')" :current="request()->routeIs('manage.branches.*')" wire:navigate>
+                                {{ __('Filialai') }}
+                            </flux:sidebar.item>
+                        @endif
 
                         <flux:sidebar.item icon="map-pin" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('manage.locations.index')" :current="request()->routeIs('manage.locations.*')" wire:navigate>
                             {{ __('Vietos') }}

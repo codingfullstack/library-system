@@ -39,7 +39,7 @@ class BorrowBookCopyAction
     {
         if (! $authUser->canManageBookCopy($bookCopy)) {
             throw ValidationException::withMessages([
-                'book_copy' => ['Neturite teisės išduoti kito filialo egzemplioriaus.'],
+                'book_copy' => ['Neturite teisės išduoti kito filialo kopijos.'],
             ]);
         }
 
@@ -187,7 +187,7 @@ class BorrowBookCopyAction
             'loan_issued',
             $loan,
             sprintf(
-                'Egzempliorius %s išduotas nariui %s.',
+                'Kopija %s išduota nariui %s.',
                 $bookCopy->inventory_code,
                 $member->name
             ),
@@ -211,7 +211,7 @@ class BorrowBookCopyAction
                 'reservation_override_issued',
                 $priorityReservation,
                 sprintf(
-                    'Apeita aktyvi rezervacija knygai "%s" ir egzempliorius %s išduotas nariui %s.',
+                    'Apeita aktyvi rezervacija knygai "%s" ir kopija %s išduota nariui %s.',
                     $bookCopy->book?->title ?: 'nežinoma knyga',
                     $bookCopy->inventory_code,
                     $member->name

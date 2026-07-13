@@ -23,7 +23,7 @@ class ChangeBookCopyStatusAction
         $fromStatus = $bookCopy->status;
 
         if (! in_array($toStatus, array_keys(BookCopy::statusLabels()), true)) {
-            throw new InvalidArgumentException('Nežinoma egzemplioriaus būsena.');
+            throw new InvalidArgumentException('Nežinoma kopijos būsena.');
         }
 
         if ($fromStatus !== $toStatus || $attributes !== []) {
@@ -47,7 +47,7 @@ class ChangeBookCopyStatusAction
             'book_copy_status_changed',
             $bookCopy,
             sprintf(
-                'Egzemplioriaus %s statusas pakeistas is "%s" i "%s".',
+                'Kopijos %s statusas pakeistas is "%s" i "%s".',
                 $bookCopy->inventory_code,
                 BookCopy::statusLabels()[$fromStatus] ?? $fromStatus,
                 BookCopy::statusLabels()[$toStatus] ?? $toStatus

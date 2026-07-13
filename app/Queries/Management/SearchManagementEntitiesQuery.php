@@ -52,17 +52,19 @@ class SearchManagementEntitiesQuery
             ->limit(8)
             ->get(['id', 'name']);
 
-        $results['branches'] = Branch::query()
-            ->when(! $actor->isSuperAdmin(), fn (Builder $query) => $query->where('library_id', $actor->activeLibraryId()))
-            ->where(function (Builder $query) use ($search) {
-                $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%")
-                    ->orWhere('city', 'like', "%{$search}%");
-            })
-            ->with('library:id,name')
-            ->orderBy('name')
-            ->limit(8)
-            ->get();
+        if ($actor->isSuperAdmin() || $actor->isAdmin()) {
+            $results['branches'] = Branch::query()
+                ->when(! $actor->isSuperAdmin(), fn (Builder $query) => $query->where('library_id', $actor->activeLibraryId()))
+                ->where(function (Builder $query) use ($search) {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhere('code', 'like', "%{$search}%")
+                        ->orWhere('city', 'like', "%{$search}%");
+                })
+                ->with('library:id,name')
+                ->orderBy('name')
+                ->limit(8)
+                ->get();
+        }
 
         $results['locations'] = Location::query()
             ->when(! $actor->isSuperAdmin(), fn (Builder $query) => $query->where('library_id', $actor->activeLibraryId()))

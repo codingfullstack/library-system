@@ -145,7 +145,7 @@ it('shows extended dashboard reports scoped to the staff library', function () {
     $response->assertSee('Populiariausios knygos');
     $response->assertSee('Aktyviausi nariai');
     $response->assertSee('Veiklos suvestinė');
-    $response->assertSee('Egzempliorių būsenos');
+    $response->assertSee('Kopijų būsenos');
     $response->assertDontSee('Populiariaušios knygos');
     $response->assertDontSee('Peržiūrėti visą');
     $response->assertDontSee('Peržiūrėti visus');

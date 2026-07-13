@@ -45,17 +45,17 @@
 
                         <div class="flex flex-wrap items-center gap-3">
                             @can('update', $copy)
-                                <a href="{{ route('manage.book-copies.edit', $copy) }}" title="Redaguoti egzempliorių" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600">
+                                <a href="{{ route('manage.book-copies.edit', $copy) }}" title="Redaguoti kopiją" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600">
                                     <flux:icon.pencil-square class="size-4" />
                                     Redaguoti
                                 </a>
                             @endcan
 
                             @can('delete', $copy)
-                                <form method="POST" action="{{ route('manage.book-copies.destroy', $copy) }}" onsubmit="return confirm('Ar tikrai nori ištrinti šį egzempliorių?')">
+                                <form method="POST" action="{{ route('manage.book-copies.destroy', $copy) }}" onsubmit="return confirm('Ar tikrai nori ištrinti šią kopiją?')">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" title="Ištrinti egzempliorių" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-red-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-red-500">
+                                    <button type="submit" title="Ištrinti kopiją" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-red-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-red-500">
                                         <flux:icon.trash class="size-4" />
                                         Ištrinti
                                     </button>
@@ -224,13 +224,13 @@
                             <section class="overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                                 <div class="border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
                                     <h2 class="text-lg font-semibold text-zinc-950 dark:text-white">Veiksmų istorija</h2>
-                                    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Paskutiniai audito įrašai, susiję su šiuo egzemplioriumi.</p>
+                                    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Paskutiniai audito įrašai, susiję su šia kopija.</p>
                                 </div>
                                 <div class="p-5">
                                     @include('manage.audit-logs._list', [
                                         'auditLogs' => $auditLogs,
                                         'emptyTitle' => 'Veiksmų dar nėra',
-                                        'emptyDescription' => 'Šiam egzemplioriui audito įrašų dar nesukaupta.',
+                                        'emptyDescription' => 'Šiai kopijai audito įrašų dar nesukaupta.',
                                     ])
                                 </div>
                             </section>

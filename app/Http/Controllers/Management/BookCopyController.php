@@ -63,7 +63,7 @@ class BookCopyController extends Controller
             $request->validated('status'),
             $request->user(),
             'created',
-            $request->validated('notes') ?: 'Egzempliorius sukurtas sistemoje.'
+            $request->validated('notes') ?: 'Kopija sukurta sistemoje.'
         );
 
         $copy->loadMissing('book:id,slug,title');
@@ -72,7 +72,7 @@ class BookCopyController extends Controller
             $request->user(),
             'book_copy_created',
             $copy,
-            sprintf('Sukurtas egzempliorius %s knygai "%s".', $copy->inventory_code, $copy->book?->title ?: 'be pavadinimo'),
+            sprintf('Sukurta kopija %s knygai "%s".', $copy->inventory_code, $copy->book?->title ?: 'be pavadinimo'),
             [
                 'inventory_code' => $copy->inventory_code,
                 'book_id' => $copy->book_id,
@@ -85,7 +85,7 @@ class BookCopyController extends Controller
 
         return redirect()
             ->route('book-copies.show', $copy->id)
-            ->with('success', 'Egzempliorius sėkmingai pridėtas prie esamos knygos.');
+            ->with('success', 'Kopija sėkmingai pridėta prie esamos knygos.');
     }
 
     public function edit(
@@ -133,7 +133,7 @@ class BookCopyController extends Controller
             $request->user(),
             'book_copy_updated',
             $bookCopy,
-            sprintf('Atnaujintas egzempliorius %s.', $bookCopy->inventory_code),
+            sprintf('Atnaujinta kopija %s.', $bookCopy->inventory_code),
             array_merge([
                 'inventory_code' => $bookCopy->inventory_code,
             ], $changeSummary),
@@ -142,7 +142,7 @@ class BookCopyController extends Controller
 
         return redirect()
             ->route('book-copies.show', $bookCopy->id)
-            ->with('success', 'Egzempliorius atnaujintas.');
+            ->with('success', 'Kopija atnaujinta.');
     }
 
     public function destroy(Request $request, BookCopy $bookCopy): RedirectResponse
@@ -150,15 +150,15 @@ class BookCopyController extends Controller
         $this->authorize('delete', $bookCopy);
 
         if ($bookCopy->activeLoan()->exists()) {
-            return back()->with('error', 'Egzemplioriaus ištrinti negalima, nes jis šiuo metu išduotas.');
+            return back()->with('error', 'Kopijos ištrinti negalima, nes ji šiuo metu išduota.');
         }
 
         if ($bookCopy->loans()->exists()) {
-            return back()->with('error', 'Egzemplioriaus ištrinti negalima, nes jis turi išduotų knygų istorija.');
+            return back()->with('error', 'Kopijos ištrinti negalima, nes ji turi išduotų knygų istoriją.');
         }
 
         if ($bookCopy->scanLogs()->exists()) {
-            return back()->with('error', 'Egzemplioriaus ištrinti negalima, nes jis turi skenavimo istorija.');
+            return back()->with('error', 'Kopijos ištrinti negalima, nes ji turi skenavimo istoriją.');
         }
 
         $bookCopy->loadMissing([
@@ -171,7 +171,7 @@ class BookCopyController extends Controller
             $request->user(),
             'book_copy_deleted',
             $bookCopy,
-            sprintf('Ištrintas egzempliorius %s.', $bookCopy->inventory_code),
+            sprintf('Ištrinta kopija %s.', $bookCopy->inventory_code),
             [
                 'inventory_code' => $bookCopy->inventory_code,
                 'book_id' => $bookCopy->book_id,
@@ -195,7 +195,7 @@ class BookCopyController extends Controller
 
         return redirect()
             ->route('books.index')
-            ->with('success', 'Egzempliorius ištrintas.');
+            ->with('success', 'Kopija ištrinta.');
     }
 
     public function updateLifecycle(
@@ -206,7 +206,7 @@ class BookCopyController extends Controller
         $this->authorize('update', $bookCopy);
 
         if ($bookCopy->activeLoan()->exists()) {
-            return back()->with('error', 'Negalima keisti egzemplioriaus gyvavimo ciklo, kol jis yra aktyviai išduotas.');
+            return back()->with('error', 'Negalima keisti kopijos gyvavimo ciklo, kol ji yra aktyviai išduota.');
         }
 
         $targetStatus = $request->validated('target_status');
@@ -241,7 +241,7 @@ class BookCopyController extends Controller
 
         return redirect()
             ->route('book-copies.show', $bookCopy)
-            ->with('success', 'Egzemplioriaus būsena atnaujinta.');
+            ->with('success', 'Kopijos būsena atnaujinta.');
     }
 
     private function ensureVisible(Request $request, BookCopy $bookCopy): void

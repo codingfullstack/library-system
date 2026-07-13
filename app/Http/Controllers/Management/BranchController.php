@@ -101,7 +101,7 @@ class BranchController extends Controller
         }
 
         if ($branch->bookCopies()->exists()) {
-            return back()->with('error', 'Filialo ištrinti negalima, nes jis turi egzempliorių.');
+            return back()->with('error', 'Filialo ištrinti negalima, nes jis turi kopijų.');
         }
 
         $branch->loadMissing('library:id,name');

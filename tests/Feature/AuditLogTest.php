@@ -283,15 +283,15 @@ it('shows related audit logs on category and publisher edit pages for superadmin
 it('allows superadmin to open a book page even when it has no copies yet', function () {
     $superAdmin = User::factory()->superAdmin()->create();
     $book = Book::factory()->create([
-        'title' => 'Katalogo knyga be egzempliorių',
+        'title' => 'Katalogo knyga be kopijų',
     ]);
 
     $this->actingAs($superAdmin)
         ->get(route('books.show', $book))
         ->assertOk()
-        ->assertSee('Katalogo knyga be egzempliorių')
+        ->assertSee('Katalogo knyga be kopijų')
         ->assertSee('Kopijų nerasta')
-        ->assertSee('Pridėti egzempliorių');
+        ->assertSee('Pridėti kopiją');
 });
 
 it('shows related audit logs on author edit page for superadmin', function () {
@@ -352,7 +352,7 @@ it('shows related audit logs on book edit page for superadmin', function () {
 it('shows direct audit logs on book copy edit page for superadmin', function () {
     $superAdmin = User::factory()->superAdmin()->create();
     $library = Library::factory()->create();
-    $book = Book::factory()->create(['title' => 'Egzemplioriaus knyga']);
+    $book = Book::factory()->create(['title' => 'Kopijos knyga']);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $bookCopy = BookCopy::factory()->create([
@@ -367,7 +367,7 @@ it('shows direct audit logs on book copy edit page for superadmin', function () 
         $superAdmin,
         'book_copy_updated',
         $bookCopy,
-        'Atnaujintas egzempliorius INV-EDIT-001.',
+        'Atnaujinta kopija INV-EDIT-001.',
         [
             'inventory_code' => $bookCopy->inventory_code,
             'changed_fields' => ['notes'],
@@ -385,7 +385,7 @@ it('shows direct audit logs on book copy edit page for superadmin', function () 
         ->get(route('manage.book-copies.edit', $bookCopy))
         ->assertOk()
         ->assertSee('Veiksmų istorija')
-        ->assertSee('Atnaujintas egzempliorius INV-EDIT-001.');
+        ->assertSee('Atnaujinta kopija INV-EDIT-001.');
 });
 
 it('shows related audit logs on user edit page for superadmin', function () {

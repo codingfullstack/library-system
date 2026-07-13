@@ -97,7 +97,7 @@ class LocationController extends Controller
         $this->ensureVisible($request, $location);
 
         if ($location->bookCopies()->exists()) {
-            return back()->with('error', 'Vietos ištrinti negalima, nes ji naudojama egzemplioriųose.');
+            return back()->with('error', 'Vietos ištrinti negalima, nes ji naudojama kopijose.');
         }
 
         $location->loadMissing('branch:id,name');

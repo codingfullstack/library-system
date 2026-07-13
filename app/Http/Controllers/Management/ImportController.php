@@ -156,7 +156,7 @@ class ImportController extends Controller
                     'library_id į failą nerašomas. Jis paimamas iš prisijungusio vartotojo arba superadmin pasirinktos bibliotekos.',
                 ],
                 'index_route' => 'manage.branches.index',
-            ], fn () => abort_unless($user && ($user->isSuperAdmin() || $user->isAdmin() || $user->isStaff()), 403)),
+            ], fn () => abort_unless($user && ($user->isSuperAdmin() || $user->isAdmin()), 403)),
             'locations' => tap([
                 'title' => 'Vietų importas',
                 'description' => 'Įkelkite CSV failą su vietomis. Būtina nurodyti branch_code arba branch_name. Biblioteka paimama iš prisijungusio vartotojo arba pasirenkama formoje, jei importuoja superadmin.',

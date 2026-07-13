@@ -43,7 +43,7 @@ class BookCopyController extends Controller
 
         if (! $copy) {
             return response()->json([
-                'message' => 'Egzempliorius nerastas',
+                'message' => 'Kopija nerasta',
             ], 404);
         }
 

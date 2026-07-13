@@ -104,7 +104,7 @@ class RecordAuditLogAction
         return match (true) {
             $auditable instanceof Author => 'Autorius',
             $auditable instanceof Book => 'Knyga',
-            $auditable instanceof BookCopy => 'Egzempliorius',
+            $auditable instanceof BookCopy => 'Kopija',
             $auditable instanceof Branch => 'Filialas',
             $auditable instanceof Category => 'Kategorija',
             $auditable instanceof Library => 'Biblioteka',
