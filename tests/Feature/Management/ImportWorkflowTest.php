@@ -43,7 +43,7 @@ it('collects book import row errors and continues importing later rows', functio
 
 it('collects branch import row errors without stopping the import', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $staff = User::factory()->admin()->create(['library_id' => $library->id]);
     Branch::factory()->create(['library_id' => $library->id, 'name' => 'Esamas filialas', 'code' => 'EXIST']);
 
     $csv = implode("\n", [
@@ -101,8 +101,3 @@ it('collects location import row errors without stopping the import', function (
     $this->assertDatabaseHas('locations', ['library_id' => $library->id, 'branch_id' => $branch->id, 'code' => 'NEW']);
     $this->assertDatabaseHas('locations', ['library_id' => $library->id, 'branch_id' => $branch->id, 'code' => 'NEXT']);
 });
-
-
-
-
-

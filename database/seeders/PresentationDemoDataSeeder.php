@@ -22,7 +22,6 @@ use App\Support\GeneratesSlugs;
 use App\Support\Notifications\NotificationUiConfig;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -31,29 +30,45 @@ use Illuminate\Support\Str;
 class PresentationDemoDataSeeder extends Seeder
 {
     private const ADMIN_EMAIL = 'adminx@test.com';
+
     private const PREFIX = 'PRES';
 
     private const TARGET_BRANCHES = 8;
+
     private const TARGET_LOCATIONS = 120;
+
     private const TARGET_CATEGORIES = 42;
+
     private const TARGET_PUBLISHERS = 75;
+
     private const TARGET_AUTHORS = 300;
+
     private const TARGET_BOOKS = 1200;
+
     private const TARGET_COPIES = 3600;
+
     private const TARGET_MEMBERS = 650;
+
     private const TARGET_STAFF = 18;
+
     private const TARGET_LOANS = 3600;
+
     private const TARGET_ACTIVE_LOANS = 500;
+
     private const TARGET_OVERDUE_LOANS = 120;
+
     private const TARGET_RESERVATIONS = 1500;
+
     private const TARGET_SCAN_LOGS = 5500;
+
     private const TARGET_AUDIT_LOGS = 11000;
+
     private const TARGET_NOTIFICATIONS = 5500;
 
     /**
      * @var array<int, string>
      */
-    private array $conditionStatuses = ['nauja', 'gera', 'padÄ—vÄ—ta', 'sugadinta'];
+    private array $conditionStatuses = ['nauja', 'gera', 'padėvėta', 'sugadinta'];
 
     public function run(): void
     {
