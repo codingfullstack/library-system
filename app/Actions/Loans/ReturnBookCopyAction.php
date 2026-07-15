@@ -8,6 +8,7 @@ use App\Actions\Notifications\CreateUserNotificationAction;
 use App\Actions\Reservations\SyncReservationQueueAction;
 use App\Models\BookCopy;
 use App\Models\User;
+use App\Services\ReservationQueueDebugService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -33,6 +34,10 @@ class ReturnBookCopyAction
      */
     private function returnLocked(User $authUser, BookCopy $bookCopy): array
     {
+        app(ReservationQueueDebugService::class)->logSnapshot('before_return', $bookCopy->library_id, $bookCopy->book_id, [
+            'triggering_copy_id' => $bookCopy->id,
+        ]);
+
         if (! $authUser->canManageBookCopy($bookCopy)) {
             throw ValidationException::withMessages([
                 'book_copy' => ['Neturite teisės priimti kito filialo kopijos grąžinimo.'],
@@ -87,6 +92,11 @@ class ReturnBookCopyAction
         );
 
         app(SyncReservationQueueAction::class)->handle($bookCopy->library_id, $bookCopy->book_id);
+
+        app(ReservationQueueDebugService::class)->logSnapshot('after_return', $bookCopy->library_id, $bookCopy->book_id, [
+            'triggering_copy_id' => $bookCopy->id,
+            'returned_loan_id' => $activeLoan->id,
+        ]);
 
         app(RecordAuditLogAction::class)->handle(
             $authUser,

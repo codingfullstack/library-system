@@ -41,7 +41,7 @@ class GetLibraryReservationsQuery
         }
 
         return $query
-            ->orderByDesc('reserved_at')
+            ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
@@ -72,6 +72,7 @@ class GetLibraryReservationsQuery
         $search = trim((string) ($filters['search'] ?? ''));
         $status = $filters['status'] ?? null;
         $libraryId = $user->isSuperAdmin() ? ($filters['library_id'] ?? null) : $user->activeLibraryId();
+        $branchId = filled($filters['branch_id'] ?? null) ? (int) $filters['branch_id'] : null;
         $reservationDate = $filters['reservation_date'] ?? null;
 
         $reservationDateRange = $this->dateRange($reservationDate);
@@ -103,8 +104,11 @@ class GetLibraryReservationsQuery
                         });
                 });
             })
+            ->when($branchId, function (Builder $builder) use ($branchId) {
+                $this->applyServiceableBranchFilter($builder, $branchId);
+            })
             ->when(! empty($status), fn ($builder) => $this->applyStatusFilter($builder, (string) $status))
-            ->when($reservationDateRange, fn ($builder) => $builder->whereBetween('reserved_at', $reservationDateRange))
+            ->when($reservationDateRange, fn ($builder) => $builder->whereBetween('created_at', $reservationDateRange))
             ->when($search !== '', function (Builder $query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->whereHas('book', function ($bookQuery) use ($search) {
@@ -119,6 +123,31 @@ class GetLibraryReservationsQuery
                     });
                 });
             });
+    }
+
+    private function applyServiceableBranchFilter(Builder $query, int $branchId): Builder
+    {
+        return $query->where(function (Builder $scopeQuery) use ($branchId) {
+            $scopeQuery
+                ->where(function (Builder $branchScopeQuery) use ($branchId) {
+                    $branchScopeQuery
+                        ->where('scope', Reservation::SCOPE_BRANCH)
+                        ->where('branch_id', $branchId);
+                })
+                ->orWhere(function (Builder $libraryScopeQuery) use ($branchId) {
+                    $libraryScopeQuery
+                        ->where('scope', Reservation::SCOPE_LIBRARY)
+                        ->whereNull('branch_id')
+                        ->whereExists(function ($copyQuery) use ($branchId) {
+                            $copyQuery
+                                ->selectRaw('1')
+                                ->from('book_copies')
+                                ->whereColumn('book_copies.library_id', 'reservations.library_id')
+                                ->whereColumn('book_copies.book_id', 'reservations.book_id')
+                                ->where('book_copies.branch_id', $branchId);
+                        });
+                });
+        });
     }
 
     private function applyStatusFilter(Builder $query, string $status): Builder
@@ -147,20 +176,6 @@ class GetLibraryReservationsQuery
             ->selectRaw('COUNT(*)')
             ->whereColumn('queue_reservations.book_id', 'reservations.book_id')
             ->whereColumn('queue_reservations.library_id', 'reservations.library_id')
-            ->where(function ($scopeQuery) {
-                $scopeQuery->where(function ($libraryScopeQuery) {
-                    $libraryScopeQuery
-                        ->whereColumn('queue_reservations.scope', 'reservations.scope')
-                        ->where('queue_reservations.scope', Reservation::SCOPE_LIBRARY)
-                        ->whereNull('queue_reservations.branch_id')
-                        ->whereNull('reservations.branch_id');
-                })->orWhere(function ($branchScopeQuery) {
-                    $branchScopeQuery
-                        ->whereColumn('queue_reservations.scope', 'reservations.scope')
-                        ->where('queue_reservations.scope', Reservation::SCOPE_BRANCH)
-                        ->whereColumn('queue_reservations.branch_id', 'reservations.branch_id');
-                });
-            })
             ->where('queue_reservations.status', Reservation::STATUS_RESERVED)
             ->whereNull('queue_reservations.fulfilled_at')
             ->whereNull('queue_reservations.cancelled_at')
@@ -169,9 +184,9 @@ class GetLibraryReservationsQuery
                     ->orWhere('queue_reservations.expires_at', '>', now());
             })
             ->where(function ($queueQuery) {
-                $queueQuery->whereColumn('queue_reservations.reserved_at', '<', 'reservations.reserved_at')
+                $queueQuery->whereColumn('queue_reservations.created_at', '<', 'reservations.created_at')
                     ->orWhere(function ($sameTimeQuery) {
-                        $sameTimeQuery->whereColumn('queue_reservations.reserved_at', '=', 'reservations.reserved_at')
+                        $sameTimeQuery->whereColumn('queue_reservations.created_at', '=', 'reservations.created_at')
                             ->whereColumn('queue_reservations.id', '<=', 'reservations.id');
                     });
             });

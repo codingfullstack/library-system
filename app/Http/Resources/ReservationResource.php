@@ -53,6 +53,7 @@ class ReservationResource extends JsonResource
             'user_id' => $this->user_id,
             'scope' => $this->scope,
             'branch_id' => $this->branch_id,
+            'created_at' => $this->created_at,
             'reserved_at' => $this->reserved_at,
             'expires_at' => $this->expires_at,
             'fulfilled_at' => $this->fulfilled_at,

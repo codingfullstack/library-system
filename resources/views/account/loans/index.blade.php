@@ -85,31 +85,33 @@
 
                 <section class="overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                     <div class="px-5 py-4">
-                        <form method="GET" action="{{ route('loans.index') }}" class="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_210px_120px_auto_auto] lg:items-center">
-                            <div class="relative min-w-0">
+                        <form method="GET" action="{{ route('loans.index') }}" class="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+                            <div class="relative lg:min-w-[320px] lg:flex-1">
                                 <input id="search" type="text" name="search" value="{{ request('search') }}" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 pl-11 shadow-none dark:border-zinc-700 dark:bg-zinc-950" placeholder="Ieškoti pagal knygą, ISBN ar kopiją...">
                                 <div class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
                                     <flux:icon.magnifying-glass class="size-4" />
                                 </div>
                             </div>
 
-                            <select id="status" name="status" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
+                            <select id="status" name="status" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none lg:w-48 dark:border-zinc-700 dark:bg-zinc-950">
                                 <option value="">Visos aktyvios</option>
                                 <option value="aktyvi" @selected(request('status') === 'aktyvi')>Aktyvios</option>
                                 <option value="vėluoja" @selected(request('status') === 'vėluoja')>Vėluojančios</option>
                             </select>
 
-                            <select id="per_page" name="per_page" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
+                            <select id="per_page" name="per_page" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none lg:w-28 dark:border-zinc-700 dark:bg-zinc-950">
                                 <option value="10" @selected(request('per_page') == 10)>10</option>
                                 <option value="15" @selected(request('per_page', 15) == 15)>15</option>
                                 <option value="25" @selected(request('per_page') == 25)>25</option>
                             </select>
 
+                            <div class="flex flex-col gap-3 sm:flex-row lg:w-auto lg:shrink-0">
                             <button type="submit" class="app-button-secondary h-11 rounded-2xl px-4">
                                 <flux:icon.funnel class="mr-2 size-4" />
                                 Filtruoti
                             </button>
                             <a href="{{ route('loans.index') }}" class="app-button-secondary h-11 rounded-2xl px-4">Išvalyti</a>
+                            </div>
                         </form>
                     </div>
                 </section>

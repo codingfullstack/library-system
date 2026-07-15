@@ -32,6 +32,7 @@ class ReservationController extends Controller
             ])],
             'queue' => ['nullable', Rule::in(['first', 'waiting'])],
             'library_id' => ['nullable', 'integer', 'exists:libraries,id'],
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -40,6 +41,7 @@ class ReservationController extends Controller
             'status' => $validated['status'] ?? null,
             'queue' => $validated['queue'] ?? null,
             'library_id' => $validated['library_id'] ?? null,
+            'branch_id' => $validated['branch_id'] ?? null,
             'per_page' => $validated['per_page'] ?? 25,
         ];
 

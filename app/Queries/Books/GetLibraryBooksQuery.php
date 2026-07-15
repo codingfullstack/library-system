@@ -4,6 +4,7 @@ namespace App\Queries\Books;
 
 use App\Models\Book;
 use App\Models\BookCopy;
+use App\Models\Branch;
 use App\Models\Library;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -19,6 +20,7 @@ class GetLibraryBooksQuery
         $publisherId = $filters['publisher_id'] ?? null;
         $availability = $filters['availability'] ?? null;
         $libraryIds = $this->visibleLibraryIds($user, $filters);
+        $branchId = $this->visibleBranchId($user, $filters, $libraryIds);
         $sort = $filters['sort'] ?? 'title';
         $direction = strtolower($filters['direction'] ?? 'asc');
 
@@ -76,30 +78,30 @@ class GetLibraryBooksQuery
                         ->withoutGlobalScope('library')
                         ->whereIn('library_id', $libraryIds))
             )
+            ->when(
+                filled($filters['branch_id'] ?? null) && $branchId === null,
+                fn ($builder) => $builder->whereRaw('1 = 0')
+            )
+            ->when(
+                $branchId,
+                fn ($builder) => $builder->whereHas('bookCopies', fn ($copyQuery) => $this->applyCopyVisibility($copyQuery, $libraryIds, $branchId))
+            )
             ->withCount([
-                'bookCopies as copies_count' => function ($copyQuery) use ($libraryIds) {
-                    if (is_array($libraryIds)) {
-                        $copyQuery->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
-                    }
+                'bookCopies as copies_count' => function ($copyQuery) use ($libraryIds, $branchId) {
+                    $this->applyCopyVisibility($copyQuery, $libraryIds, $branchId);
                 },
-                'bookCopies as available_copies_count' => function ($copyQuery) use ($libraryIds) {
-                    if (is_array($libraryIds)) {
-                        $copyQuery->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
-                    }
+                'bookCopies as available_copies_count' => function ($copyQuery) use ($libraryIds, $branchId) {
+                    $this->applyCopyVisibility($copyQuery, $libraryIds, $branchId);
 
                     $copyQuery->where('status', BookCopy::STATUS_AVAILABLE);
                 },
-                'bookCopies as loaned_copies_count' => function ($copyQuery) use ($libraryIds) {
-                    if (is_array($libraryIds)) {
-                        $copyQuery->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
-                    }
+                'bookCopies as loaned_copies_count' => function ($copyQuery) use ($libraryIds, $branchId) {
+                    $this->applyCopyVisibility($copyQuery, $libraryIds, $branchId);
 
                     $copyQuery->where('status', BookCopy::STATUS_LOANED);
                 },
-                'bookCopies as unavailable_copies_count' => function ($copyQuery) use ($libraryIds) {
-                    if (is_array($libraryIds)) {
-                        $copyQuery->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
-                    }
+                'bookCopies as unavailable_copies_count' => function ($copyQuery) use ($libraryIds, $branchId) {
+                    $this->applyCopyVisibility($copyQuery, $libraryIds, $branchId);
 
                     $copyQuery->whereIn('status', [
                         BookCopy::STATUS_LOST,
@@ -152,10 +154,8 @@ class GetLibraryBooksQuery
         }
 
         if ($availability === BookCopy::STATUS_AVAILABLE) {
-            $query->whereHas('bookCopies', function ($copyQuery) use ($libraryIds) {
-                if (is_array($libraryIds)) {
-                    $copyQuery->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
-                }
+            $query->whereHas('bookCopies', function ($copyQuery) use ($libraryIds, $branchId) {
+                $this->applyCopyVisibility($copyQuery, $libraryIds, $branchId);
 
                 $copyQuery->where('status', BookCopy::STATUS_AVAILABLE);
             });
@@ -163,15 +163,11 @@ class GetLibraryBooksQuery
 
         if ($availability === 'unavailable') {
             $query
-                ->whereHas('bookCopies', function ($copyQuery) use ($libraryIds) {
-                    if (is_array($libraryIds)) {
-                        $copyQuery->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
-                    }
+                ->whereHas('bookCopies', function ($copyQuery) use ($libraryIds, $branchId) {
+                    $this->applyCopyVisibility($copyQuery, $libraryIds, $branchId);
                 })
-                ->whereDoesntHave('bookCopies', function ($copyQuery) use ($libraryIds) {
-                    if (is_array($libraryIds)) {
-                        $copyQuery->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
-                    }
+                ->whereDoesntHave('bookCopies', function ($copyQuery) use ($libraryIds, $branchId) {
+                    $this->applyCopyVisibility($copyQuery, $libraryIds, $branchId);
 
                     $copyQuery->where('status', BookCopy::STATUS_AVAILABLE);
                 });
@@ -209,5 +205,45 @@ class GetLibraryBooksQuery
         $libraryId = $user->activeLibraryId();
 
         return $libraryId ? [(int) $libraryId] : [];
+    }
+
+    private function visibleBranchId(?User $user, array $filters, ?array $libraryIds): ?int
+    {
+        $branchId = filled($filters['branch_id'] ?? null) ? (int) $filters['branch_id'] : null;
+
+        if (! $branchId) {
+            return null;
+        }
+
+        $query = Branch::query()->whereKey($branchId);
+
+        if (is_array($libraryIds)) {
+            if ($libraryIds === []) {
+                return null;
+            }
+
+            $query->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
+        }
+
+        if ($user?->role === User::ROLE_STAFF && ! $user->isAdmin()) {
+            $assignedBranchId = $user->assignedBranchId($user->activeLibraryId());
+
+            if ($assignedBranchId === null || $branchId !== $assignedBranchId) {
+                return null;
+            }
+        }
+
+        return $query->exists() ? $branchId : null;
+    }
+
+    private function applyCopyVisibility($copyQuery, ?array $libraryIds, ?int $branchId): void
+    {
+        if (is_array($libraryIds)) {
+            $copyQuery->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
+        }
+
+        if ($branchId) {
+            $copyQuery->where('branch_id', $branchId);
+        }
     }
 }

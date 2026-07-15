@@ -52,7 +52,7 @@
                             <div class="app-muted-card">
                                 <p class="app-label">Rezervuota</p>
                                 <p class="mt-1 text-sm font-medium text-zinc-950 dark:text-white">
-                                    {{ $reservation->reserved_at?->format('Y-m-d H:i') ?: '-' }}
+                                    {{ $reservation->created_at?->format('Y-m-d H:i') ?: '-' }}
                                 </p>
                             </div>
 

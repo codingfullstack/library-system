@@ -64,7 +64,8 @@ class GetLibraryBookDetailsQuery
                         'user:id,name,email,membership_number',
                         'branch:id,name',
                     ])
-                    ->orderBy('reserved_at');
+                    ->orderBy('created_at')
+                    ->orderBy('id');
             },
             'bookCopies' => function ($q) use ($libraryIds, $copyStatus, $copyLifecycle, $copySearch, $branchId, $locationId, $user) {
                 $q->when(is_array($libraryIds), fn ($copyQuery) => $copyQuery

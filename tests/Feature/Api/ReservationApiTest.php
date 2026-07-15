@@ -1,7 +1,10 @@
 <?php
 
 use App\Models\Book;
+use App\Models\BookCopy;
+use App\Models\Branch;
 use App\Models\Library;
+use App\Models\Location;
 use App\Models\Reservation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -124,7 +127,7 @@ it('includes active reservations in the api book details response', function () 
         ->assertJsonPath('reservations.0.is_pending', true);
 });
 
-it('orders api reservations by reservation date descending', function () {
+it('orders api reservations by creation date descending', function () {
     $library = Library::factory()->create();
     $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
@@ -151,6 +154,81 @@ it('orders api reservations by reservation date descending', function () {
     $this->actingAs($staff)
         ->getJson('/api/auth/reservations')
         ->assertOk()
-        ->assertJsonPath('data.0.id', $newerReservation->id)
-        ->assertJsonPath('data.1.id', $olderReservation->id);
+        ->assertJsonPath('data.0.id', $olderReservation->id)
+        ->assertJsonPath('data.1.id', $newerReservation->id);
+});
+
+it('uses the serviceable branch reservation filter in api responses', function () {
+    $library = Library::factory()->create();
+    $admin = User::factory()->admin()->create(['library_id' => $library->id]);
+    $memberA = User::factory()->member()->create(['library_id' => $library->id]);
+    $memberB = User::factory()->member()->create(['library_id' => $library->id]);
+    $memberLibrary = User::factory()->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create();
+    $branchA = Branch::factory()->create(['library_id' => $library->id]);
+    $branchB = Branch::factory()->create(['library_id' => $library->id]);
+    $locationA = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branchA->id]);
+    $locationB = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branchB->id]);
+
+    BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branchA->id,
+        'location_id' => $locationA->id,
+        'status' => BookCopy::STATUS_LOANED,
+    ]);
+    BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branchB->id,
+        'location_id' => $locationB->id,
+        'status' => BookCopy::STATUS_LOANED,
+    ]);
+
+    $branchAReservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $memberA->id,
+        'scope' => Reservation::SCOPE_BRANCH,
+        'branch_id' => $branchA->id,
+        'status' => Reservation::STATUS_RESERVED,
+        'reserved_at' => now()->subHours(3),
+        'expires_at' => null,
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+    $branchBReservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $memberB->id,
+        'scope' => Reservation::SCOPE_BRANCH,
+        'branch_id' => $branchB->id,
+        'status' => Reservation::STATUS_RESERVED,
+        'reserved_at' => now()->subHours(2),
+        'expires_at' => null,
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+    $libraryReservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $memberLibrary->id,
+        'scope' => Reservation::SCOPE_LIBRARY,
+        'branch_id' => null,
+        'status' => Reservation::STATUS_RESERVED,
+        'reserved_at' => now()->subHour(),
+        'expires_at' => null,
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+
+    $response = $this->actingAs($admin)
+        ->getJson('/api/auth/reservations?branch_id='.$branchA->id)
+        ->assertOk()
+        ->assertJsonPath('meta.total', 2);
+
+    $ids = collect($response->json('data'))->pluck('id')->all();
+
+    expect($ids)->toContain($branchAReservation->id, $libraryReservation->id)
+        ->not->toContain($branchBReservation->id);
 });

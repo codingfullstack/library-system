@@ -23,7 +23,7 @@
                 {{ $firstActiveReservation->user?->membership_number ?: ($firstActiveReservation->user?->email ?: '-') }}
             </p>
             <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
-                Rezervuota: {{ $firstActiveReservation->reserved_at?->format('Y-m-d H:i') ?: '-' }}
+                Rezervuota: {{ $firstActiveReservation->created_at?->format('Y-m-d H:i') ?: '-' }}
             </p>
         </div>
     @endif

@@ -52,8 +52,8 @@
 
                 <section class="overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                     <div class="px-5 py-4">
-                        <form method="GET" action="{{ route('books.index') }}" class="grid gap-3 xl:grid-cols-[minmax(320px,1.5fr)_180px_180px_160px_auto_auto] xl:items-center">
-                            <div class="relative xl:min-w-0">
+                        <form method="GET" action="{{ route('books.index') }}" class="flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-center">
+                            <div class="relative xl:min-w-[360px] xl:flex-1">
                                 <input
                                     id="search"
                                     type="text"
@@ -67,7 +67,7 @@
                                 </div>
                             </div>
 
-                            <div class="xl:min-w-0">
+                            <div class="xl:w-48">
                                 <select id="category_id" name="category_id" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
                                     <option value="">Kategorija</option>
                                     @foreach($categories as $category)
@@ -78,7 +78,7 @@
                                 </select>
                             </div>
 
-                            <div class="xl:min-w-0">
+                            <div class="xl:w-48">
                                 <select id="availability" name="availability" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
                                     <option value="">Būsena</option>
                                     <option value="laisva" {{ request('availability') === 'laisva' ? 'selected' : '' }}>Yra laisvų</option>
@@ -87,9 +87,9 @@
                             </div>
 
                             @if(auth()->user()?->isSuperAdmin())
-                                <div class="xl:min-w-0">
+                                <div class="xl:w-48">
                                     <select id="library_id" name="library_id" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
-                                        <option value="">Filialas</option>
+                                        <option value="">Biblioteka</option>
                                         @foreach($libraries as $library)
                                             <option value="{{ $library->id }}" {{ (string) request('library_id') === (string) $library->id ? 'selected' : '' }}>
                                                 {{ $library->name }}
@@ -101,14 +101,29 @@
                                 <input type="hidden" name="library_id" value="{{ request('library_id') }}">
                             @endif
 
-                            <button type="submit" class="app-button-secondary h-11 rounded-2xl px-4 xl:w-auto">
-                                <flux:icon.funnel class="mr-2 size-4" />
-                                Filtruoti
-                            </button>
+                            @if($branches->isNotEmpty())
+                                <div class="xl:w-48">
+                                    <select id="branch_id" name="branch_id" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
+                                        <option value="">Filialas</option>
+                                        @foreach($branches as $branch)
+                                            <option value="{{ $branch->id }}" {{ (string) request('branch_id') === (string) $branch->id ? 'selected' : '' }}>
+                                                {{ $branch->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @endif
 
-                            <a href="{{ route('books.index') }}" class="app-button-secondary h-11 rounded-2xl px-4 xl:w-auto">
+                            <div class="flex flex-col gap-3 sm:flex-row xl:w-auto xl:shrink-0">
+                                <button type="submit" class="app-button-secondary h-11 rounded-2xl px-4 sm:w-auto">
+                                    <flux:icon.funnel class="mr-2 size-4" />
+                                Filtruoti
+                                </button>
+
+                                <a href="{{ route('books.index') }}" class="app-button-secondary h-11 rounded-2xl px-4 sm:w-auto">
                                 Išvalyti
-                            </a>
+                                </a>
+                            </div>
 
                             <input type="hidden" name="sort" value="{{ request('sort', 'updated_at') }}">
                             <input type="hidden" name="direction" value="{{ request('direction', 'desc') }}">

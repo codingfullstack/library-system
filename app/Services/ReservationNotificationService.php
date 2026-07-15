@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Actions\Notifications\CreateUserNotificationAction;
 use App\Models\Reservation;
 use App\Notifications\LibraryNotification;
+use Illuminate\Support\Facades\Log;
 
 class ReservationNotificationService
 {
@@ -27,12 +28,7 @@ class ReservationNotificationService
         }
 
         $position = $this->queueService->positionFor($reservation);
-        $dueAt = $this->queueService->activeLoanDueAt(
-            $reservation->library_id,
-            $reservation->book_id,
-            $reservation->scope ?: Reservation::SCOPE_LIBRARY,
-            $reservation->branch_id ? (int) $reservation->branch_id : null
-        );
+        $dueAt = $this->queueService->activeLoanDueAt($reservation->library_id, $reservation->book_id);
         $isFirst = $position === 1;
 
         app(CreateUserNotificationAction::class)->handle(
@@ -60,9 +56,9 @@ class ReservationNotificationService
             return;
         }
 
-        $position = (int) ($reservation->queue_position ?? $this->queueService->positionFor($reservation));
+        $position = $this->queueService->positionFor($reservation);
 
-        if ($position < 1) {
+        if ($position === null || $position < 1) {
             return;
         }
 
@@ -72,12 +68,7 @@ class ReservationNotificationService
             return;
         }
 
-        $dueAt = $this->queueService->activeLoanDueAt(
-            $reservation->library_id,
-            $reservation->book_id,
-            $reservation->scope ?: Reservation::SCOPE_LIBRARY,
-            $reservation->branch_id ? (int) $reservation->branch_id : null
-        );
+        $dueAt = $this->queueService->activeLoanDueAt($reservation->library_id, $reservation->book_id);
 
         if ($this->hasDuplicateQueueChange($reservation, $oldPosition, $position, $dueAt)) {
             return;
@@ -100,11 +91,77 @@ class ReservationNotificationService
         ));
     }
 
+    /**
+     * @param  array<int, int>  $oldPositions
+     */
+    public function notifyQueuePositionsChangedFromSnapshot(int $libraryId, int $bookId, array $oldPositions): void
+    {
+        $newPositions = $this->queueService->getPositionsForBook($libraryId, $bookId);
+        $debugService = app(ReservationQueueDebugService::class);
+        $notifications = [];
+
+        $debugService->logSnapshot('before_queue_notification', $libraryId, $bookId, [
+            'old_positions' => $oldPositions,
+            'new_positions' => $newPositions,
+        ]);
+
+        $this->queueService
+            ->pendingReservations($libraryId, $bookId)
+            ->each(function (Reservation $reservation) use ($oldPositions, $newPositions, &$notifications): void {
+                $oldPosition = $oldPositions[(int) $reservation->id] ?? null;
+                $newPosition = $newPositions[(int) $reservation->id] ?? null;
+
+                if ($oldPosition === null || $newPosition === null || $oldPosition === $newPosition) {
+                    return;
+                }
+
+                $this->notifyQueuePositionChangedTo($reservation, $oldPosition, $newPosition);
+
+                $notifications[] = [
+                    'reservation_id' => (int) $reservation->id,
+                    'old_position' => $oldPosition,
+                    'new_position' => $newPosition,
+                ];
+            });
+
+        $debugService->rememberQueueChange(
+            $libraryId,
+            $bookId,
+            'queue_positions_changed',
+            $oldPositions,
+            $newPositions,
+            $notifications
+        );
+
+        $debugService->logSnapshot('after_queue_notification', $libraryId, $bookId, [
+            'old_positions' => $oldPositions,
+            'new_positions' => $newPositions,
+            'notifications' => $notifications,
+        ]);
+    }
+
     public function notifyReady(Reservation $reservation): void
     {
         $reservation->loadMissing(['user:id,name,email', 'book:id,slug,title']);
 
         if (! $reservation->user) {
+            return;
+        }
+
+        $position = $this->queueService->positionFor($reservation);
+
+        if ($position === null || $position < 1) {
+            return;
+        }
+
+        if ($position !== 1) {
+            Log::warning('Attempted to send ready notification for non-first reservation', [
+                'reservation_id' => $reservation->id,
+                'position' => $position,
+                'library_id' => $reservation->library_id,
+                'book_id' => $reservation->book_id,
+            ]);
+
             return;
         }
 
@@ -119,11 +176,11 @@ class ReservationNotificationService
                 $reservation->expires_at?->format('Y-m-d H:i') ?: '-'
             ),
             $this->metadata($reservation, [
-                'queue_position' => 1,
-                'new_position' => 1,
+                'queue_position' => $position,
+                'new_position' => $position,
                 'due_at' => null,
                 'pickup_expires_at' => $reservation->expires_at?->toDateTimeString(),
-                'is_first_in_queue' => true,
+                'is_first_in_queue' => $position === 1,
             ]),
             Reservation::class,
             $reservation->id
@@ -168,6 +225,37 @@ class ReservationNotificationService
             : $query->where('data->metadata->due_at', $dueAt);
 
         return $query->exists();
+    }
+
+    private function notifyQueuePositionChangedTo(Reservation $reservation, int $oldPosition, int $newPosition): void
+    {
+        $reservation->loadMissing(['user:id,name,email', 'book:id,slug,title']);
+
+        if (! $reservation->user) {
+            return;
+        }
+
+        $dueAt = $this->queueService->activeLoanDueAt($reservation->library_id, $reservation->book_id);
+
+        if ($this->hasDuplicateQueueChange($reservation, $oldPosition, $newPosition, $dueAt)) {
+            return;
+        }
+
+        $reservation->user->notify(new LibraryNotification(
+            kind: 'reservation_queue_changed',
+            title: 'Rezervacijos eilė pasikeitė',
+            message: $this->queueChangedMessage($reservation, $newPosition, $dueAt),
+            url: route('notifications.index', absolute: false),
+            metadata: $this->metadata($reservation, [
+                'old_position' => $oldPosition,
+                'new_position' => $newPosition,
+                'queue_position' => $newPosition,
+                'due_at' => $dueAt,
+                'is_first_in_queue' => $newPosition === 1,
+            ]),
+            relatedType: Reservation::class,
+            relatedId: $reservation->id,
+        ));
     }
 
     /**

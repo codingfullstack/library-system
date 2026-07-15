@@ -10,6 +10,9 @@ use App\Models\BookCopy;
 use App\Models\Loan;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Services\ReservationNotificationService;
+use App\Services\ReservationQueueDebugService;
+use App\Services\ReservationQueueService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -64,23 +67,11 @@ class BorrowBookCopyAction
             ]);
         }
 
-        $pendingReservations = Reservation::query()
-            ->where('library_id', $bookCopy->library_id)
-            ->where('book_id', $bookCopy->book_id)
-            ->where(function ($query) use ($bookCopy) {
-                $query->where(function ($libraryScopeQuery) {
-                    $libraryScopeQuery
-                        ->where('scope', Reservation::SCOPE_LIBRARY)
-                        ->whereNull('branch_id');
-                })->orWhere(function ($branchScopeQuery) use ($bookCopy) {
-                    $branchScopeQuery
-                        ->where('scope', Reservation::SCOPE_BRANCH)
-                        ->where('branch_id', $bookCopy->branch_id);
-                });
-            })
-            ->pending()
-            ->orderBy('reserved_at')
-            ->orderBy('id')
+        $queueService = app(ReservationQueueService::class);
+        $notificationService = app(ReservationNotificationService::class);
+
+        $pendingReservations = $queueService
+            ->serviceablePendingReservationsQuery($bookCopy->library_id, $bookCopy->book_id, (int) $bookCopy->branch_id)
             ->lockForUpdate()
             ->get();
 
@@ -121,7 +112,17 @@ class BorrowBookCopyAction
 
         $reservation = $pendingReservations->firstWhere('user_id', $member->id);
 
+        $positionsBeforeFulfillment = $reservation
+            ? $queueService->snapshotPositions($bookCopy->library_id, $bookCopy->book_id)
+            : [];
+
         if ($reservation) {
+            app(ReservationQueueDebugService::class)->logSnapshot('before_fulfillment', $bookCopy->library_id, $bookCopy->book_id, [
+                'triggering_reservation_id' => $reservation->id,
+                'triggering_copy_id' => $bookCopy->id,
+                'old_positions' => $positionsBeforeFulfillment,
+            ]);
+
             $reservation->update([
                 'status' => Reservation::STATUS_FULFILLED,
                 'fulfilled_at' => now(),
@@ -170,6 +171,21 @@ class BorrowBookCopyAction
                 ],
                 $bookCopy->library_id
             );
+        }
+
+        if ($positionsBeforeFulfillment !== []) {
+            $notificationService->notifyQueuePositionsChangedFromSnapshot(
+                $bookCopy->library_id,
+                $bookCopy->book_id,
+                $positionsBeforeFulfillment
+            );
+
+            app(ReservationQueueDebugService::class)->logSnapshot('after_fulfillment', $bookCopy->library_id, $bookCopy->book_id, [
+                'triggering_reservation_id' => $reservation->id,
+                'triggering_copy_id' => $bookCopy->id,
+                'old_positions' => $positionsBeforeFulfillment,
+                'new_positions' => $queueService->getPositionsForBook($bookCopy->library_id, $bookCopy->book_id),
+            ]);
         }
 
         app(ChangeBookCopyStatusAction::class)->handle(

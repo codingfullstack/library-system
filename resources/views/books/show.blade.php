@@ -5,7 +5,7 @@
 
         $preferredReservation = $book->reservations
             ->filter(fn ($reservation) => $reservation->isPending())
-            ->sortBy('reserved_at')
+            ->sortBy([['created_at', 'asc'], ['id', 'asc']])
             ->first();
 
         $visibleCopies = $book->bookCopies;
@@ -391,7 +391,7 @@
                                                     || (($reservation->scope ?: \App\Models\Reservation::SCOPE_LIBRARY) === \App\Models\Reservation::SCOPE_LIBRARY && $reservation->branch_id === null)
                                                 ))
                                             ->where('library_id', $copy->library_id)
-                                            ->sortBy('reserved_at')
+                                            ->sortBy([['created_at', 'asc'], ['id', 'asc']])
                                             ->first();
                                         $copyLocationText = $copy->location
                                             ? collect([$copy->location->name, $copy->location->room, $copy->location->shelf])->filter()->join(' / ')
@@ -594,7 +594,7 @@
                                                                     <p class="mt-8 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Rezervacijos sukūrimo data</p>
                                                                     <p class="mt-3 flex items-center gap-2 text-sm font-semibold text-zinc-950 dark:text-white">
                                                                         <flux:icon.calendar-days class="size-4 text-zinc-500 dark:text-zinc-400" />
-                                                                        {{ $preferredReservationForCopy->reserved_at?->format('Y-m-d H:i') ?: '-' }}
+                                                                        {{ $preferredReservationForCopy->created_at?->format('Y-m-d H:i') ?: '-' }}
                                                                     </p>
                                                                 </div>
 
@@ -647,7 +647,7 @@
                                                                 || (($reservation->scope ?: \App\Models\Reservation::SCOPE_LIBRARY) === \App\Models\Reservation::SCOPE_LIBRARY && $reservation->branch_id === null)
                                                             ))
                                                         ->where('library_id', $copy->library_id)
-                                                        ->sortBy('reserved_at')
+                                                        ->sortBy([['created_at', 'asc'], ['id', 'asc']])
                                                         ->first();
                                                     $copyLocationText = $copy->location
                                                         ? collect([$copy->location->name, $copy->location->room, $copy->location->shelf])->filter()->join(' / ')
@@ -788,7 +788,7 @@
                                                                     </div>
                                                                     <div class="rounded-xl bg-zinc-50 px-3 py-2 dark:bg-zinc-900/70">
                                                                         <p class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Rezervacijos sukūrimo data</p>
-                                                                        <p class="mt-1 text-sm font-medium text-zinc-950 dark:text-white">{{ $preferredReservationForCopy->reserved_at?->format('Y-m-d H:i') ?: '-' }}</p>
+                                                                        <p class="mt-1 text-sm font-medium text-zinc-950 dark:text-white">{{ $preferredReservationForCopy->created_at?->format('Y-m-d H:i') ?: '-' }}</p>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -858,8 +858,20 @@
                         </section>
                     @endif
                 </div>
+
+                @if(app()->environment('local') && ! empty($reservationQueueDebug))
+                    <details class="mt-6 overflow-hidden rounded-xl border border-red-300 bg-red-50 shadow-sm">
+                        <summary class="cursor-pointer px-4 py-3 font-semibold text-red-800">
+                            Reservation queue debug
+                        </summary>
+
+                        <pre class="max-h-[700px] overflow-auto border-t border-red-200 p-4 text-xs leading-5 text-red-900">{{ json_encode(
+                            $reservationQueueDebug,
+                            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                        ) }}</pre>
+                    </details>
+                @endif
             </div>
         </div>
     </x-ui.page>
 </x-layouts::app>
-

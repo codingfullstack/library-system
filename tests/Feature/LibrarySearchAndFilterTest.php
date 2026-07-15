@@ -72,6 +72,44 @@ it('filters books by author category publisher and availability', function () {
     $response->assertDontSee('Netinkama knyga');
 });
 
+it('filters the staff book catalog by branch for administrators', function () {
+    $library = Library::factory()->create();
+    $admin = User::factory()->admin()->create(['library_id' => $library->id]);
+
+    $matchingBranch = Branch::factory()->create(['library_id' => $library->id, 'name' => 'Centrinis filialas']);
+    $otherBranch = Branch::factory()->create(['library_id' => $library->id, 'name' => 'Vaiku filialas']);
+    $matchingLocation = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $matchingBranch->id]);
+    $otherLocation = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $otherBranch->id]);
+
+    $matchingBook = Book::factory()->create(['title' => 'Knyga centriniame filiale']);
+    $otherBook = Book::factory()->create(['title' => 'Knyga kitame filiale']);
+
+    BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $matchingBook->id,
+        'branch_id' => $matchingBranch->id,
+        'location_id' => $matchingLocation->id,
+        'status' => BookCopy::STATUS_AVAILABLE,
+    ]);
+
+    BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $otherBook->id,
+        'branch_id' => $otherBranch->id,
+        'location_id' => $otherLocation->id,
+        'status' => BookCopy::STATUS_AVAILABLE,
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('books.index', [
+        'branch_id' => $matchingBranch->id,
+    ]));
+
+    $response->assertOk();
+    $response->assertSee('Centrinis filialas');
+    $response->assertSee('Knyga centriniame filiale');
+    $response->assertDontSee('Knyga kitame filiale');
+});
+
 it('filters book copies on the book page by status branch and location', function () {
     $library = Library::factory()->create();
     $user = User::factory()->staff()->create(['library_id' => $library->id]);
@@ -234,7 +272,9 @@ it('filters loans by member employee and overdue status', function () {
     $member = User::factory()->member()->create(['library_id' => $library->id, 'name' => 'Narys A']);
     $otherMember = User::factory()->member()->create(['library_id' => $library->id, 'name' => 'Narys B']);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $otherBranch = Branch::factory()->create(['library_id' => $library->id]);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $otherLocation = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $otherBranch->id]);
 
     $matchingCopy = BookCopy::factory()->create([
         'library_id' => $library->id,
@@ -245,8 +285,8 @@ it('filters loans by member employee and overdue status', function () {
 
     $otherCopy = BookCopy::factory()->create([
         'library_id' => $library->id,
-        'branch_id' => $branch->id,
-        'location_id' => $location->id,
+        'branch_id' => $otherBranch->id,
+        'location_id' => $otherLocation->id,
         'inventory_code' => 'LOAN-OTHER-001',
     ]);
 
@@ -276,11 +316,61 @@ it('filters loans by member employee and overdue status', function () {
         'member_id' => $member->id,
         'employee_id' => $employee->id,
         'overdue' => 'yes',
+        'branch_id' => $branch->id,
     ]));
 
     $response->assertOk();
     $response->assertSee('LOAN-MATCH-001');
     $response->assertDontSee('LOAN-OTHER-001');
+});
+
+it('filters library loans by branch for administrators', function () {
+    $library = Library::factory()->create();
+    $admin = User::factory()->admin()->create(['library_id' => $library->id]);
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $matchingBranch = Branch::factory()->create(['library_id' => $library->id, 'name' => 'Pagrindinis filialas']);
+    $otherBranch = Branch::factory()->create(['library_id' => $library->id, 'name' => 'Kitas filialas']);
+    $matchingLocation = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $matchingBranch->id]);
+    $otherLocation = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $otherBranch->id]);
+
+    $matchingCopy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'branch_id' => $matchingBranch->id,
+        'location_id' => $matchingLocation->id,
+        'inventory_code' => 'BRANCH-LOAN-MATCH',
+    ]);
+
+    $otherCopy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'branch_id' => $otherBranch->id,
+        'location_id' => $otherLocation->id,
+        'inventory_code' => 'BRANCH-LOAN-OTHER',
+    ]);
+
+    Loan::factory()->create([
+        'library_id' => $library->id,
+        'book_copy_id' => $matchingCopy->id,
+        'user_id' => $member->id,
+        'returned_at' => null,
+        'status' => 'aktyvi',
+    ]);
+
+    Loan::factory()->create([
+        'library_id' => $library->id,
+        'book_copy_id' => $otherCopy->id,
+        'user_id' => $member->id,
+        'returned_at' => null,
+        'status' => 'aktyvi',
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('loans.index', [
+        'branch_id' => $matchingBranch->id,
+    ]));
+
+    $response->assertOk();
+    $response->assertSee('Pagrindinis filialas');
+    $response->assertSee('BRANCH-LOAN-MATCH');
+    $response->assertDontSee('BRANCH-LOAN-OTHER');
 });
 
 it('filters reservations by queue and library', function () {
@@ -335,6 +425,51 @@ it('filters reservations by queue and library', function () {
     $response->assertDontSee('Antras narys');
     $response->assertDontSee('Kitos bibliotekos narys');
     $response->assertSee('1');
+});
+
+it('filters library reservations by branch for administrators', function () {
+    $library = Library::factory()->create();
+    $admin = User::factory()->admin()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create(['title' => 'Filialo rezervacija']);
+    $matchingMember = User::factory()->member()->create(['library_id' => $library->id, 'name' => 'Filialo narys']);
+    $otherMember = User::factory()->member()->create(['library_id' => $library->id, 'name' => 'Kito filialo narys']);
+    $matchingBranch = Branch::factory()->create(['library_id' => $library->id, 'name' => 'Rezervaciju filialas']);
+    $otherBranch = Branch::factory()->create(['library_id' => $library->id, 'name' => 'Kitas rezervaciju filialas']);
+
+    Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $matchingMember->id,
+        'scope' => Reservation::SCOPE_BRANCH,
+        'branch_id' => $matchingBranch->id,
+        'status' => Reservation::STATUS_RESERVED,
+        'reserved_at' => now()->subHour(),
+        'expires_at' => now()->addDays(2),
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+
+    Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $otherMember->id,
+        'scope' => Reservation::SCOPE_BRANCH,
+        'branch_id' => $otherBranch->id,
+        'status' => Reservation::STATUS_RESERVED,
+        'reserved_at' => now()->subMinutes(30),
+        'expires_at' => now()->addDays(2),
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('reservations.index', [
+        'branch_id' => $matchingBranch->id,
+    ]));
+
+    $response->assertOk();
+    $response->assertSee('Rezervaciju filialas');
+    $response->assertSee('Filialo narys');
+    $response->assertDontSee('Kito filialo narys');
 });
 
 it('does not show expired reserved reservations as active on the reservations page', function () {

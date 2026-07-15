@@ -26,6 +26,7 @@ class ReservationController extends Controller
             $filters = [
                 'search' => $request->query('search'),
                 'status' => $request->query('status'),
+                'branch_id' => $request->query('branch_id'),
                 'reservation_date' => $request->query('reservation_date'),
                 'per_page' => $request->query('per_page', 15),
             ];
@@ -41,6 +42,7 @@ class ReservationController extends Controller
             'status' => $request->query('status'),
             'queue' => $request->query('queue'),
             'library_id' => $request->query('library_id'),
+            'branch_id' => $request->query('branch_id'),
             'reservation_date' => $request->query('reservation_date'),
             'per_page' => $request->query('per_page', 20),
         ]);
@@ -50,9 +52,12 @@ class ReservationController extends Controller
                 'reservations' => $reservations,
                 'summary' => $getLibraryReservationsQuery->summary($request->user(), [
                     'library_id' => $request->query('library_id'),
+                    'branch_id' => $request->query('branch_id'),
                 ]),
             ],
-            $getReservationIndexFiltersDataQuery->handle($request->user())
+            $getReservationIndexFiltersDataQuery->handle($request->user(), [
+                'library_id' => $request->query('library_id'),
+            ])
         ));
     }
 
@@ -82,11 +87,3 @@ class ReservationController extends Controller
         return back()->with('success', 'Rezervacija atšaukta.');
     }
 }
-
-
-
-
-
-
-
-

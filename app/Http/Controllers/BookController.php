@@ -8,6 +8,7 @@ use App\Queries\Books\GetBookIndexFiltersDataQuery;
 use App\Queries\Books\GetLibraryBookDetailsQuery;
 use App\Queries\Books\GetLibraryBooksQuery;
 use App\Queries\Management\AuditLogs\GetRecentAuditLogsForBookQuery;
+use App\Services\ReservationQueueDebugService;
 use App\Services\SeoService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
@@ -29,6 +30,7 @@ class BookController extends Controller
             'author_id' => $request->query('author_id'),
             'publisher_id' => $request->query('publisher_id'),
             'library_id' => $request->query('library_id'),
+            'branch_id' => $request->query('branch_id'),
             'availability' => $request->query('availability'),
             'sort' => $request->query('sort', 'title'),
             'direction' => $request->query('direction', 'asc'),
@@ -38,7 +40,7 @@ class BookController extends Controller
 
         return view($actor->effectiveRole() === 'narys' ? 'account.books.index' : 'books.index', array_merge(
             ['books' => $books],
-            $getBookIndexFiltersDataQuery->handle($actor)
+            $getBookIndexFiltersDataQuery->handle($actor, $filters)
         ));
     }
 
@@ -48,6 +50,7 @@ class BookController extends Controller
         GetLibraryBookDetailsQuery $getLibraryBookDetailsQuery,
         GetBookCopyFiltersDataQuery $getBookCopyFiltersDataQuery,
         GetRecentAuditLogsForBookQuery $getRecentAuditLogsForBookQuery,
+        ReservationQueueDebugService $reservationQueueDebugService,
         SeoService $seoService,
     ): View {
         $actor = $request->user();
@@ -62,7 +65,7 @@ class BookController extends Controller
         if ($actor->effectiveRole() === 'narys') {
             $currentReservation = $book->reservations
                 ->filter(fn ($reservation) => $reservation->isPending())
-                ->sortBy('reserved_at')
+                ->sortBy([['created_at', 'asc'], ['id', 'asc']])
                 ->first();
 
             $memberReservation = $book->reservations
@@ -97,6 +100,7 @@ class BookController extends Controller
                 'auditLogs' => $actor?->isSuperAdmin()
                     ? $getRecentAuditLogsForBookQuery->handle($book)
                     : collect(),
+                'reservationQueueDebug' => $reservationQueueDebugService->forBook($book, $actor),
                 'seo' => $this->bookSeo($book, $seoService),
             ],
             $getBookCopyFiltersDataQuery->handle($request->user(), $book)

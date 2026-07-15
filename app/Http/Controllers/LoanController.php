@@ -7,9 +7,9 @@ use App\Actions\Loans\ReturnBookCopyAction;
 use App\Http\Requests\BorrowBookCopyRequest;
 use App\Http\Resources\LibraryMemberResource;
 use App\Models\BookCopy;
-use App\Queries\Loans\GetMemberLoansQuery;
 use App\Queries\Loans\GetActiveLibraryLoansQuery;
 use App\Queries\Loans\GetLoanIndexFiltersDataQuery;
+use App\Queries\Loans\GetMemberLoansQuery;
 use App\Queries\Users\SearchLibraryMembersQuery;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -24,12 +24,12 @@ class LoanController extends Controller
         GetMemberLoansQuery $getMemberLoansQuery,
         GetActiveLibraryLoansQuery $getActiveLibraryLoansQuery,
         GetLoanIndexFiltersDataQuery $getLoanIndexFiltersDataQuery
-    ): View
-    {
+    ): View {
         if ($request->user()->effectiveRole() === 'narys') {
             $filters = [
                 'search' => $request->query('search'),
                 'status' => $request->query('status'),
+                'branch_id' => $request->query('branch_id'),
                 'per_page' => $request->query('per_page', 15),
             ];
 
@@ -51,6 +51,7 @@ class LoanController extends Controller
             'overdue' => $request->query('overdue'),
             'due_date' => $request->query('due_date'),
             'library_id' => $request->query('library_id'),
+            'branch_id' => $request->query('branch_id'),
             'per_page' => $request->query('per_page', 10),
         ]);
 
@@ -62,6 +63,7 @@ class LoanController extends Controller
             'overdue' => $request->query('overdue'),
             'due_date' => $request->query('due_date'),
             'library_id' => $request->query('library_id'),
+            'branch_id' => $request->query('branch_id'),
         ]);
 
         return view('loans.index', array_merge(
@@ -113,12 +115,3 @@ class LoanController extends Controller
         return back()->with('success', 'Kopija sėkmingai grąžinta.');
     }
 }
-
-
-
-
-
-
-
-
-

@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use App\Models\Reservation;
+use App\Services\ReservationQueueService;
 
 class BookCopyDetailsResource extends JsonResource
 {
@@ -26,29 +27,14 @@ class BookCopyDetailsResource extends JsonResource
         if ($canViewOperationalDetails && $this->relationLoaded('book') && $this->book && $this->book->relationLoaded('reservations')) {
             $currentReservation = $this->book->reservations
                 ->filter(fn ($reservation) => $reservation->isPending() && $this->reservationAppliesToCopy($reservation))
-                ->sortBy('reserved_at')
+                ->sortBy([['created_at', 'asc'], ['id', 'asc']])
                 ->first();
         }
 
         if ($canViewOperationalDetails && ! $currentReservation && $this->book_id && $this->library_id) {
-            $currentReservation = Reservation::query()
+            $currentReservation = app(ReservationQueueService::class)
+                ->serviceablePendingReservationsQuery($this->library_id, $this->book_id, (int) $this->branch_id)
                 ->with('user:id,name,email,membership_number')
-                ->where('library_id', $this->library_id)
-                ->where('book_id', $this->book_id)
-                ->where(function ($query) {
-                    $query->where(function ($libraryScopeQuery) {
-                        $libraryScopeQuery
-                            ->where('scope', Reservation::SCOPE_LIBRARY)
-                            ->whereNull('branch_id');
-                    })->orWhere(function ($branchScopeQuery) {
-                        $branchScopeQuery
-                            ->where('scope', Reservation::SCOPE_BRANCH)
-                            ->where('branch_id', $this->branch_id);
-                    });
-                })
-                ->pending()
-                ->orderBy('reserved_at')
-                ->orderBy('id')
                 ->first();
         }
 
@@ -145,8 +131,6 @@ class BookCopyDetailsResource extends JsonResource
         return ($reservation->scope ?: Reservation::SCOPE_LIBRARY) === Reservation::SCOPE_LIBRARY;
     }
 }
-
-
 
 
 

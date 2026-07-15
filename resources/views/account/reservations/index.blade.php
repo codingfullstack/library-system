@@ -93,15 +93,15 @@
 
                 <section class="overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                     <div class="px-5 py-4">
-                        <form method="GET" action="{{ route('reservations.index') }}" class="grid gap-3 xl:grid-cols-[minmax(320px,1.5fr)_170px_210px_160px_auto_auto] xl:items-center">
-                            <div class="relative xl:min-w-0">
+                        <form method="GET" action="{{ route('reservations.index') }}" class="flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-center">
+                            <div class="relative xl:min-w-[360px] xl:flex-1">
                                 <input id="search" type="text" name="search" value="{{ request('search') }}" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 pl-11 shadow-none dark:border-zinc-700 dark:bg-zinc-950" placeholder="Ieškoti pagal knygos pavadinimą ar ISBN...">
                                 <div class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
                                     <flux:icon.magnifying-glass class="size-4" />
                                 </div>
                             </div>
 
-                            <div class="xl:min-w-0">
+                            <div class="xl:w-48">
                                 <select id="status" name="status" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
                                     <option value="">Būsena</option>
                                     <option value="rezervuota" @selected(request('status') === 'rezervuota')>Aktyvios</option>
@@ -111,11 +111,11 @@
                                 </select>
                             </div>
 
-                            <div class="xl:min-w-0">
+                            <div class="xl:w-48">
                                 <input type="date" id="reservation_date" name="reservation_date" value="{{ request('reservation_date') }}" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
                             </div>
 
-                            <div class="xl:min-w-0">
+                            <div class="xl:w-28">
                                 <select id="per_page" name="per_page" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
                                     <option value="10" @selected(request('per_page') == 10)>10</option>
                                     <option value="15" @selected(request('per_page', 15) == 15)>15</option>
@@ -123,12 +123,14 @@
                                 </select>
                             </div>
 
+                            <div class="flex flex-col gap-3 sm:flex-row xl:w-auto xl:shrink-0">
                             <button type="submit" class="app-button-secondary h-11 rounded-2xl px-4">
                                 <flux:icon.funnel class="mr-2 size-4" />
                                 Filtruoti
                             </button>
 
                             <a href="{{ route('reservations.index') }}" class="app-button-secondary h-11 rounded-2xl px-4">Išvalyti</a>
+                            </div>
                         </form>
                     </div>
                 </section>
@@ -193,7 +195,7 @@
                                                 </div>
                                             </td>
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">{{ $reservation->library?->name ?: '-' }}</td>
-                                            <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">{{ $reservation->reserved_at?->format('Y-m-d H:i') ?: '-' }}</td>
+                                            <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">{{ $reservation->created_at?->format('Y-m-d H:i') ?: '-' }}</td>
                                             <td class="px-4 py-4 align-middle">
                                                 <span x-show="! cancelled" class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClasses }}">
                                                     {{ $statusLabel }}

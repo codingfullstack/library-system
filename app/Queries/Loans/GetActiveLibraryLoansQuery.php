@@ -71,6 +71,7 @@ class GetActiveLibraryLoansQuery
         $employeeId = $filters['employee_id'] ?? null;
         $overdue = $filters['overdue'] ?? null;
         $libraryId = $user->isSuperAdmin() ? ($filters['library_id'] ?? null) : $user->activeLibraryId();
+        $branchId = filled($filters['branch_id'] ?? null) ? (int) $filters['branch_id'] : null;
         $dueDate = $filters['due_date'] ?? null;
 
         $query = Loan::query()
@@ -82,6 +83,10 @@ class GetActiveLibraryLoansQuery
             $query->whereHas('bookCopy', fn ($copyQuery) => $branchId
                 ? $copyQuery->where('branch_id', $branchId)
                 : $copyQuery->whereRaw('1 = 0'));
+        }
+
+        if ($branchId && $user->role !== User::ROLE_STAFF) {
+            $query->whereHas('bookCopy', fn ($copyQuery) => $copyQuery->where('branch_id', $branchId));
         }
 
         if (! empty($status)) {

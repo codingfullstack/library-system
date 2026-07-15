@@ -104,8 +104,8 @@
 
                 <section class="overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                     <div class="px-5 py-4">
-                        <form method="GET" action="{{ route('reservations.index') }}" class="grid gap-3 xl:grid-cols-[minmax(320px,1.5fr)_170px_210px_170px_auto] xl:items-center">
-                            <div class="relative xl:min-w-0">
+                        <form method="GET" action="{{ route('reservations.index') }}" class="flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-center">
+                            <div class="relative xl:min-w-[360px] xl:flex-1">
                                 <input
                                     id="search"
                                     type="text"
@@ -119,7 +119,7 @@
                                 </div>
                             </div>
 
-                            <div class="xl:min-w-0">
+                            <div class="xl:w-48">
                                 <select id="status" name="status" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
                                     <option value="">Būsena</option>
                                     <option value="rezervuota" {{ request('status') === 'rezervuota' ? 'selected' : '' }}>Aktyvios</option>
@@ -129,14 +129,14 @@
                                 </select>
                             </div>
 
-                            <div class="xl:min-w-0">
+                            <div class="xl:w-48">
                                 <input type="date" id="reservation_date" name="reservation_date" value="{{ request('reservation_date') }}" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
                             </div>
 
                             @if(auth()->user()?->isSuperAdmin())
-                                <div class="xl:min-w-0">
+                                <div class="xl:w-48">
                                     <select id="library_id" name="library_id" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
-                                        <option value="">Filialas</option>
+                                        <option value="">Biblioteka</option>
                                         @foreach($libraries as $library)
                                             <option value="{{ $library->id }}" {{ (string) request('library_id') === (string) $library->id ? 'selected' : '' }}>
                                                 {{ $library->name }}
@@ -148,7 +148,20 @@
                                 <input type="hidden" name="library_id" value="{{ request('library_id') }}">
                             @endif
 
-                            <div class="flex items-center gap-3 xl:justify-start">
+                            @if($branches->isNotEmpty())
+                                <div class="xl:w-48">
+                                    <select id="branch_id" name="branch_id" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
+                                        <option value="">Filialas</option>
+                                        @foreach($branches as $branch)
+                                            <option value="{{ $branch->id }}" {{ (string) request('branch_id') === (string) $branch->id ? 'selected' : '' }}>
+                                                {{ $branch->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @endif
+
+                            <div class="flex flex-col gap-3 sm:flex-row xl:w-auto xl:shrink-0">
                                 <button type="submit" class="app-button-secondary h-11 rounded-2xl px-4">
                                     <flux:icon.funnel class="mr-2 size-4" />
                                     Filtruoti
@@ -176,6 +189,7 @@
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Knyga</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Vartotojas</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Rezervacijos data</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Apimtis</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Būsena</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Galioja iki</th>
                                         <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Eilės nr.</th>
@@ -192,6 +206,7 @@
                                                 default => ['label' => 'Pasibaigusi', 'classes' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'],
                                             };
                                             $daysUntilExpiry = $reservation->expires_at ? now()->startOfDay()->diffInDays($reservation->expires_at->copy()->startOfDay(), false) : null;
+                                            $isBranchScoped = $reservation->scope === \App\Models\Reservation::SCOPE_BRANCH;
                                         @endphp
                                         <tr
                                             x-data="{ cancelled: false }"
@@ -219,7 +234,32 @@
                                                 <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{{ $reservation->user?->email ?? $reservation->user?->membership_number ?? '-' }}</div>
                                             </td>
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">
-                                                {{ $reservation->reserved_at?->format('Y-m-d H:i') ?? '-' }}
+                                                {{ $reservation->created_at?->format('Y-m-d H:i') ?? '-' }}
+                                            </td>
+                                            <td class="px-4 py-4 align-middle">
+                                                @if($isBranchScoped)
+                                                    <div class="inline-flex max-w-[220px] flex-col items-start gap-1">
+                                                        <span
+                                                            title="Rezervacija gali b&#363;ti &#303;vykdyta tik &#353;iame filiale"
+                                                            class="inline-flex max-w-full items-center gap-1.5 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700 ring-1 ring-sky-100 dark:bg-sky-500/10 dark:text-sky-200 dark:ring-sky-500/20"
+                                                        >
+                                                            <flux:icon.building-office-2 class="size-3.5 shrink-0" />
+                                                            <span class="truncate">{{ $reservation->branch?->name ?? 'Filialas nenurodytas' }}</span>
+                                                        </span>
+                                                        <span class="pl-2 text-xs text-zinc-500 dark:text-zinc-400">Konkretus filialas</span>
+                                                    </div>
+                                                @else
+                                                    <div class="inline-flex max-w-[220px] flex-col items-start gap-1">
+                                                        <span
+                                                            title="Rezervacija gali b&#363;ti &#303;vykdyta bet kuriame tinkamame bibliotekos filiale"
+                                                            class="inline-flex max-w-full items-center gap-1.5 rounded-full bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700 ring-1 ring-violet-100 dark:bg-violet-500/10 dark:text-violet-200 dark:ring-violet-500/20"
+                                                        >
+                                                            <flux:icon.book-open class="size-3.5 shrink-0" />
+                                                            <span class="truncate">Visa biblioteka</span>
+                                                        </span>
+                                                        <span class="pl-2 text-xs text-zinc-500 dark:text-zinc-400">Bet kuris filialas</span>
+                                                    </div>
+                                                @endif
                                             </td>
                                             <td class="px-4 py-4 align-middle">
                                                 <span x-show="! cancelled" class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusMeta['classes'] }}">

@@ -6,6 +6,9 @@ use App\Actions\AuditLogs\RecordAuditLogAction;
 use App\Actions\Notifications\CreateUserNotificationAction;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Services\ReservationNotificationService;
+use App\Services\ReservationQueueDebugService;
+use App\Services\ReservationQueueService;
 use Illuminate\Validation\ValidationException;
 
 class CancelReservationAction
@@ -38,12 +41,32 @@ class CancelReservationAction
             ]);
         }
 
+        $positionsBeforeCancellation = app(ReservationQueueService::class)
+            ->snapshotPositions($reservation->library_id, $reservation->book_id);
+
+        app(ReservationQueueDebugService::class)->logSnapshot('before_cancellation', $reservation->library_id, $reservation->book_id, [
+            'triggering_reservation_id' => $reservation->id,
+            'old_positions' => $positionsBeforeCancellation,
+        ]);
+
         $reservation->update([
             'status' => Reservation::STATUS_CANCELLED,
             'cancelled_at' => now(),
             'notes' => $normalizedReason !== ''
                 ? trim(implode("\n\n", array_filter([$reservation->notes, 'Atšaukimo priežastis: '.$normalizedReason])))
                 : $reservation->notes,
+        ]);
+
+        app(ReservationNotificationService::class)->notifyQueuePositionsChangedFromSnapshot(
+            $reservation->library_id,
+            $reservation->book_id,
+            $positionsBeforeCancellation
+        );
+
+        app(ReservationQueueDebugService::class)->logSnapshot('after_cancellation', $reservation->library_id, $reservation->book_id, [
+            'triggering_reservation_id' => $reservation->id,
+            'old_positions' => $positionsBeforeCancellation,
+            'new_positions' => app(ReservationQueueService::class)->getPositionsForBook($reservation->library_id, $reservation->book_id),
         ]);
 
         app(SyncReservationQueueAction::class)->handle($reservation->library_id, $reservation->book_id);

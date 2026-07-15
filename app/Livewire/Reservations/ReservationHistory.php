@@ -8,6 +8,7 @@ use App\Models\Book;
 use App\Models\BookCopy;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Services\ReservationQueueService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -184,10 +185,10 @@ class ReservationHistory extends Component
         }
 
         if ($leftRank <= 1) {
-            return $left->reserved_at <=> $right->reserved_at;
+            return [$left->created_at, $left->id] <=> [$right->created_at, $right->id];
         }
 
-        return $right->reserved_at <=> $left->reserved_at;
+        return [$right->created_at, $right->id] <=> [$left->created_at, $left->id];
     }
 
     private function reservationRank(Reservation $reservation): int
@@ -219,33 +220,22 @@ class ReservationHistory extends Component
             return null;
         }
 
-        return Reservation::query()
-            ->where('book_id', $this->bookId)
+        $query = $bookCopy
+            ? app(ReservationQueueService::class)
+                ->serviceablePendingReservationsQuery($bookCopy->library_id, $bookCopy->book_id, (int) $bookCopy->branch_id)
+            : Reservation::query()
+                ->where('book_id', $this->bookId);
+
+        return $query
             ->when(! $actor->isSuperAdmin(), function ($query) use ($actor) {
                 $query->where('library_id', $actor->activeLibraryId());
             })
             ->when($actor->role === User::ROLE_STAFF, function ($query) use ($actor) {
                 $this->scopeReservationsToStaffBranch($query, $actor);
             })
-            ->when($bookCopy, function ($query) use ($bookCopy) {
-                $query->where('library_id', $bookCopy->library_id)
-                    ->where(function ($scopeQuery) use ($bookCopy) {
-                        $scopeQuery
-                            ->where(function ($libraryScopeQuery) {
-                                $libraryScopeQuery
-                                    ->where('scope', Reservation::SCOPE_LIBRARY)
-                                    ->whereNull('branch_id');
-                            })
-                            ->orWhere(function ($branchScopeQuery) use ($bookCopy) {
-                                $branchScopeQuery
-                                    ->where('scope', Reservation::SCOPE_BRANCH)
-                                    ->where('branch_id', $bookCopy->branch_id);
-                            });
-                    });
-            })
             ->with('user:id,name,email,membership_number')
             ->pending()
-            ->orderBy('reserved_at')
+            ->orderBy('created_at')
             ->orderBy('id')
             ->first();
     }

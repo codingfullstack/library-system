@@ -150,7 +150,7 @@ class ListExportController extends Controller
             $reservation->user?->name,
             $reservation->user?->membership_number,
             $reservation->library?->name,
-            $reservation->reserved_at?->format('Y-m-d H:i'),
+            $reservation->created_at?->format('Y-m-d H:i'),
             $reservation->expires_at?->format('Y-m-d H:i'),
             $reservation->statusLabel(),
             $reservation->isPending() ? $reservation->queue_position : null,

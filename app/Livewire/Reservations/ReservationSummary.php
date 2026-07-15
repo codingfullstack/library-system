@@ -64,7 +64,8 @@ class ReservationSummary extends Component
             })
             ->with('user:id,name,email,membership_number')
             ->pending()
-            ->orderBy('reserved_at')
+            ->orderBy('created_at')
+            ->orderBy('id')
             ->get();
 
         return view('livewire.reservations.reservation-summary', [
