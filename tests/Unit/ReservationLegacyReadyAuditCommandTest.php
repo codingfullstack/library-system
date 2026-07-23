@@ -12,6 +12,7 @@ use App\Models\Reservation;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\Support\UsesTemporaryMariaDbDatabase;
 use Tests\TestCase;
 
@@ -57,6 +58,40 @@ class ReservationLegacyReadyAuditCommandTest extends TestCase
                 'assigned_book_copy_id' => null,
             ]);
         }
+    }
+
+    public function test_it_audits_legacy_ready_rows_before_the_assigned_copy_column_exists(): void
+    {
+        $this->dropAssignedCopyMigrationColumns();
+        $this->seedLegacyReadyDataset();
+
+        $exitCode = Artisan::call('reservations:audit-legacy-ready', ['--json' => true]);
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertFalse($payload['assigned_book_copy_column_exists']);
+        $this->assertSame('WARN', $payload['status']);
+        $this->assertSame(1, $payload['categories']['assignable_single_copy']);
+        $this->assertSame(1, $payload['categories']['missing_pickup_branch']);
+    }
+
+    public function test_apply_is_blocked_before_the_assigned_copy_column_exists(): void
+    {
+        $this->dropAssignedCopyMigrationColumns();
+        $this->seedLegacyReadyDataset();
+
+        $exitCode = Artisan::call('reservations:audit-legacy-ready', [
+            '--apply' => true,
+            '--json' => true,
+        ]);
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertSame('BLOCK', $payload['status']);
+        $this->assertSame(
+            'Cannot apply assignments before reservations.assigned_book_copy_id exists.',
+            $payload['apply_error']
+        );
     }
 
     public function test_apply_assigns_only_deterministic_single_copy_rows(): void
@@ -138,14 +173,13 @@ class ReservationLegacyReadyAuditCommandTest extends TestCase
         $book ??= Book::factory()->create();
         $expiresAt ??= now()->addDay();
 
-        return (int) DB::table('reservations')->insertGetId([
+        $row = [
             'library_id' => $library->id,
             'book_id' => $book->id,
             'user_id' => $member->id,
             'scope' => Reservation::SCOPE_LIBRARY,
             'branch_id' => null,
             'pickup_branch_id' => $pickupBranch?->id,
-            'assigned_book_copy_id' => null,
             'status' => Reservation::STATUS_READY,
             'reserved_at' => now()->subHour(),
             'ready_at' => now()->subMinutes(30),
@@ -155,6 +189,28 @@ class ReservationLegacyReadyAuditCommandTest extends TestCase
             'notes' => null,
             'created_at' => now()->subHour(),
             'updated_at' => now()->subHour(),
-        ]);
+        ];
+
+        if (Schema::hasColumn('reservations', 'assigned_book_copy_id')) {
+            $row['assigned_book_copy_id'] = null;
+        }
+
+        return (int) DB::table('reservations')->insertGetId($row);
+    }
+
+    private function dropAssignedCopyMigrationColumns(): void
+    {
+        foreach ([
+            'ALTER TABLE reservations DROP INDEX reservations_active_ready_book_copy_unique',
+            'ALTER TABLE reservations DROP COLUMN active_ready_book_copy_id',
+            'ALTER TABLE reservations DROP FOREIGN KEY reservations_assigned_book_copy_id_foreign',
+            'ALTER TABLE reservations DROP COLUMN assigned_book_copy_id',
+        ] as $statement) {
+            try {
+                DB::statement($statement);
+            } catch (\Throwable) {
+                // The command must support databases at different points in the migration chain.
+            }
+        }
     }
 }

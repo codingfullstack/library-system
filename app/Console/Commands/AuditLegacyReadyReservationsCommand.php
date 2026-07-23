@@ -7,6 +7,7 @@ use App\Models\Loan;
 use App\Models\Reservation;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class AuditLegacyReadyReservationsCommand extends Command
 {
@@ -16,38 +17,49 @@ class AuditLegacyReadyReservationsCommand extends Command
 
     public function handle(): int
     {
+        $hasAssignedCopyColumn = Schema::hasColumn('reservations', 'assigned_book_copy_id');
+
         $rows = Reservation::query()
             ->where('status', Reservation::STATUS_READY)
-            ->whereNull('assigned_book_copy_id')
+            ->when($hasAssignedCopyColumn, fn ($query) => $query->whereNull('assigned_book_copy_id'))
             ->orderBy('id')
             ->get();
 
         $report = $rows->map(fn (Reservation $reservation) => $this->classify($reservation))->values();
         $applied = [];
+        $applyError = null;
 
         if ($this->option('apply')) {
-            foreach ($report->where('category', 'assignable_single_copy') as $item) {
-                DB::transaction(function () use ($item, &$applied): void {
-                    $reservation = Reservation::query()->whereKey($item['reservation_id'])->lockForUpdate()->firstOrFail();
-                    $copy = BookCopy::query()->whereKey($item['candidate_copy_ids'][0])->lockForUpdate()->firstOrFail();
+            if (! $hasAssignedCopyColumn) {
+                $applyError = 'Cannot apply assignments before reservations.assigned_book_copy_id exists.';
+            } else {
+                foreach ($report->where('category', 'assignable_single_copy') as $item) {
+                    DB::transaction(function () use ($item, &$applied): void {
+                        $reservation = Reservation::query()->whereKey($item['reservation_id'])->lockForUpdate()->firstOrFail();
+                        $copy = BookCopy::query()->whereKey($item['candidate_copy_ids'][0])->lockForUpdate()->firstOrFail();
 
-                    if ($this->classify($reservation)['category'] !== 'assignable_single_copy') {
-                        return;
-                    }
+                        if ($this->classify($reservation)['category'] !== 'assignable_single_copy') {
+                            return;
+                        }
 
-                    $reservation->update([
-                        'assigned_book_copy_id' => $copy->id,
-                        'pickup_branch_id' => $reservation->pickup_branch_id ?: $copy->branch_id,
-                    ]);
+                        $reservation->update([
+                            'assigned_book_copy_id' => $copy->id,
+                            'pickup_branch_id' => $reservation->pickup_branch_id ?: $copy->branch_id,
+                        ]);
 
-                    $applied[] = $reservation->id;
-                });
+                        $applied[] = $reservation->id;
+                    });
+                }
             }
         }
 
         $payload = [
-            'status' => $report->whereNotIn('category', ['assignable_single_copy'])->isEmpty() ? 'PASS' : 'WARN',
+            'status' => $applyError !== null
+                ? 'BLOCK'
+                : ($report->whereNotIn('category', ['assignable_single_copy'])->isEmpty() ? 'PASS' : 'WARN'),
+            'assigned_book_copy_column_exists' => $hasAssignedCopyColumn,
             'applied_reservation_ids' => $applied,
+            'apply_error' => $applyError,
             'categories' => $report->countBy('category')->all(),
             'reservations' => $report->all(),
         ];
@@ -61,7 +73,7 @@ class AuditLegacyReadyReservationsCommand extends Command
             }
         }
 
-        return self::SUCCESS;
+        return $applyError === null ? self::SUCCESS : self::FAILURE;
     }
 
     /**
