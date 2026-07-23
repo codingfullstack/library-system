@@ -19,15 +19,18 @@ class GetLibraryReservationsQuery
         $perPage = max(1, min((int) ($filters['per_page'] ?? 25), 100));
 
         $queuePositionSubquery = $this->queuePositionSubquery();
+        $queueSizeSubquery = $this->queueSizeSubquery();
 
         $query = $this->baseQuery($user, $filters)
             ->select('reservations.*')
             ->selectSub($queuePositionSubquery, 'queue_position')
+            ->selectSub($queueSizeSubquery, 'queue_size')
             ->with([
                 'book:id,slug,title,subtitle,isbn',
                 'user:id,name,email,membership_number',
                 'library:id,name',
                 'branch:id,name',
+                'pickupBranch:id,name',
             ]);
 
         $queue = $filters['queue'] ?? null;
@@ -57,7 +60,8 @@ class GetLibraryReservationsQuery
 
         return [
             'all_count' => (clone $baseQuery)->count(),
-            'active_count' => (clone $baseQuery)->pending()->count(),
+            'active_count' => (clone $baseQuery)->active()->count(),
+            'ready_count' => (clone $baseQuery)->current()->count(),
             'fulfilled_count' => (clone $baseQuery)->where('status', Reservation::STATUS_FULFILLED)->count(),
             'cancelled_count' => (clone $baseQuery)->where('status', Reservation::STATUS_CANCELLED)->count(),
             'expired_count' => (clone $baseQuery)->expired()->count(),
@@ -153,7 +157,9 @@ class GetLibraryReservationsQuery
     private function applyStatusFilter(Builder $query, string $status): Builder
     {
         return match ($status) {
-            Reservation::STATUS_RESERVED => $query->pending(),
+            'active' => $query->active(),
+            Reservation::STATUS_WAITING => $query->pending(),
+            Reservation::STATUS_READY => $query->current(),
             Reservation::STATUS_EXPIRED => $query->expired(),
             default => $query->where('status', $status),
         };
@@ -176,13 +182,9 @@ class GetLibraryReservationsQuery
             ->selectRaw('COUNT(*)')
             ->whereColumn('queue_reservations.book_id', 'reservations.book_id')
             ->whereColumn('queue_reservations.library_id', 'reservations.library_id')
-            ->where('queue_reservations.status', Reservation::STATUS_RESERVED)
+            ->where('queue_reservations.status', Reservation::STATUS_WAITING)
             ->whereNull('queue_reservations.fulfilled_at')
             ->whereNull('queue_reservations.cancelled_at')
-            ->where(function ($expiresQuery) {
-                $expiresQuery->whereNull('queue_reservations.expires_at')
-                    ->orWhere('queue_reservations.expires_at', '>', now());
-            })
             ->where(function ($queueQuery) {
                 $queueQuery->whereColumn('queue_reservations.created_at', '<', 'reservations.created_at')
                     ->orWhere(function ($sameTimeQuery) {
@@ -190,5 +192,16 @@ class GetLibraryReservationsQuery
                             ->whereColumn('queue_reservations.id', '<=', 'reservations.id');
                     });
             });
+    }
+
+    private function queueSizeSubquery()
+    {
+        return DB::table('reservations as queue_reservations')
+            ->selectRaw('COUNT(*)')
+            ->whereColumn('queue_reservations.book_id', 'reservations.book_id')
+            ->whereColumn('queue_reservations.library_id', 'reservations.library_id')
+            ->where('queue_reservations.status', Reservation::STATUS_WAITING)
+            ->whereNull('queue_reservations.fulfilled_at')
+            ->whereNull('queue_reservations.cancelled_at');
     }
 }

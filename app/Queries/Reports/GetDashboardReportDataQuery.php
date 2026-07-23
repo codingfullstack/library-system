@@ -66,7 +66,7 @@ class GetDashboardReportDataQuery
             'returned_loans_count' => (clone $loansQuery)
                 ->whereNotNull('returned_at')
                 ->count(),
-            'active_reservations_count' => (clone $reservationsQuery)->pending()->count(),
+            'active_reservations_count' => (clone $reservationsQuery)->active()->count(),
             'fulfilled_reservations_count' => (clone $reservationsQuery)
                 ->where('status', Reservation::STATUS_FULFILLED)
                 ->count(),
@@ -183,7 +183,7 @@ class GetDashboardReportDataQuery
                 'reservations as active_reservations_count' => function (Builder $query) use ($dateFrom, $dateTo) {
                     $this->applyReservationPeriod($query, $dateFrom, $dateTo);
 
-                    $query->pending();
+                    $query->active();
                 },
                 'reservations as fulfilled_reservations_count' => function (Builder $query) use ($dateFrom, $dateTo) {
                     $this->applyReservationPeriod($query, $dateFrom, $dateTo);
@@ -449,7 +449,7 @@ class GetDashboardReportDataQuery
             ->selectRaw('COUNT(DISTINCT reservations.id)')
             ->join('book_copies', 'book_copies.book_id', '=', 'reservations.book_id')
             ->whereColumn('book_copies.branch_id', 'branches.id')
-            ->where('reservations.status', Reservation::STATUS_RESERVED);
+            ->active();
 
         $this->applyReservationPeriod($reservationCountSubquery, $dateFrom, $dateTo);
 

@@ -24,7 +24,6 @@ class CreateReservationRequest extends FormRequest
 
         if ($this->user()?->hasAnyEffectiveRole(['superadministratorius', 'administratorius', 'darbuotojas'])) {
             $rules['user_id'] = ['required', 'integer', 'exists:users,id'];
-            $rules['expires_at'] = ['nullable', 'date', 'after:now'];
         }
 
         return $rules;

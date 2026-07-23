@@ -9,12 +9,13 @@ use App\Models\Book;
 use App\Queries\Books\GetLibraryBookDetailsQuery;
 use App\Queries\Books\GetLibraryBooksQuery;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class BookController extends Controller
 {
-    public function index(Request $request, GetLibraryBooksQuery $getLibraryBooksQuery): JsonResponse
+    public function index(Request $request, GetLibraryBooksQuery $getLibraryBooksQuery): AnonymousResourceCollection
     {
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:120'],
@@ -26,6 +27,7 @@ class BookController extends Controller
             'sort' => ['nullable', Rule::in(['title', 'publication_year', 'copies_count', 'created_at', 'updated_at'])],
             'direction' => ['nullable', Rule::in(['asc', 'desc'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $books = $getLibraryBooksQuery->handle($request->user(), [
@@ -40,9 +42,7 @@ class BookController extends Controller
             'per_page' => $validated['per_page'] ?? 25,
         ]);
 
-        return response()->json(
-            BookResource::collection(collect($books->items()))->resolve()
-        );
+        return BookResource::collection($books);
     }
 
     public function show(

@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Support\Notifications\NotificationUiConfig;
+use App\Support\Notifications\NotificationType;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -16,17 +17,19 @@ class UserNotificationResource extends JsonResource
         $data = $this->data ?? [];
         $metadata = $data['metadata'] ?? ($this->metadata ?? []);
         $sender = $data['sender'] ?? ($metadata['sender'] ?? null);
-        $kind = $data['kind'] ?? $this->type;
+        $kind = NotificationType::normalize($data['kind'] ?? $data['type'] ?? $this->type);
         $ui = NotificationUiConfig::for($kind);
 
         return [
             'id' => $this->id,
-            'type' => $ui['type'],
-            'kind' => $kind,
+            'type' => $kind->value,
+            'kind' => $kind->value,
             'ui' => $ui,
             'category' => $ui['category'],
             'icon' => $ui['icon'],
             'color' => $ui['color'],
+            'badge' => $ui['badge'],
+            'priority' => $ui['priority'],
             'title' => $data['title'] ?? $this->title,
             'message' => $data['message'] ?? $this->message,
             'url' => $data['url'] ?? route('notifications.index', absolute: false),

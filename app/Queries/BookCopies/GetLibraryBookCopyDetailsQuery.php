@@ -52,7 +52,10 @@ class GetLibraryBookCopyDetailsQuery
                 },
                 'book.reservations' => function ($reservationQuery) use ($libraryId) {
                     $reservationQuery->where('library_id', $libraryId)
-                        ->with('user:id,name,email,membership_number')
+                        ->with([
+                            'pickupBranch:id,name',
+                            'user:id,name,email,membership_number',
+                        ])
                         ->orderBy('reserved_at');
                 },
             ]);

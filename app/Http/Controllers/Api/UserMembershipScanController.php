@@ -9,6 +9,7 @@ use App\Http\Resources\LibraryMemberResource;
 use App\Models\Library;
 use App\Models\LibraryMembership;
 use App\Models\User;
+use App\Support\Notifications\NotificationType;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -124,8 +125,8 @@ class UserMembershipScanController extends Controller
         $createUserNotificationAction->handle(
             $member,
             $actor,
-            'library_membership_added',
-            'Pridėta bibliotekos narystė',
+            NotificationType::LIBRARY_MEMBERSHIP_ADDED,
+            null,
             sprintf('Jūs buvote pridėtas prie bibliotekos "%s".', $library->name),
             [
                 'library_id' => $library->id,
@@ -162,7 +163,6 @@ class UserMembershipScanController extends Controller
         return $membership?->library;
     }
 }
-
 
 
 
