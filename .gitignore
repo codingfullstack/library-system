@@ -24,6 +24,7 @@ yarn-error.log
 /.zed
 /LibraryApp/
 /android-library-app/
+library_system_codex_upgrade_*
 
 # Laravel 4 specific
 bootstrap/compiled.php

@@ -19,6 +19,7 @@ use App\Models\ScanLog;
 use App\Models\User;
 use App\Models\UserNotification;
 use App\Support\GeneratesSlugs;
+use App\Support\Notifications\NotificationType;
 use App\Support\Notifications\NotificationUiConfig;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Seeder;
@@ -587,9 +588,10 @@ class PresentationDemoDataSeeder extends Seeder
             $branch = $branches[$i % $branches->count()];
             $reservedAt = $this->safeTimestamp(now()->subDays($i % 650)->setTime(8 + ($i % 10), ($i * 11) % 60));
             $status = $this->reservationStatusForIndex($i);
-            $expiresAt = in_array($status, [Reservation::STATUS_RESERVED, Reservation::STATUS_EXPIRED], true)
-                ? $this->safeTimestamp($status === Reservation::STATUS_RESERVED ? now()->addDays(1 + ($i % 8)) : $reservedAt->copy()->addDays(5))
+            $expiresAt = in_array($status, [Reservation::STATUS_READY, Reservation::STATUS_EXPIRED], true)
+                ? $this->safeTimestamp($status === Reservation::STATUS_READY ? now()->addDays(1 + ($i % 8)) : $reservedAt->copy()->addDays(5))
                 : null;
+            $readyAt = $status === Reservation::STATUS_READY ? $reservedAt : null;
 
             $rows[] = [
                 'library_id' => $library->id,
@@ -597,12 +599,14 @@ class PresentationDemoDataSeeder extends Seeder
                 'user_id' => $member->id,
                 'scope' => $i % 3 === 0 ? Reservation::SCOPE_BRANCH : Reservation::SCOPE_LIBRARY,
                 'branch_id' => $i % 3 === 0 ? $branch->id : null,
+                'pickup_branch_id' => $status === Reservation::STATUS_READY ? $branch->id : null,
                 'status' => $status,
                 'reserved_at' => $reservedAt,
+                'ready_at' => $readyAt,
                 'expires_at' => $expiresAt,
                 'fulfilled_at' => $status === Reservation::STATUS_FULFILLED ? $this->safeTimestamp($reservedAt->copy()->addDays(2)) : null,
                 'cancelled_at' => $status === Reservation::STATUS_CANCELLED ? $this->safeTimestamp($reservedAt->copy()->addDay()) : null,
-                'notes' => $status === Reservation::STATUS_RESERVED ? 'Aktyvi demonstracine rezervacijos eile.' : 'Istorine demonstracine rezervacija.',
+                'notes' => in_array($status, [Reservation::STATUS_WAITING, Reservation::STATUS_READY], true) ? 'Aktyvi demonstracine rezervacijos eile.' : 'Istorine demonstracine rezervacija.',
                 'created_at' => $reservedAt,
                 'updated_at' => $reservedAt,
             ];
@@ -807,7 +811,7 @@ class PresentationDemoDataSeeder extends Seeder
     private function reservationStatusForIndex(int $i): string
     {
         return match ($i % 10) {
-            0, 1, 2, 3 => Reservation::STATUS_RESERVED,
+            0, 1, 2, 3 => Reservation::STATUS_WAITING,
             4, 5 => Reservation::STATUS_FULFILLED,
             6, 7 => Reservation::STATUS_CANCELLED,
             default => Reservation::STATUS_EXPIRED,
@@ -830,7 +834,7 @@ class PresentationDemoDataSeeder extends Seeder
     private function bookDescription(string $category, string $title): string
     {
         return sprintf(
-            '%s yra %s srities leidinys, tinkamas tiek kasdieniam skaitymui, tiek mokymuisi. Aprasyme aptariamos praktines situacijos, istorinis kontekstas ir temos, kurios padeda bibliotekos lankytojams greitai atsirinkti aktualu turini.',
+            '%s yra %s srities leidinys, tinkamas tiek kasdieniam skaitymui, tiek mokymuisi. Aprašyme aptariamos praktinės situacijos, istorinis kontekstas ir temos, kurios padeda bibliotekos lankytojams greitai atsirinkti aktualų turinį.',
             $title,
             mb_strtolower($category)
         );
@@ -895,24 +899,7 @@ class PresentationDemoDataSeeder extends Seeder
 
     private function notificationTitle(string $type): string
     {
-        return match ($type) {
-            'reservation_created' => 'Rezervacija sukurta',
-            'reservation_queue_changed' => 'Pasikeite rezervacijos eile',
-            'reservation_ready' => 'Rezervacija paruosta',
-            'reservation_cancelled' => 'Rezervacija atsaukta',
-            'reservation_fulfilled' => 'Rezervacija ivykdyta',
-            'loan_overdue' => 'Veluojate grazinti knyga',
-            'book_due_soon' => 'Arteja grazinimo terminas',
-            'book_returned' => 'Knyga grazinta',
-            'new_user' => 'Paskyra aktyvuota',
-            'qr_scan' => 'QR kodas nuskaitytas',
-            'report_ready' => 'Ataskaita paruosta',
-            'issuance_summary' => 'Isdavimo suvestine',
-            'system_warning' => 'Sistemos perspejimas',
-            'system_error' => 'Sistemos klaida',
-            'account_security' => 'Paskyros saugumas',
-            default => 'Bibliotekos pranesimas',
-        };
+        return NotificationType::normalize($type)->defaultTitle();
     }
 
     private function notificationMessage(string $type, Book $book): string
@@ -921,6 +908,7 @@ class PresentationDemoDataSeeder extends Seeder
             'reservation_created' => 'Jusu rezervacija knygai "'.$book->title.'" sukurta.',
             'reservation_ready' => 'Knyga "'.$book->title.'" paruosta atsiemimui.',
             'reservation_cancelled' => 'Rezervacija knygai "'.$book->title.'" buvo atsaukta.',
+            'reservation_expired' => 'Rezervacijos knygai "'.$book->title.'" atsiemimo terminas baigesi.',
             'loan_overdue' => 'Knygos "'.$book->title.'" grazinimo terminas jau praejo.',
             'book_due_soon' => 'Knyga "'.$book->title.'" turetu buti grazinta artimiausiomis dienomis.',
             'book_returned' => 'Knyga "'.$book->title.'" sekmingai grazinta.',
