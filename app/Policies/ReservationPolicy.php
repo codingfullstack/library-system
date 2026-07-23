@@ -60,6 +60,11 @@ class ReservationPolicy
         return $user->hasAnyEffectiveRole(['administratorius'], $reservation->library_id)
             && $user->belongsToLibrary($reservation->library_id);
     }
+
+    public function cancel(User $user, Reservation $reservation): bool
+    {
+        return $user->canCancelReservation($reservation);
+    }
 }
 
 

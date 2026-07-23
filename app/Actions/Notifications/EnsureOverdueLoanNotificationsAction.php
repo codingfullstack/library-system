@@ -4,6 +4,9 @@ namespace App\Actions\Notifications;
 
 use App\Models\Loan;
 use App\Models\User;
+use App\Support\Notifications\NotificationMessageBuilder;
+use App\Support\Notifications\NotificationMetadataBuilder;
+use App\Support\Notifications\NotificationType;
 
 class EnsureOverdueLoanNotificationsAction
 {
@@ -26,21 +29,12 @@ class EnsureOverdueLoanNotificationsAction
             app(CreateUserNotificationAction::class)->handle(
                 $user,
                 null,
-                'loan_overdue',
-                'Vėluojate grąžinti knygą',
-                sprintf(
-                    'Knyga "%s" vėluoja jau %d d. Grąžinimo terminas buvo %s.',
-                    $loan->bookCopy?->book?->title ?: 'nežinoma knyga',
-                    $loan->overdue_days,
-                    $loan->due_at?->format('Y-m-d') ?: '-'
-                ),
-                [
-                    'loan_id' => $loan->id,
-                    'book_copy_id' => $loan->book_copy_id,
-                    'book_title' => $loan->bookCopy?->book?->title,
-                    'due_at' => $loan->due_at?->toDateString(),
+                NotificationType::LOAN_OVERDUE,
+                null,
+                NotificationMessageBuilder::loanOverdue($loan),
+                NotificationMetadataBuilder::loan($loan, [
                     'overdue_days' => $loan->overdue_days,
-                ],
+                ]),
                 Loan::class,
                 $loan->id
             );

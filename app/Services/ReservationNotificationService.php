@@ -5,14 +5,17 @@ namespace App\Services;
 use App\Actions\Notifications\CreateUserNotificationAction;
 use App\Models\Reservation;
 use App\Notifications\LibraryNotification;
+use App\Support\Notifications\NotificationMessageBuilder;
+use App\Support\Notifications\NotificationMetadataBuilder;
+use App\Support\Notifications\NotificationType;
 use Illuminate\Support\Facades\Log;
 
 class ReservationNotificationService
 {
     private const POSITION_TYPES = [
-        'reservation_created',
-        'reservation_queue_changed',
-        'reservation_ready',
+        NotificationType::RESERVATION_CREATED->value,
+        NotificationType::RESERVATION_QUEUE_CHANGED->value,
+        NotificationType::RESERVATION_READY->value,
     ];
 
     public function __construct(
@@ -21,7 +24,7 @@ class ReservationNotificationService
 
     public function notifyCreated(Reservation $reservation): void
     {
-        $reservation->loadMissing(['user:id,name,email', 'book:id,slug,title']);
+        $reservation->loadMissing(['user:id,name,email', 'book:id,slug,title', 'branch:id,name']);
 
         if (! $reservation->user) {
             return;
@@ -34,12 +37,12 @@ class ReservationNotificationService
         app(CreateUserNotificationAction::class)->handle(
             $reservation->user,
             null,
-            'reservation_created',
-            'Rezervacija sukurta',
-            $this->createdMessage($reservation, $position, $dueAt, $isFirst),
-            $this->metadata($reservation, [
+            NotificationType::RESERVATION_CREATED,
+            null,
+            NotificationMessageBuilder::reservationCreated($reservation, $position, $dueAt, $isFirst),
+            NotificationMetadataBuilder::reservation($reservation, [
                 'queue_position' => $position,
-                'new_position' => $position,
+                'new_queue_position' => $position,
                 'due_at' => $dueAt,
                 'is_first_in_queue' => $isFirst,
             ]),
@@ -50,7 +53,7 @@ class ReservationNotificationService
 
     public function notifyQueuePositionChanged(Reservation $reservation): void
     {
-        $reservation->loadMissing(['user:id,name,email', 'book:id,slug,title']);
+        $reservation->loadMissing(['user:id,name,email', 'book:id,slug,title', 'pickupBranch:id,name']);
 
         if (! $reservation->user) {
             return;
@@ -75,13 +78,13 @@ class ReservationNotificationService
         }
 
         $reservation->user->notify(new LibraryNotification(
-            kind: 'reservation_queue_changed',
-            title: 'Rezervacijos eilė pasikeitė',
-            message: $this->queueChangedMessage($reservation, $position, $dueAt),
+            kind: NotificationType::RESERVATION_QUEUE_CHANGED,
+            title: NotificationType::RESERVATION_QUEUE_CHANGED->defaultTitle(),
+            message: NotificationMessageBuilder::reservationQueueChanged($reservation, $position, $dueAt),
             url: route('notifications.index', absolute: false),
-            metadata: $this->metadata($reservation, [
-                'old_position' => $oldPosition,
-                'new_position' => $position,
+            metadata: NotificationMetadataBuilder::reservation($reservation, [
+                'old_queue_position' => $oldPosition,
+                'new_queue_position' => $position,
                 'queue_position' => $position,
                 'due_at' => $dueAt,
                 'is_first_in_queue' => $position === 1,
@@ -142,22 +145,16 @@ class ReservationNotificationService
 
     public function notifyReady(Reservation $reservation): void
     {
-        $reservation->loadMissing(['user:id,name,email', 'book:id,slug,title']);
+        $reservation->loadMissing(['user:id,name,email', 'book:id,slug,title', 'pickupBranch:id,name']);
 
         if (! $reservation->user) {
             return;
         }
 
-        $position = $this->queueService->positionFor($reservation);
-
-        if ($position === null || $position < 1) {
-            return;
-        }
-
-        if ($position !== 1) {
+        if (! $reservation->isReady()) {
             Log::warning('Attempted to send ready notification for non-first reservation', [
                 'reservation_id' => $reservation->id,
-                'position' => $position,
+                'status' => $reservation->status,
                 'library_id' => $reservation->library_id,
                 'book_id' => $reservation->book_id,
             ]);
@@ -168,19 +165,11 @@ class ReservationNotificationService
         app(CreateUserNotificationAction::class)->handle(
             $reservation->user,
             null,
-            'reservation_ready',
-            'Rezervacija paruošta',
-            sprintf(
-                'Knyga "%s" jau laukia jūsų. Atsiimkite iki %s.',
-                $reservation->book?->title ?: 'nežinoma knyga',
-                $reservation->expires_at?->format('Y-m-d H:i') ?: '-'
-            ),
-            $this->metadata($reservation, [
-                'queue_position' => $position,
-                'new_position' => $position,
-                'due_at' => null,
-                'pickup_expires_at' => $reservation->expires_at?->toDateTimeString(),
-                'is_first_in_queue' => $position === 1,
+            NotificationType::RESERVATION_READY,
+            null,
+            NotificationMessageBuilder::reservationReady($reservation),
+            NotificationMetadataBuilder::reservation($reservation, [
+                'is_first_in_queue' => true,
             ]),
             Reservation::class,
             $reservation->id
@@ -200,7 +189,7 @@ class ReservationNotificationService
 
         foreach ($notifications as $notification) {
             $metadata = $notification->data['metadata'] ?? [];
-            $position = $metadata['new_position'] ?? $metadata['queue_position'] ?? null;
+            $position = $metadata['new_queue_position'] ?? $metadata['new_position'] ?? $metadata['queue_position'] ?? null;
 
             if ($position !== null) {
                 return (int) $position;
@@ -214,11 +203,11 @@ class ReservationNotificationService
     {
         $query = $reservation->user
             ->notifications()
-            ->where('type', 'reservation_queue_changed')
+            ->where('type', NotificationType::RESERVATION_QUEUE_CHANGED->value)
             ->where('data->related_type', Reservation::class)
             ->where('data->related_id', $reservation->id)
-            ->where('data->metadata->old_position', $oldPosition)
-            ->where('data->metadata->new_position', $newPosition);
+            ->where('data->metadata->old_queue_position', $oldPosition)
+            ->where('data->metadata->new_queue_position', $newPosition);
 
         $dueAt === null
             ? $query->whereNull('data->metadata->due_at')
@@ -242,13 +231,13 @@ class ReservationNotificationService
         }
 
         $reservation->user->notify(new LibraryNotification(
-            kind: 'reservation_queue_changed',
-            title: 'Rezervacijos eilė pasikeitė',
-            message: $this->queueChangedMessage($reservation, $newPosition, $dueAt),
+            kind: NotificationType::RESERVATION_QUEUE_CHANGED,
+            title: NotificationType::RESERVATION_QUEUE_CHANGED->defaultTitle(),
+            message: NotificationMessageBuilder::reservationQueueChanged($reservation, $newPosition, $dueAt),
             url: route('notifications.index', absolute: false),
-            metadata: $this->metadata($reservation, [
-                'old_position' => $oldPosition,
-                'new_position' => $newPosition,
+            metadata: NotificationMetadataBuilder::reservation($reservation, [
+                'old_queue_position' => $oldPosition,
+                'new_queue_position' => $newPosition,
                 'queue_position' => $newPosition,
                 'due_at' => $dueAt,
                 'is_first_in_queue' => $newPosition === 1,
@@ -256,59 +245,5 @@ class ReservationNotificationService
             relatedType: Reservation::class,
             relatedId: $reservation->id,
         ));
-    }
-
-    /**
-     * @param  array<string, mixed>  $extra
-     * @return array<string, mixed>
-     */
-    private function metadata(Reservation $reservation, array $extra): array
-    {
-        return array_merge([
-            'reservation_id' => $reservation->id,
-            'book_id' => $reservation->book_id,
-            'book_title' => $reservation->book?->title,
-            'library_id' => $reservation->library_id,
-            'scope' => $reservation->scope,
-            'branch_id' => $reservation->branch_id,
-        ], $extra);
-    }
-
-    private function createdMessage(Reservation $reservation, ?int $position, ?string $dueAt, bool $isFirst): string
-    {
-        $message = sprintf(
-            'Jūs sėkmingai rezervavote knygą "%s". Jūsų vieta eilėje: %s.',
-            $reservation->book?->title ?: 'nežinoma knyga',
-            $position ?: '-'
-        );
-
-        if ($dueAt) {
-            return $message.' Šiuo metu knyga paskolinta kitam skaitytojui iki '.$dueAt.'.';
-        }
-
-        if ($isFirst) {
-            return $message.' Esate pirmi eilėje, informuosime, kai knygą bus galima pasiimti.';
-        }
-
-        return $message.' Knyga šiuo metu nėra paskolinta su žinoma grąžinimo data.';
-    }
-
-    private function queueChangedMessage(Reservation $reservation, int $position, ?string $dueAt): string
-    {
-        $message = sprintf(
-            'Jūsų rezervacijos eilė pasikeitė. Knyga "%s" - dabar esate %d vietoje eilėje.',
-            $reservation->book?->title ?: 'nežinoma knyga',
-            $position
-        );
-
-        if ($dueAt) {
-            return $message.' Dabartinis skaitytojas turi grąžinti knygą iki '.$dueAt.'.';
-        }
-
-        if ($position === 1) {
-            return $message.' Esate pirmi eilėje.';
-        }
-
-        return $message;
     }
 }

@@ -4,6 +4,8 @@ namespace App\Actions\Notifications;
 
 use App\Models\User;
 use App\Notifications\LibraryNotification;
+use App\Support\Notifications\NotificationMetadataBuilder;
+use App\Support\Notifications\NotificationType;
 use App\Support\Notifications\NotificationUiConfig;
 use Illuminate\Notifications\DatabaseNotification;
 
@@ -15,28 +17,30 @@ class CreateUserNotificationAction
     public function handle(
         User $recipient,
         ?User $sender,
-        string $type,
-        string $title,
+        NotificationType|string $type,
+        ?string $title,
         string $message,
         array $metadata = [],
         ?string $relatedType = null,
         ?int $relatedId = null
     ): ?DatabaseNotification {
+        $type = NotificationType::normalize($type);
         $ui = NotificationUiConfig::for($type);
+        $metadata = NotificationMetadataBuilder::compact($metadata);
         $existing = null;
 
         if ($relatedType && $relatedId) {
             $existing = $recipient->notifications()
-                ->where('type', $type)
+                ->where('type', $type->value)
                 ->where('data->related_type', $relatedType)
                 ->where('data->related_id', $relatedId)
                 ->first();
         }
 
         $payload = [
-            'kind' => $type,
-            'type' => $ui['type'],
-            'title' => $title,
+            'kind' => $type->value,
+            'type' => $type->value,
+            'title' => $title ?: $type->defaultTitle(),
             'message' => $message,
             'url' => (string) ($metadata['url'] ?? route('notifications.index', absolute: false)),
             'created_at' => now()->toIso8601String(),
@@ -44,6 +48,8 @@ class CreateUserNotificationAction
             'category' => $ui['category'],
             'icon' => $ui['icon'],
             'color' => $ui['color'],
+            'badge' => $ui['badge'],
+            'priority' => $ui['priority'],
             'related_type' => $relatedType,
             'related_id' => $relatedId,
             'metadata' => $metadata,
@@ -66,7 +72,7 @@ class CreateUserNotificationAction
 
         $recipient->notify(new LibraryNotification(
             kind: $type,
-            title: $title,
+            title: $title ?: $type->defaultTitle(),
             message: $message,
             url: $payload['url'],
             metadata: array_merge($metadata, [

@@ -7,6 +7,7 @@ use App\Models\BookCopy;
 use App\Models\Branch;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Support\Notifications\NotificationType;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -185,7 +186,7 @@ class ReservationQueueDebugService
             'branch_name' => $reservation->branch?->name,
             'status' => $reservation->status,
             'is_pending' => $reservation->isPending(),
-            'is_ready' => $reservation->isPending() && $reservation->expires_at !== null,
+            'is_ready' => $reservation->isReady(),
             'expires_at' => $reservation->expires_at?->toDateTimeString(),
             'reserved_at' => $reservation->reserved_at?->toDateTimeString(),
             'created_at' => $reservation->created_at?->toDateTimeString(),
@@ -194,7 +195,6 @@ class ReservationQueueDebugService
             'cancelled_at' => $reservation->cancelled_at?->toDateTimeString(),
             'ready_at' => $reservation->getAttribute('ready_at'),
             'assigned_branch_id' => $reservation->getAttribute('assigned_branch_id'),
-            'assigned_book_copy_id' => $reservation->getAttribute('assigned_book_copy_id'),
             'pickup_branch_id' => $reservation->getAttribute('pickup_branch_id'),
             'queue_position_attribute' => $includeRawAttribute ? $reservation->getAttribute('queue_position') : null,
             'computed_position' => $positionsMap[(int) $reservation->id] ?? null,
@@ -221,7 +221,7 @@ class ReservationQueueDebugService
             'branch_name' => $reservation->branch?->name,
             'status' => $reservation->status,
             'is_active_queue' => isset($positionsMap[(int) $reservation->id]),
-            'is_ready' => $reservation->isPending() && $reservation->expires_at !== null,
+            'is_ready' => $reservation->isReady(),
             'displayed_reservation_date' => $reservation->created_at?->toDateTimeString(),
             'queue_order_timestamp' => $reservation->created_at?->toDateTimeString(),
             'reserved_at' => $reservation->reserved_at?->toDateTimeString(),
@@ -247,8 +247,25 @@ class ReservationQueueDebugService
             ->orderBy('name')
             ->get()
             ->mapWithKeys(function (Branch $branch) use ($libraryId, $bookId, $positionsMap) {
-                $reservations = $this->queueService
-                    ->serviceablePendingReservationsQuery($libraryId, $bookId, $branch->id)
+                $reservations = Reservation::query()
+                    ->where('library_id', $libraryId)
+                    ->where('book_id', $bookId)
+                    ->active()
+                    ->where(function ($query) use ($branch) {
+                        $query
+                            ->where(function ($libraryScopeQuery) {
+                                $libraryScopeQuery
+                                    ->where('scope', Reservation::SCOPE_LIBRARY)
+                                    ->whereNull('branch_id');
+                            })
+                            ->orWhere(function ($branchScopeQuery) use ($branch) {
+                                $branchScopeQuery
+                                    ->where('scope', Reservation::SCOPE_BRANCH)
+                                    ->where('branch_id', $branch->id);
+                            });
+                    })
+                    ->orderBy('created_at')
+                    ->orderBy('id')
                     ->with(['user:id,name', 'branch:id,name'])
                     ->get()
                     ->values()
@@ -306,7 +323,12 @@ class ReservationQueueDebugService
     private function latestNotifications(int $libraryId, int $bookId): array
     {
         return \Illuminate\Notifications\DatabaseNotification::query()
-            ->whereIn('type', ['reservation_created', 'reservation_queue_changed', 'reservation_ready', 'reservation_fulfilled'])
+            ->whereIn('type', [
+                NotificationType::RESERVATION_CREATED->value,
+                NotificationType::RESERVATION_QUEUE_CHANGED->value,
+                NotificationType::RESERVATION_READY->value,
+                NotificationType::RESERVATION_FULFILLED->value,
+            ])
             ->where('data->metadata->library_id', $libraryId)
             ->where('data->metadata->book_id', $bookId)
             ->latest()
@@ -320,8 +342,8 @@ class ReservationQueueDebugService
                     'user_id' => $notification->notifiable_id,
                     'type' => $notification->type,
                     'reservation_id' => $metadata['reservation_id'] ?? $notification->data['related_id'] ?? null,
-                    'old_position' => $metadata['old_position'] ?? null,
-                    'new_position' => $metadata['new_position'] ?? $metadata['queue_position'] ?? null,
+                    'old_position' => $metadata['old_queue_position'] ?? $metadata['old_position'] ?? null,
+                    'new_position' => $metadata['new_queue_position'] ?? $metadata['new_position'] ?? $metadata['queue_position'] ?? null,
                     'created_at' => $notification->created_at?->toDateTimeString(),
                     'data' => $notification->data,
                 ];
@@ -348,8 +370,8 @@ class ReservationQueueDebugService
     private function readyReservationIds(int $libraryId, int $bookId): array
     {
         return $this->queueService
-            ->pendingReservationsQuery($libraryId, $bookId)
-            ->whereNotNull('expires_at')
+            ->activeReservationsQuery($libraryId, $bookId)
+            ->where('status', Reservation::STATUS_READY)
             ->pluck('id')
             ->map(fn ($id): int => (int) $id)
             ->all();

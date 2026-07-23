@@ -9,45 +9,31 @@ class NotificationUiConfig
      */
     public static function all(): array
     {
-        return [
-            'reservation_created' => self::forType(NotificationType::RESERVATION),
-            'reservation_queue_changed' => self::forType(NotificationType::RESERVATION),
-            'reservation_ready' => self::forType(NotificationType::RESERVATION),
-            'reservation_cancelled' => self::forType(NotificationType::RESERVATION),
-            'reservation_fulfilled' => self::forType(NotificationType::RESERVATION),
-            'loan_overdue' => self::forType(NotificationType::LOAN),
-            'book_due_soon' => self::forType(NotificationType::LOAN),
-            'book_returned' => self::forType(NotificationType::LOAN),
-            'library_membership_added' => self::forType(NotificationType::INFO),
-            'system' => self::forType(NotificationType::INFO),
-            'new_user' => self::forType(NotificationType::INFO),
-            'qr_scan' => self::forType(NotificationType::INFO),
-            'report_ready' => self::forType(NotificationType::INFO),
-            'issuance_summary' => self::forType(NotificationType::INFO),
-            'system_warning' => self::forType(NotificationType::WARNING),
-            'system_error' => self::forType(NotificationType::ERROR),
-            'account_security' => self::forType(NotificationType::WARNING),
-        ];
+        return collect(NotificationType::cases())
+            ->mapWithKeys(fn (NotificationType $type) => [$type->value => self::for($type)])
+            ->all();
     }
 
     /**
      * @return array<string, mixed>
      */
-    public static function for(string $type): array
+    public static function for(NotificationType|string $type): array
     {
-        $normalizedType = strtolower($type);
-        $config = self::all()[$normalizedType] ?? null;
+        $notificationType = NotificationType::normalize($type);
+        $ui = $notificationType->category()->ui();
 
-        if ($config === null) {
-            return self::fallback();
-        }
-
-        return $config;
+        return array_merge($ui, [
+            'title' => $notificationType->defaultTitle(),
+            'subtitle' => $ui['category'],
+            'badge' => $ui['category_key'],
+            'priority' => $notificationType->priority(),
+            'web' => self::webTokens($ui['color'], $ui['icon']),
+        ]);
     }
 
     public static function has(string $type): bool
     {
-        return array_key_exists(strtolower($type), self::all());
+        return NotificationType::tryFrom(strtolower($type)) !== null;
     }
 
     /**
@@ -67,8 +53,8 @@ class NotificationUiConfig
      */
     public static function typeCatalog(): array
     {
-        return collect(NotificationType::cases())
-            ->mapWithKeys(fn (NotificationType $type) => [$type->value => self::forType($type)])
+        return collect(NotificationCategory::cases())
+            ->mapWithKeys(fn (NotificationCategory $type) => [$type->value => self::forCategory($type)])
             ->all();
     }
 
@@ -77,13 +63,13 @@ class NotificationUiConfig
      */
     private static function fallback(): array
     {
-        return self::forType(NotificationType::INFO);
+        return self::for(NotificationType::SYSTEM);
     }
 
     /**
      * @return array<string, mixed>
      */
-    private static function forType(NotificationType $type): array
+    private static function forCategory(NotificationCategory $type): array
     {
         $ui = $type->ui();
 

@@ -9,6 +9,9 @@ use App\Actions\Reservations\SyncReservationQueueAction;
 use App\Models\BookCopy;
 use App\Models\User;
 use App\Services\ReservationQueueDebugService;
+use App\Support\Notifications\NotificationMessageBuilder;
+use App\Support\Notifications\NotificationMetadataBuilder;
+use App\Support\Notifications\NotificationType;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -24,6 +27,7 @@ class ReturnBookCopyAction
                 ->whereKey($bookCopy->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
+            $bookCopy->loadMissing(['book:id,title', 'branch:id,name']);
 
             return $this->returnLocked($authUser, $bookCopy);
         });
@@ -61,27 +65,19 @@ class ReturnBookCopyAction
         ]);
 
         if ($activeLoan->user) {
-            app(CreateUserNotificationAction::class)->handle(
+            DB::afterCommit(fn () => app(CreateUserNotificationAction::class)->handle(
                 $activeLoan->user,
                 $authUser,
-                'book_returned',
-                'Knyga grąžinta',
-                sprintf(
-                    'Knygos "%s" kopija %s sėkmingai grąžinta.',
-                    $bookCopy->book?->title ?: 'nežinoma knyga',
-                    $bookCopy->inventory_code ?: ('#'.$bookCopy->id)
-                ),
-                [
+                NotificationType::BOOK_RETURNED,
+                null,
+                NotificationMessageBuilder::bookReturned($bookCopy),
+                NotificationMetadataBuilder::bookCopy($bookCopy, [
                     'loan_id' => $activeLoan->id,
-                    'book_id' => $bookCopy->book_id,
-                    'book_copy_id' => $bookCopy->id,
-                    'book_title' => $bookCopy->book?->title,
-                    'inventory_code' => $bookCopy->inventory_code,
                     'returned_at' => $activeLoan->returned_at?->toDateTimeString(),
-                ],
+                ]),
                 \App\Models\Loan::class,
                 $activeLoan->id
-            );
+            ));
         }
 
         app(ChangeBookCopyStatusAction::class)->handle(

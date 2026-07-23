@@ -184,6 +184,14 @@ class BookCopyController extends Controller
             return back()->with('error', 'Kopijos ištrinti negalima, nes ji turi skenavimo istoriją.');
         }
 
+        if ($bookCopy->reservations()->exists()) {
+            return back()->with('error', 'Kopijos istrinti negalima, nes ji turi rezervaciju istorija.');
+        }
+
+        if ($bookCopy->statusHistories()->exists() || $bookCopy->auditLogs()->exists()) {
+            return back()->with('error', 'Kopijos istrinti negalima, nes ji turi audito arba busenos istorija.');
+        }
+
         $bookCopy->loadMissing([
             'book:id,slug,title',
             'branch:id,name',

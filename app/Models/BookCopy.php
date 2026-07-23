@@ -10,13 +10,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class BookCopy extends Model
 {
-    use HasFactory, BelongsToLibrary;
+    use BelongsToLibrary, HasFactory;
 
     public const STATUS_AVAILABLE = 'laisva';
+
     public const STATUS_LOANED = 'išduota';
+
     public const STATUS_LOST = 'prarasta';
+
     public const STATUS_DAMAGED = 'sugadinta';
+
     public const STATUS_MAINTENANCE = 'tvarkoma';
+
     public const STATUS_WITHDRAWN = 'nurašyta';
 
     protected $fillable = [
@@ -78,7 +83,25 @@ class BookCopy extends Model
     public function activeLoan()
     {
         return $this->hasOne(Loan::class)
-            ->whereNull('returned_at');
+            ->active();
+    }
+
+    public function activeReadyReservation()
+    {
+        return $this->hasOne(Reservation::class, 'assigned_book_copy_id')
+            ->where('status', Reservation::STATUS_READY)
+            ->whereNull('fulfilled_at')
+            ->whereNull('cancelled_at');
+    }
+
+    public function reservations(): HasMany
+    {
+        return $this->hasMany(Reservation::class, 'assigned_book_copy_id');
+    }
+
+    public function auditLogs()
+    {
+        return $this->morphMany(AuditLog::class, 'auditable');
     }
 
     public static function statusLabels(): array
@@ -150,11 +173,3 @@ class BookCopy extends Model
         };
     }
 }
-
-
-
-
-
-
-
-
