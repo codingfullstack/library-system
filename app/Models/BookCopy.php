@@ -24,6 +24,14 @@ class BookCopy extends Model
 
     public const STATUS_WITHDRAWN = 'nurašyta';
 
+    public const CONDITION_NEW = 'nauja';
+
+    public const CONDITION_GOOD = 'gera';
+
+    public const CONDITION_WORN = 'padėvėta';
+
+    public const CONDITION_DAMAGED = 'sugadinta';
+
     protected $fillable = [
         'library_id',
         'book_id',
@@ -119,6 +127,38 @@ class BookCopy extends Model
     public function statusLabel(): string
     {
         return self::statusLabels()[$this->status] ?? (string) $this->status;
+    }
+
+    public static function conditionLabels(): array
+    {
+        return [
+            self::CONDITION_NEW => 'Nauja',
+            self::CONDITION_GOOD => 'Gera',
+            self::CONDITION_WORN => 'Padėvėta',
+            self::CONDITION_DAMAGED => 'Sugadinta',
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function conditionValues(): array
+    {
+        return array_keys(self::conditionLabels());
+    }
+
+    public static function conditionLabelFor(?string $condition): string
+    {
+        if ($condition === null || $condition === '') {
+            return '-';
+        }
+
+        return self::conditionLabels()[$condition] ?? $condition;
+    }
+
+    public function conditionLabel(): string
+    {
+        return self::conditionLabelFor($this->condition_status);
     }
 
     public static function lifecycleTargetLabels(): array

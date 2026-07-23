@@ -41,6 +41,7 @@ class BookCopyDetailsResource extends JsonResource
             'barcode' => $this->barcode,
             'status' => $this->status,
             'condition_status' => $this->condition_status,
+            'condition_label' => $this->conditionLabel(),
             'acquired_at' => $this->acquired_at,
             'notes' => $canViewOperationalDetails ? $this->notes : null,
             'status_history' => $canViewOperationalDetails && $this->statusHistories
@@ -114,6 +115,5 @@ class BookCopyDetailsResource extends JsonResource
     }
 
 }
-
 
 

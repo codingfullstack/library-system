@@ -13,7 +13,7 @@
             ['icon' => 'bookmark', 'label' => 'Būsena', 'badge' => true, 'value' => $statusLabels[$status] ?? $status],
             ['icon' => 'book-open', 'label' => 'Kopija', 'value' => $copy->inventory_code ?: '-'],
             ['icon' => 'tag', 'label' => 'Brūkšninis kodas', 'value' => $copy->barcode ?: '-'],
-            ['icon' => 'shield-check', 'label' => 'Būklė', 'value' => ucfirst((string) $copy->condition_status) ?: '-'],
+            ['icon' => 'shield-check', 'label' => 'Būklė', 'value' => $copy->conditionLabel()],
             ['icon' => 'building-library', 'label' => 'Filialas', 'value' => $copy->branch->name ?? '-'],
             ['icon' => 'map-pin', 'label' => 'Vieta', 'value' => $copy->location ? collect([$copy->location->name, $copy->location->room, $copy->location->shelf])->filter()->join(' / ') : '-'],
             ['icon' => 'calendar-days', 'label' => 'Įsigyta', 'value' => $copy->acquired_at?->format('Y-m-d') ?: '-'],

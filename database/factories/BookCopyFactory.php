@@ -79,7 +79,13 @@ class BookCopyFactory extends Factory
                 BookCopy::STATUS_DAMAGED,
                 BookCopy::STATUS_LOST,
             ]),
-            'condition_status' => fake()->randomElement(['nauja', 'gera', 'gera', 'padėvėta', 'sugadinta']),
+            'condition_status' => fake()->randomElement([
+                BookCopy::CONDITION_NEW,
+                BookCopy::CONDITION_GOOD,
+                BookCopy::CONDITION_GOOD,
+                BookCopy::CONDITION_WORN,
+                BookCopy::CONDITION_DAMAGED,
+            ]),
             'acquired_at' => fake()->date(),
             'notes' => fake()->optional()->sentence(),
         ];

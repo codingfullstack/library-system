@@ -66,11 +66,6 @@ class PresentationDemoDataSeeder extends Seeder
 
     private const TARGET_NOTIFICATIONS = 5500;
 
-    /**
-     * @var array<int, string>
-     */
-    private array $conditionStatuses = ['nauja', 'gera', 'padėvėta', 'sugadinta'];
-
     public function run(): void
     {
         $admin = User::query()->where('email', self::ADMIN_EMAIL)->first();
@@ -416,7 +411,7 @@ class PresentationDemoDataSeeder extends Seeder
                 'qr_code' => self::PREFIX.'-QR-'.str_pad((string) $i, 6, '0', STR_PAD_LEFT),
                 'barcode' => self::PREFIX.'-BC-'.str_pad((string) $i, 6, '0', STR_PAD_LEFT),
                 'status' => $status,
-                'condition_status' => $this->conditionStatuses[$i % count($this->conditionStatuses)],
+                'condition_status' => BookCopy::conditionValues()[$i % count(BookCopy::conditionValues())],
                 'acquired_at' => $createdAt->toDateString(),
                 'notes' => $this->copyNotes($status),
                 'created_at' => $createdAt,

@@ -54,11 +54,11 @@
         @media (min-width: 1024px) {
             .copy-list-grid {
                 grid-template-columns:
-                    110px
-                    minmax(190px, 1.15fr)
-                    minmax(155px, 0.85fr)
-                    minmax(190px, 1fr)
-                    minmax(140px, 0.75fr);
+                    126px
+                    minmax(230px, 1fr)
+                    minmax(180px, 0.8fr)
+                    minmax(150px, 0.65fr)
+                    minmax(320px, 0.95fr);
             }
 
             .copy-list-divider {
@@ -404,11 +404,6 @@
                                                 ],
                                             };
                                         }
-                                        $conditionTone = match ((string) $copy->condition_status) {
-                                            'nauja', 'gera' => 'text-emerald-700 dark:text-emerald-300',
-                                            'padėvėta', 'padeveta' => 'text-amber-700 dark:text-amber-300',
-                                            default => 'text-rose-700 dark:text-rose-300',
-                                        };
                                         $reservationDaysLeft = $preferredReservationForCopy?->isReady() && $preferredReservationForCopy?->expires_at
                                             ? now()->startOfDay()->diffInDays($preferredReservationForCopy->expires_at->copy()->startOfDay(), false)
                                             : null;
@@ -438,8 +433,8 @@
                                             <div class="space-y-3">
                                                 <p class="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 lg:hidden">Būklė / įsigyta</p>
                                                 <p class="flex items-center gap-2 text-sm font-semibold text-zinc-800 dark:text-zinc-100">
-                                                    <flux:icon.heart class="size-4 {{ $conditionTone }}" />
-                                                    <span>{{ ucfirst((string) $copy->condition_status) ?: '-' }}</span>
+                                                    <flux:icon.heart class="size-4 text-zinc-500 dark:text-zinc-400" />
+                                                    <span>{{ $copy->conditionLabel() }}</span>
                                                 </p>
                                                 <p class="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-200">
                                                     <flux:icon.calendar-days class="size-4 text-zinc-500 dark:text-zinc-400" />
@@ -473,7 +468,7 @@
                                                 @endif
                                             </div>
 
-                                            <div class="flex items-center gap-2 lg:justify-end">
+                                            <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
 
                                                 @if($preferredReservationForCopy)
                                                     <button
@@ -489,9 +484,13 @@
                                                     </button>
                                                 @else
                                                     @if($copy->activeLoan)
-                                                        <livewire:loans.return-book-copy-form :book-copy="$copy" :key="'row-return-copy-'.$copy->id" />
+                                                        <div class="min-w-[17rem] max-w-full">
+                                                            <livewire:loans.return-book-copy-form :book-copy="$copy" :key="'row-return-copy-'.$copy->id" />
+                                                        </div>
                                                     @endif
-                                                    <livewire:loans.borrow-book-copy-form :book-copy="$copy" :preferred-reservation-id="null" :key="'row-borrow-copy-'.$copy->id" />
+                                                    <div class="max-w-full">
+                                                        <livewire:loans.borrow-book-copy-form :book-copy="$copy" :preferred-reservation-id="null" :key="'row-borrow-copy-'.$copy->id" />
+                                                    </div>
                                                 @endif
                                             </div>
                                         </div>
@@ -711,7 +710,7 @@
                                                     <td class="px-4 py-4 text-sm text-zinc-700 dark:text-zinc-300">
                                                         {{ $copyLocationText }}
                                                     </td>
-                                                    <td class="px-4 py-4 text-sm text-zinc-700 dark:text-zinc-300">{{ ucfirst((string) $copy->condition_status) }}</td>
+                                                    <td class="px-4 py-4 text-sm text-zinc-700 dark:text-zinc-300">{{ $copy->conditionLabel() }}</td>
                                                     <td class="px-4 py-4 text-sm text-zinc-700 dark:text-zinc-300">{{ $copy->acquired_at?->format('Y-m-d') ?: '-' }}</td>
                                                     <td class="px-4 py-4">
                                                         <div class="flex items-center gap-2">
@@ -741,7 +740,7 @@
                                                                         <div>
                                                                             <p class="text-sm font-semibold text-zinc-950 dark:text-white">Rezervacijos informacija</p>
                                                                             <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                                                                                Inventorinis nr.: {{ $copy->inventory_code ?: '-' }} · Būklė: {{ ucfirst((string) $copy->condition_status) ?: '-' }} · Vieta: {{ $copyLocationText }}
+                                                                                Inventorinis nr.: {{ $copy->inventory_code ?: '-' }} · Būklė: {{ $copy->conditionLabel() }} · Vieta: {{ $copyLocationText }}
                                                                             </p>
                                                                         </div>
                                                                     </div>

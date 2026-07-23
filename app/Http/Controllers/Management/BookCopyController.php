@@ -254,11 +254,11 @@ class BookCopyController extends Controller
         $attributes = [];
 
         if ($targetStatus === BookCopy::STATUS_DAMAGED) {
-            $attributes['condition_status'] = 'sugadinta';
+            $attributes['condition_status'] = BookCopy::CONDITION_DAMAGED;
         }
 
-        if ($targetStatus === BookCopy::STATUS_AVAILABLE && $bookCopy->condition_status === 'sugadinta') {
-            $attributes['condition_status'] = 'gera';
+        if ($targetStatus === BookCopy::STATUS_AVAILABLE && $bookCopy->condition_status === BookCopy::CONDITION_DAMAGED) {
+            $attributes['condition_status'] = BookCopy::CONDITION_GOOD;
         }
 
         $changeBookCopyStatusAction->handle(

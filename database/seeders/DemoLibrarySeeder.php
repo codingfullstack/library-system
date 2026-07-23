@@ -770,10 +770,10 @@ class DemoLibrarySeeder extends Seeder
                 ])->random();
 
                 $condition = match ($targetStatus) {
-                    BookCopy::STATUS_DAMAGED => 'sugadinta',
-                    BookCopy::STATUS_MAINTENANCE => collect(['padėvėta', 'sugadinta'])->random(),
-                    BookCopy::STATUS_LOST => collect(['gera', 'padėvėta'])->random(),
-                    default => collect(['nauja', 'gera', 'gera', 'padėvėta'])->random(),
+                    BookCopy::STATUS_DAMAGED => BookCopy::CONDITION_DAMAGED,
+                    BookCopy::STATUS_MAINTENANCE => collect([BookCopy::CONDITION_WORN, BookCopy::CONDITION_DAMAGED])->random(),
+                    BookCopy::STATUS_LOST => collect([BookCopy::CONDITION_GOOD, BookCopy::CONDITION_WORN])->random(),
+                    default => collect([BookCopy::CONDITION_NEW, BookCopy::CONDITION_GOOD, BookCopy::CONDITION_GOOD, BookCopy::CONDITION_WORN])->random(),
                 };
 
                 $copy = BookCopy::create([

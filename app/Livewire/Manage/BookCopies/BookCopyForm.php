@@ -40,7 +40,7 @@ class BookCopyForm extends Component
 
     public string $status = BookCopy::STATUS_AVAILABLE;
 
-    public string $conditionStatus = 'gera';
+    public string $conditionStatus = BookCopy::CONDITION_GOOD;
 
     public string $acquiredAt = '';
 
@@ -68,7 +68,7 @@ class BookCopyForm extends Component
             $this->inventoryCode = (string) $bookCopy->inventory_code;
             $this->barcode = (string) ($bookCopy->barcode ?? '');
             $this->status = (string) ($bookCopy->status ?: BookCopy::STATUS_AVAILABLE);
-            $this->conditionStatus = (string) ($bookCopy->condition_status ?: 'gera');
+            $this->conditionStatus = (string) ($bookCopy->condition_status ?: BookCopy::CONDITION_GOOD);
             $this->acquiredAt = $bookCopy->acquired_at?->format('Y-m-d') ?? '';
             $this->notes = (string) ($bookCopy->notes ?? '');
 
@@ -343,12 +343,7 @@ class BookCopyForm extends Component
 
     private function conditionOptions(): array
     {
-        return [
-            'nauja' => 'Nauja',
-            'gera' => 'Gera',
-            'padėvėta' => 'Padėvėta',
-            'sugadinta' => 'Pažeista',
-        ];
+        return BookCopy::conditionLabels();
     }
 
     private function generateQrCode(int $libraryId): string

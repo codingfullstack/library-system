@@ -185,7 +185,7 @@ class ListExportController extends Controller
                 $copy->branch?->name,
                 $locationLabel,
                 $copy->statusLabel(),
-                ucfirst((string) $copy->condition_status),
+                $copy->conditionLabel(),
                 $copy->updated_at?->format('Y-m-d H:i'),
             ];
         })->all();

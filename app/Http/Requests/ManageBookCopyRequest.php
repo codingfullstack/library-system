@@ -69,7 +69,7 @@ class ManageBookCopyRequest extends FormRequest
                     ->ignore($bookCopyId),
             ],
             'status' => ['required', Rule::in(array_keys(BookCopy::statusLabels()))],
-            'condition_status' => ['required', Rule::in(['nauja', 'gera', 'padėvėta', 'sugadinta'])],
+            'condition_status' => ['required', Rule::in(BookCopy::conditionValues())],
             'acquired_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
         ];
