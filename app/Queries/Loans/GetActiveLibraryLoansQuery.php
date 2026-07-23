@@ -49,7 +49,7 @@ class GetActiveLibraryLoansQuery
         $base = $this->baseQuery($user, $filters);
 
         return [
-            'active_loans_count' => (clone $base)->whereIn('status', ['aktyvi', 'vėluoja'])->count(),
+            'active_loans_count' => (clone $base)->active()->count(),
             'unique_members_count' => (clone $base)->distinct('user_id')->count('user_id'),
             'due_today_count' => (clone $base)
                 ->whereNull('returned_at')
@@ -92,7 +92,7 @@ class GetActiveLibraryLoansQuery
         if (! empty($status)) {
             $query->where('status', $status);
         } else {
-            $query->whereIn('status', ['aktyvi', 'vėluoja']);
+            $query->active();
         }
 
         if ($search !== '') {

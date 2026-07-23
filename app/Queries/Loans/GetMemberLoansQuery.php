@@ -57,8 +57,7 @@ class GetMemberLoansQuery
         $query = Loan::query()
             ->where('user_id', $user->id)
             ->when($libraryId, fn ($builder) => $builder->where('library_id', $libraryId))
-            ->whereIn('status', ['aktyvi', 'vėluoja'])
-            ->whereNull('returned_at');
+            ->active();
 
         if ($search !== '') {
             $query->where(function ($builder) use ($search) {

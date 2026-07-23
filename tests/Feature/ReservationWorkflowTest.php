@@ -22,6 +22,7 @@ use App\Queries\Reservations\GetLibraryReservationsQuery;
 use App\Services\ReservationNotificationService;
 use App\Services\ReservationQueueService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -38,7 +39,7 @@ it('sends an internal notification when staff cancels a reservation with a reaso
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHour(),
         'expires_at' => now()->addDay(),
         'fulfilled_at' => null,
@@ -53,13 +54,17 @@ it('sends an internal notification when staff cancels a reservation with a reaso
         'type' => 'reservation_cancelled',
     ]);
 
+    $notification = $member->notifications()->where('type', 'reservation_cancelled')->first();
+
+    expect($notification->data['message'])->not->toContain('Atsiėmimo filialas')
+        ->and($notification->data['metadata'])->not->toHaveKeys(['pickup_branch_id', 'pickup_branch_name']);
+
     $this->assertDatabaseHas('audit_logs', [
         'action' => 'reservation_cancelled',
         'auditable_type' => Reservation::class,
         'auditable_id' => $reservation->id,
     ]);
 });
-
 it('cancels a reservation through livewire without redirecting to the update endpoint', function () {
     $library = Library::factory()->create();
     $staff = User::factory()->staff()->create(['library_id' => $library->id]);
@@ -70,7 +75,7 @@ it('cancels a reservation through livewire without redirecting to the update end
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHour(),
         'expires_at' => now()->addDay(),
         'fulfilled_at' => null,
@@ -109,9 +114,10 @@ it('requires an override before issuing a copy when another member has an active
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $reservedMember->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHour(),
-        'expires_at' => now()->addDay(),
+        'ready_at' => null,
+        'expires_at' => null,
         'fulfilled_at' => null,
         'cancelled_at' => null,
     ]);
@@ -145,7 +151,7 @@ it('allows reservation override with a required reason and records it in audit l
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $reservedMember->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHour(),
         'expires_at' => now()->addDay(),
         'fulfilled_at' => null,
@@ -162,9 +168,10 @@ it('allows reservation override with a required reason and records it in audit l
     ]);
 
     expect($result['loan'])->not->toBeNull();
-    expect($reservation->refresh()->status)->toBe(Reservation::STATUS_RESERVED)
+    expect($reservation->refresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and($reservation->ready_at)->toBeNull()
         ->and($reservation->cancelled_at)->toBeNull()
-        ->and($reservation->expires_at)->not->toBeNull()
+        ->and($reservation->expires_at)->toBeNull()
         ->and($reservation->isPending())->toBeTrue()
         ->and(app(ReservationQueueService::class)->positionFor($reservation))->toBe(1);
 
@@ -187,6 +194,92 @@ it('allows reservation override with a required reason and records it in audit l
     ]);
 });
 
+it('promotes waiting reservations to ready without cancelling expiring or fulfilling them', function () {
+    $library = Library::factory()->create();
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create(['title' => 'READY lifecycle']);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+
+    $loanedCopy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_AVAILABLE,
+    ]);
+
+    $reservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $member->id,
+        'scope' => Reservation::SCOPE_LIBRARY,
+        'branch_id' => null,
+        'pickup_branch_id' => null,
+        'status' => Reservation::STATUS_WAITING,
+        'reserved_at' => now()->subHour(),
+        'ready_at' => null,
+        'expires_at' => null,
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+
+    app(SyncReservationQueueAction::class)->handle($library->id, $book->id);
+
+    $reservation->refresh();
+
+    expect($reservation->status)->toBe(Reservation::STATUS_READY)
+        ->and($reservation->isActive())->toBeTrue()
+        ->and($reservation->isPending())->toBeFalse()
+        ->and($reservation->cancelled_at)->toBeNull()
+        ->and($reservation->fulfilled_at)->toBeNull()
+        ->and($reservation->pickup_branch_id)->toBe($branch->id)
+        ->and($reservation->assigned_book_copy_id)->not->toBeNull();
+
+    expect(Reservation::query()->active()->pluck('id')->all())->toContain($reservation->id)
+        ->and(Reservation::query()->expired()->pluck('id')->all())->not->toContain($reservation->id);
+});
+
+it('keeps fifo order when two available copies promote the first two waiting reservations', function () {
+    $library = Library::factory()->create();
+    $book = Book::factory()->create(['title' => 'FIFO two copies']);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $members = User::factory()->count(3)->member()->create(['library_id' => $library->id]);
+
+    BookCopy::factory()->count(2)->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_AVAILABLE,
+    ]);
+
+    $reservations = collect(range(0, 2))->map(fn (int $index) => Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $members[$index]->id,
+        'scope' => Reservation::SCOPE_LIBRARY,
+        'branch_id' => null,
+        'status' => Reservation::STATUS_WAITING,
+        'reserved_at' => now()->subMinutes(30 - $index),
+        'created_at' => now()->subMinutes(30 - $index),
+        'ready_at' => null,
+        'expires_at' => null,
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]));
+
+    app(SyncReservationQueueAction::class)->handle($library->id, $book->id);
+
+    expect($reservations[0]->fresh()->status)->toBe(Reservation::STATUS_READY)
+        ->and($reservations[1]->fresh()->status)->toBe(Reservation::STATUS_READY)
+        ->and($reservations[2]->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and($reservations[0]->fresh()->assigned_book_copy_id)->not->toBe($reservations[1]->fresh()->assigned_book_copy_id)
+        ->and(app(ReservationQueueService::class)->positionFor($reservations[2]->fresh()))->toBe(1)
+        ->and(app(ReservationQueueService::class)->queueSize($library->id, $book->id))->toBe(1);
+});
+
 it('keeps a ready reservation active when no copy is available after queue sync', function () {
     $library = Library::factory()->create();
     $member = User::factory()->member()->create(['library_id' => $library->id]);
@@ -194,7 +287,7 @@ it('keeps a ready reservation active when no copy is available after queue sync'
     $branch = Branch::factory()->create(['library_id' => $library->id]);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
 
-    BookCopy::factory()->create([
+    $loanedCopy = BookCopy::factory()->create([
         'library_id' => $library->id,
         'book_id' => $book->id,
         'branch_id' => $branch->id,
@@ -206,8 +299,11 @@ it('keeps a ready reservation active when no copy is available after queue sync'
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_READY,
+        'pickup_branch_id' => $branch->id,
+        'assigned_book_copy_id' => $loanedCopy->id,
         'reserved_at' => now()->subHour(),
+        'ready_at' => now()->subMinutes(30),
         'expires_at' => now()->addDay(),
         'fulfilled_at' => null,
         'cancelled_at' => null,
@@ -215,9 +311,11 @@ it('keeps a ready reservation active when no copy is available after queue sync'
 
     app(SyncReservationQueueAction::class)->handle($library->id, $book->id);
 
-    expect($reservation->refresh()->expires_at)->not->toBeNull()
-        ->and($reservation->isPending())->toBeTrue()
-        ->and(app(ReservationQueueService::class)->positionFor($reservation))->toBe(1);
+    expect($reservation->refresh()->status)->toBe(Reservation::STATUS_READY)
+        ->and($reservation->ready_at)->not->toBeNull()
+        ->and($reservation->expires_at)->not->toBeNull()
+        ->and($reservation->isReady())->toBeTrue()
+        ->and(app(ReservationQueueService::class)->positionFor($reservation))->toBeNull();
 });
 
 it('shows notifications for the authenticated user', function () {
@@ -340,7 +438,7 @@ it('creates a reservation ready notification for the first waiting member', func
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHour(),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -370,7 +468,10 @@ it('creates a reservation ready notification for the first waiting member', func
 
     expect($readyNotification)->not->toBeNull()
         ->and($readyNotification->data['title'])->toBe('Rezervacija paruošta')
-        ->and($readyNotification->data['message'])->toContain('jau laukia jūsų');
+        ->and($readyNotification->data['message'])->toContain('jau laukia jūsų')
+        ->and($readyNotification->data['message'])->toContain($branch->name)
+        ->and($readyNotification->data['metadata']['pickup_branch_id'])->toBe($branch->id)
+        ->and($readyNotification->data['metadata']['pickup_branch_name'])->toBe($branch->name);
 
     $this->assertDatabaseHas('notifications', [
         'notifiable_type' => $member->getMorphClass(),
@@ -417,6 +518,12 @@ it('does not duplicate return side effects when the same copy is returned twice'
         ->where('data->related_id', $loan->id)
         ->count())->toBe(1);
 
+    $returnNotification = $member->notifications()->where('type', 'book_returned')->first();
+
+    expect($returnNotification->data['message'])->toContain($branch->name)
+        ->and($returnNotification->data['metadata']['branch_id'])->toBe($branch->id)
+        ->and($returnNotification->data['metadata']['branch_name'])->toBe($branch->name);
+
     expect(AuditLog::query()
         ->where('action', 'loan_returned')
         ->where('auditable_type', Loan::class)
@@ -448,8 +555,11 @@ it('creates a reservation fulfilled notification when reserved book is issued to
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_READY,
+        'pickup_branch_id' => $branch->id,
+        'assigned_book_copy_id' => $bookCopy->id,
         'reserved_at' => now()->subHour(),
+        'ready_at' => now()->subMinutes(30),
         'expires_at' => now()->addDays(3),
         'fulfilled_at' => null,
         'cancelled_at' => null,
@@ -467,6 +577,12 @@ it('creates a reservation fulfilled notification when reserved book is issued to
         'notifiable_id' => $member->id,
         'type' => 'reservation_fulfilled',
     ]);
+
+    $fulfilledNotification = $member->notifications()->where('type', 'reservation_fulfilled')->first();
+
+    expect($fulfilledNotification->data['message'])->toContain($branch->name)
+        ->and($fulfilledNotification->data['metadata']['branch_id'])->toBe($branch->id)
+        ->and($fulfilledNotification->data['metadata']['branch_name'])->toBe($branch->name);
 });
 
 it('rolls back issued loan and reservation fulfillment if copy status update fails', function () {
@@ -488,8 +604,9 @@ it('rolls back issued loan and reservation fulfillment if copy status update fai
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_READY,
         'reserved_at' => now()->subHour(),
+        'ready_at' => now()->subMinutes(30),
         'expires_at' => now()->addDays(3),
         'fulfilled_at' => null,
         'cancelled_at' => null,
@@ -523,7 +640,7 @@ it('rolls back issued loan and reservation fulfillment if copy status update fai
 
     $this->assertDatabaseHas('reservations', [
         'id' => $reservation->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_READY,
         'fulfilled_at' => null,
     ]);
 
@@ -552,8 +669,9 @@ it('allows issuing an available copy to the member who is first in reservation q
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_READY,
         'reserved_at' => now()->subHour(),
+        'ready_at' => now()->subMinutes(30),
         'expires_at' => now()->addDays(3),
         'fulfilled_at' => null,
         'cancelled_at' => null,
@@ -642,7 +760,7 @@ it('notifies the next waiting member when the first reservation is cancelled', f
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $firstMember->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHours(2),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -652,7 +770,7 @@ it('notifies the next waiting member when the first reservation is cancelled', f
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $secondMember->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHour(),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -668,8 +786,8 @@ it('notifies the next waiting member when the first reservation is cancelled', f
 
     expect($notification)->not->toBeNull()
         ->and($notification->data['title'])->toBe('Rezervacijos eilė pasikeitė')
-        ->and($notification->data['metadata']['old_position'])->toBe(2)
-        ->and($notification->data['metadata']['new_position'])->toBe(1)
+        ->and($notification->data['metadata']['old_queue_position'])->toBe(2)
+        ->and($notification->data['metadata']['new_queue_position'])->toBe(1)
         ->and($notification->data['metadata']['due_at'])->toBe('2026-06-20')
         ->and($notification->data['message'])->toContain('Jūsų rezervacijos eilė pasikeitė')
         ->and($notification->data['message'])->toContain('Dabartinis skaitytojas turi grąžinti knygą iki 2026-06-20.');
@@ -694,7 +812,7 @@ it('does not create a queue changed notification when the position did not chang
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHour(),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -738,7 +856,7 @@ it('does not move reservation queue notifications across library boundaries', fu
         'library_id' => $firstLibrary->id,
         'book_id' => $book->id,
         'user_id' => $firstMember->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHours(2),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -748,7 +866,7 @@ it('does not move reservation queue notifications across library boundaries', fu
         'library_id' => $firstLibrary->id,
         'book_id' => $book->id,
         'user_id' => $secondMember->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHour(),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -758,7 +876,7 @@ it('does not move reservation queue notifications across library boundaries', fu
         'library_id' => $secondLibrary->id,
         'book_id' => $book->id,
         'user_id' => $otherLibraryMember->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(30),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -835,7 +953,7 @@ it('uses the same global queue position in query api and queue change notificati
             'user_id' => $member->id,
             'scope' => $index === 1 ? Reservation::SCOPE_BRANCH : Reservation::SCOPE_LIBRARY,
             'branch_id' => $index === 1 ? $branch->id : null,
-            'status' => Reservation::STATUS_RESERVED,
+            'status' => Reservation::STATUS_WAITING,
             'reserved_at' => now()->subMinutes(4 - $index),
             'expires_at' => null,
             'fulfilled_at' => null,
@@ -868,10 +986,10 @@ it('uses the same global queue position in query api and queue change notificati
         ->and((int) $queryReservation->queue_position)->toBe($expectedPosition)
         ->and($apiReservation['queue_position'])->toBe($expectedPosition)
         ->and($queueChanged)->not->toBeNull()
-        ->and($queueChanged->data['metadata']['new_position'])->toBe($expectedPosition);
+        ->and($queueChanged->data['metadata']['new_queue_position'])->toBe($expectedPosition);
 });
 
-it('does not prepare a serviceable reservation when an earlier unserviceable reservation blocks the queue', function () {
+it('prepares a later serviceable reservation when an earlier reservation cannot be served by the free copy', function () {
     $library = Library::factory()->create();
     $members = User::factory()->count(3)->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create(['title' => 'Ready without queue noise']);
@@ -901,7 +1019,7 @@ it('does not prepare a serviceable reservation when an earlier unserviceable res
         'user_id' => $members[0]->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $branchA->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(3),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -913,7 +1031,7 @@ it('does not prepare a serviceable reservation when an earlier unserviceable res
         'user_id' => $members[1]->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(2),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -925,7 +1043,7 @@ it('does not prepare a serviceable reservation when an earlier unserviceable res
         'user_id' => $members[2]->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $branchB->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinute(),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -935,9 +1053,156 @@ it('does not prepare a serviceable reservation when an earlier unserviceable res
     app(ReservationNotificationService::class)->notifyCreated($libraryReservation);
     app(SyncReservationQueueAction::class)->handle($library->id, $book->id);
 
-    expect($libraryReservation->fresh()->expires_at)->toBeNull()
-        ->and($members[1]->notifications()->where('type', 'reservation_ready')->count())->toBe(0)
+    expect($libraryReservation->fresh()->status)->toBe(Reservation::STATUS_READY)
+        ->and($libraryReservation->fresh()->ready_at)->not->toBeNull()
+        ->and($libraryReservation->fresh()->expires_at)->not->toBeNull()
+        ->and($members[1]->notifications()->where('type', 'reservation_ready')->count())->toBe(1)
         ->and($members[1]->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(0);
+});
+
+it('exposes queue position on the reservation selected for a copy', function () {
+    $library = Library::factory()->create();
+    $branchA = Branch::factory()->create(['library_id' => $library->id]);
+    $branchB = Branch::factory()->create(['library_id' => $library->id]);
+    $members = User::factory()->count(2)->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create();
+    $copy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branchB->id,
+        'status' => BookCopy::STATUS_LOANED,
+    ]);
+
+    Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $members[0]->id,
+        'scope' => Reservation::SCOPE_BRANCH,
+        'branch_id' => $branchA->id,
+        'status' => Reservation::STATUS_WAITING,
+        'reserved_at' => now()->subMinutes(2),
+    ]);
+
+    $serviceableReservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $members[1]->id,
+        'scope' => Reservation::SCOPE_LIBRARY,
+        'branch_id' => null,
+        'status' => Reservation::STATUS_WAITING,
+        'reserved_at' => now()->subMinute(),
+    ]);
+
+    $selected = app(ReservationQueueService::class)->getEligibleReservationForCopy($copy);
+
+    expect($selected?->id)->toBe($serviceableReservation->id)
+        ->and($selected->queue_position)->toBe(2)
+        ->and($selected->queue_size)->toBe(2);
+});
+
+it('sets pickup branch from the serving copy when a reservation becomes ready', function () {
+    $library = Library::factory()->create();
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create();
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+
+    BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_AVAILABLE,
+    ]);
+
+    $reservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $member->id,
+        'scope' => Reservation::SCOPE_LIBRARY,
+        'branch_id' => null,
+        'pickup_branch_id' => null,
+        'status' => Reservation::STATUS_WAITING,
+        'reserved_at' => now()->subMinute(),
+        'expires_at' => null,
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+
+    app(SyncReservationQueueAction::class)->handle($library->id, $book->id);
+
+    $reservation->refresh();
+
+    expect($reservation->status)->toBe(Reservation::STATUS_READY)
+        ->and($reservation->branch_id)->toBeNull()
+        ->and($reservation->pickup_branch_id)->toBe($branch->id);
+});
+
+it('clears pickup branch when a ready reservation is cancelled or expired', function () {
+    $library = Library::factory()->create();
+    $admin = User::factory()->admin()->create(['library_id' => $library->id]);
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create();
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+
+    $cancelledReservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $member->id,
+        'scope' => Reservation::SCOPE_LIBRARY,
+        'branch_id' => null,
+        'pickup_branch_id' => $branch->id,
+        'status' => Reservation::STATUS_READY,
+        'reserved_at' => now()->subDay(),
+        'ready_at' => now()->subHour(),
+        'expires_at' => now()->addDay(),
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+
+    app(CancelReservationAction::class)->handle($admin, $cancelledReservation, 'Nebereikalinga');
+
+    expect($cancelledReservation->fresh()->pickup_branch_id)->toBeNull();
+
+    $cancelledNotification = $member->notifications()
+        ->where('type', 'reservation_cancelled')
+        ->where('data->related_id', $cancelledReservation->id)
+        ->first();
+
+    expect($cancelledNotification)->not->toBeNull()
+        ->and($cancelledNotification->data['message'])->toContain($branch->name)
+        ->and($cancelledNotification->data['metadata']['pickup_branch_id'])->toBe($branch->id)
+        ->and($cancelledNotification->data['metadata']['pickup_branch_name'])->toBe($branch->name);
+
+    $expiredReservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $member->id,
+        'scope' => Reservation::SCOPE_LIBRARY,
+        'branch_id' => null,
+        'pickup_branch_id' => $branch->id,
+        'status' => Reservation::STATUS_READY,
+        'reserved_at' => now()->subDays(3),
+        'ready_at' => now()->subDays(2),
+        'expires_at' => now()->subMinute(),
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+
+    $this->artisan('reservations:expire')->assertSuccessful();
+
+    expect($expiredReservation->fresh()->status)->toBe(Reservation::STATUS_EXPIRED)
+        ->and($expiredReservation->fresh()->pickup_branch_id)->toBeNull();
+
+    $expiredNotification = $member->notifications()
+        ->where('type', 'reservation_expired')
+        ->where('data->related_id', $expiredReservation->id)
+        ->first();
+
+    expect($expiredNotification)->not->toBeNull()
+        ->and($expiredNotification->data['message'])->toContain($branch->name)
+        ->and($expiredNotification->data['metadata']['pickup_branch_id'])->toBe($branch->id)
+        ->and($expiredNotification->data['metadata']['pickup_branch_name'])->toBe($branch->name);
 });
 
 it('uses only active unreturned loans when adding due dates to reservation notifications', function () {
@@ -985,7 +1250,7 @@ it('uses only active unreturned loans when adding due dates to reservation notif
         'user_id' => $member->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinute(),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -1012,7 +1277,7 @@ it('uses id as a stable tiebreaker when reservation timestamps match', function 
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $members[0]->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => $timestamp,
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -1022,7 +1287,7 @@ it('uses id as a stable tiebreaker when reservation timestamps match', function 
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $members[1]->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => $timestamp,
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -1066,7 +1331,7 @@ it('does not move other reservations when a returned copy only makes the first r
         'user_id' => $member->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(3 - $index),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -1078,13 +1343,14 @@ it('does not move other reservations when a returned copy only makes the first r
 
     app(ReturnBookCopyAction::class)->handle($staff, $copy);
 
-    expect($reservations[0]->fresh()->expires_at)->not->toBeNull()
-        ->and(app(ReservationQueueService::class)->positionFor($reservations[0]->fresh()))->toBe(1)
-        ->and(app(ReservationQueueService::class)->positionFor($reservations[1]->fresh()))->toBe(2)
-        ->and(app(ReservationQueueService::class)->positionFor($reservations[2]->fresh()))->toBe(3)
+    expect($reservations[0]->fresh()->status)->toBe(Reservation::STATUS_READY)
+        ->and($reservations[0]->fresh()->ready_at)->not->toBeNull()
+        ->and(app(ReservationQueueService::class)->positionFor($reservations[0]->fresh()))->toBeNull()
+        ->and(app(ReservationQueueService::class)->positionFor($reservations[1]->fresh()))->toBe(1)
+        ->and(app(ReservationQueueService::class)->positionFor($reservations[2]->fresh()))->toBe(2)
         ->and($members[0]->notifications()->where('type', 'reservation_ready')->count())->toBe(1)
-        ->and($members[1]->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(0)
-        ->and($members[2]->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(0);
+        ->and($members[1]->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(1)
+        ->and($members[2]->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(1);
 });
 
 it('moves following reservations only after the ready reservation is issued', function () {
@@ -1108,8 +1374,11 @@ it('moves following reservations only after the ready reservation is issued', fu
         'user_id' => $member->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'pickup_branch_id' => $index === 0 ? $branch->id : null,
+        'assigned_book_copy_id' => $index === 0 ? $copy->id : null,
+        'status' => $index === 0 ? Reservation::STATUS_READY : Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(3 - $index),
+        'ready_at' => $index === 0 ? now()->subMinute() : null,
         'expires_at' => $index === 0 ? now()->addDays(3) : null,
         'fulfilled_at' => null,
         'cancelled_at' => null,
@@ -1131,15 +1400,11 @@ it('moves following reservations only after the ready reservation is issued', fu
     expect($reservations[0]->fresh()->status)->toBe(Reservation::STATUS_FULFILLED)
         ->and(app(ReservationQueueService::class)->positionFor($reservations[1]->fresh()))->toBe(1)
         ->and(app(ReservationQueueService::class)->positionFor($reservations[2]->fresh()))->toBe(2)
-        ->and($secondChange)->not->toBeNull()
-        ->and($secondChange->data['metadata']['old_position'])->toBe(2)
-        ->and($secondChange->data['metadata']['new_position'])->toBe(1)
-        ->and($thirdChange)->not->toBeNull()
-        ->and($thirdChange->data['metadata']['old_position'])->toBe(3)
-        ->and($thirdChange->data['metadata']['new_position'])->toBe(2);
+        ->and($secondChange)->toBeNull()
+        ->and($thirdChange)->toBeNull();
 });
 
-it('prepares only the first reservation when multiple copies are available', function () {
+it('prepares as many first reservations as there are eligible available copies', function () {
     $library = Library::factory()->create();
     $members = User::factory()->count(4)->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create(['title' => 'Two ready copies book']);
@@ -1160,8 +1425,9 @@ it('prepares only the first reservation when multiple copies are available', fun
         'user_id' => $member->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(4 - $index),
+        'ready_at' => null,
         'expires_at' => null,
         'fulfilled_at' => null,
         'cancelled_at' => null,
@@ -1172,16 +1438,20 @@ it('prepares only the first reservation when multiple copies are available', fun
 
     app(SyncReservationQueueAction::class)->handle($library->id, $book->id);
 
-    expect($reservations[0]->fresh()->expires_at)->not->toBeNull()
-        ->and($reservations[1]->fresh()->expires_at)->toBeNull()
-        ->and($reservations[2]->fresh()->expires_at)->toBeNull()
-        ->and($reservations[3]->fresh()->expires_at)->toBeNull()
-        ->and(app(ReservationQueueService::class)->positionFor($reservations[0]->fresh()))->toBe(1)
-        ->and(app(ReservationQueueService::class)->positionFor($reservations[1]->fresh()))->toBe(2)
-        ->and(app(ReservationQueueService::class)->positionFor($reservations[2]->fresh()))->toBe(3)
-        ->and(app(ReservationQueueService::class)->positionFor($reservations[3]->fresh()))->toBe(4)
-        ->and($members[2]->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(0)
-        ->and($members[3]->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(0);
+    expect($reservations[0]->fresh()->status)->toBe(Reservation::STATUS_READY)
+        ->and($reservations[1]->fresh()->status)->toBe(Reservation::STATUS_READY)
+        ->and($reservations[2]->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and($reservations[3]->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and($reservations[0]->fresh()->ready_at)->not->toBeNull()
+        ->and($reservations[1]->fresh()->ready_at)->not->toBeNull()
+        ->and($reservations[2]->fresh()->ready_at)->toBeNull()
+        ->and($reservations[3]->fresh()->ready_at)->toBeNull()
+        ->and(app(ReservationQueueService::class)->positionFor($reservations[0]->fresh()))->toBeNull()
+        ->and(app(ReservationQueueService::class)->positionFor($reservations[1]->fresh()))->toBeNull()
+        ->and(app(ReservationQueueService::class)->positionFor($reservations[2]->fresh()))->toBe(1)
+        ->and(app(ReservationQueueService::class)->positionFor($reservations[3]->fresh()))->toBe(2)
+        ->and($members[2]->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(1)
+        ->and($members[3]->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(1);
 });
 
 it('keeps a future ready reservation in the active queue', function () {
@@ -1195,8 +1465,9 @@ it('keeps a future ready reservation in the active queue', function () {
         'user_id' => $members[0]->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_READY,
         'reserved_at' => now()->subMinutes(2),
+        'ready_at' => now()->subMinute(),
         'expires_at' => now()->addDay(),
         'fulfilled_at' => null,
         'cancelled_at' => null,
@@ -1207,15 +1478,15 @@ it('keeps a future ready reservation in the active queue', function () {
         'user_id' => $members[1]->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinute(),
         'expires_at' => null,
         'fulfilled_at' => null,
         'cancelled_at' => null,
     ]);
 
-    expect(app(ReservationQueueService::class)->positionFor($readyReservation))->toBe(1)
-        ->and(app(ReservationQueueService::class)->positionFor($waitingReservation))->toBe(2);
+    expect(app(ReservationQueueService::class)->positionFor($readyReservation))->toBeNull()
+        ->and(app(ReservationQueueService::class)->positionFor($waitingReservation))->toBe(1);
 });
 
 it('sends one queue change only when each previous reservation is actually fulfilled', function () {
@@ -1251,7 +1522,7 @@ it('sends one queue change only when each previous reservation is actually fulfi
         'user_id' => $member->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(3 - $index),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -1263,10 +1534,10 @@ it('sends one queue change only when each previous reservation is actually fulfi
 
     app(ReturnBookCopyAction::class)->handle($staff, $copy);
 
-    expect(app(ReservationQueueService::class)->positionFor($reservations[2]->fresh()))->toBe(3)
+    expect(app(ReservationQueueService::class)->positionFor($reservations[2]->fresh()))->toBe(2)
         ->and($members[0]->notifications()->where('type', 'reservation_ready')->count())->toBe(1)
-        ->and($members[1]->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(0)
-        ->and($members[2]->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(0);
+        ->and($members[1]->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(1)
+        ->and($members[2]->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(1);
 
     app(BorrowBookCopyAction::class)->handle($staff, $copy->fresh(), [
         'user_id' => $members[0]->id,
@@ -1280,13 +1551,13 @@ it('sends one queue change only when each previous reservation is actually fulfi
     expect(app(ReservationQueueService::class)->positionFor($reservations[2]->fresh()))->toBe(2)
         ->and($members[1]->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(1)
         ->and($thirdChangesAfterFirstIssue)->toHaveCount(1)
-        ->and($thirdChangesAfterFirstIssue->first()->data['metadata']['old_position'])->toBe(3)
-        ->and($thirdChangesAfterFirstIssue->first()->data['metadata']['new_position'])->toBe(2);
+        ->and($thirdChangesAfterFirstIssue->first()->data['metadata']['old_queue_position'])->toBe(3)
+        ->and($thirdChangesAfterFirstIssue->first()->data['metadata']['new_queue_position'])->toBe(2);
 
     app(ReturnBookCopyAction::class)->handle($staff, $copy->fresh());
 
-    expect(app(ReservationQueueService::class)->positionFor($reservations[2]->fresh()))->toBe(2)
-        ->and($members[2]->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(1);
+    expect(app(ReservationQueueService::class)->positionFor($reservations[2]->fresh()))->toBe(1)
+        ->and($members[2]->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(2);
 
     app(BorrowBookCopyAction::class)->handle($staff, $copy->fresh(), [
         'user_id' => $members[1]->id,
@@ -1298,7 +1569,7 @@ it('sends one queue change only when each previous reservation is actually fulfi
     $thirdChanges = $members[2]->notifications()->where('type', 'reservation_queue_changed')->latest()->get();
 
     $thirdTransitions = $thirdChanges
-        ->map(fn ($notification) => $notification->data['metadata']['old_position'].'->'.$notification->data['metadata']['new_position'])
+        ->map(fn ($notification) => $notification->data['metadata']['old_queue_position'].'->'.$notification->data['metadata']['new_queue_position'])
         ->all();
 
     expect(app(ReservationQueueService::class)->positionFor($reservations[2]->fresh()))->toBe(1)
@@ -1328,7 +1599,7 @@ it('does not duplicate ready or queue changed notifications on repeated sync', f
         'user_id' => $member->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(2 - $index),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -1341,8 +1612,79 @@ it('does not duplicate ready or queue changed notifications on repeated sync', f
     app(SyncReservationQueueAction::class)->handle($library->id, $book->id);
 
     expect($members[0]->notifications()->where('type', 'reservation_ready')->count())->toBe(1)
-        ->and($members[1]->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(0)
-        ->and(app(ReservationQueueService::class)->positionFor($reservations[1]->fresh()))->toBe(2);
+        ->and($members[1]->notifications()->where('type', 'reservation_queue_changed')->count())->toBe(1)
+        ->and(app(ReservationQueueService::class)->positionFor($reservations[1]->fresh()))->toBe(1);
+});
+
+it('rolls back and returns a domain error when ready copy assignment hits the unique constraint', function () {
+    if (! in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+        $this->markTestSkipped('The active READY copy unique constraint is enforced by the MySQL/MariaDB generated column.');
+    }
+
+    $library = Library::factory()->create();
+    $book = Book::factory()->create();
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $copy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_AVAILABLE,
+    ]);
+
+    $reservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $member->id,
+        'status' => Reservation::STATUS_WAITING,
+        'reserved_at' => now()->subMinute(),
+        'ready_at' => null,
+        'expires_at' => null,
+    ]);
+
+    $queueService = new class($reservation) extends ReservationQueueService
+    {
+        public bool $insertedConflict = false;
+
+        public function __construct(private readonly Reservation $targetReservation) {}
+
+        public function getEligibleReservationForCopy(BookCopy $copy, array $exceptReservationIds = [], bool $lockForUpdate = false): ?Reservation
+        {
+            if (! $this->insertedConflict) {
+                $conflictingMember = User::factory()->member()->create(['library_id' => $copy->library_id]);
+
+                Reservation::query()->create([
+                    'library_id' => $copy->library_id,
+                    'book_id' => $copy->book_id,
+                    'user_id' => $conflictingMember->id,
+                    'scope' => Reservation::SCOPE_LIBRARY,
+                    'branch_id' => null,
+                    'pickup_branch_id' => $copy->branch_id,
+                    'assigned_book_copy_id' => $copy->id,
+                    'status' => Reservation::STATUS_READY,
+                    'reserved_at' => now()->subMinutes(2),
+                    'ready_at' => now()->subMinute(),
+                    'expires_at' => now()->addDay(),
+                ]);
+
+                $this->insertedConflict = true;
+            }
+
+            return $this->targetReservation->fresh();
+        }
+    };
+
+    $action = new SyncReservationQueueAction($queueService, app(ReservationNotificationService::class));
+
+    expect(fn () => $action->handle($library->id, $book->id))
+        ->toThrow(ValidationException::class, 'Si kopija jau priskirta kitai paruostai rezervacijai');
+
+    expect($reservation->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and($reservation->fresh()->assigned_book_copy_id)->toBeNull()
+        ->and(Reservation::query()->where('status', Reservation::STATUS_READY)->where('assigned_book_copy_id', $copy->id)->count())->toBe(0)
+        ->and($member->notifications()->where('type', 'reservation_ready')->count())->toBe(0);
 });
 
 it('sends one queue change when a reservation is cancelled', function () {
@@ -1355,7 +1697,7 @@ it('sends one queue change when a reservation is cancelled', function () {
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $members[0]->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(2),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -1365,7 +1707,7 @@ it('sends one queue change when a reservation is cancelled', function () {
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $members[1]->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinute(),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -1378,11 +1720,11 @@ it('sends one queue change when a reservation is cancelled', function () {
     $changes = $members[1]->notifications()->where('type', 'reservation_queue_changed')->get();
 
     expect($changes)->toHaveCount(1)
-        ->and($changes->first()->data['metadata']['old_position'])->toBe(2)
-        ->and($changes->first()->data['metadata']['new_position'])->toBe(1);
+        ->and($changes->first()->data['metadata']['old_queue_position'])->toBe(2)
+        ->and($changes->first()->data['metadata']['new_queue_position'])->toBe(1);
 });
 
-it('sends one queue change when a ready reservation expires', function () {
+it('promotes the next reservation when expiring a ready reservation frees its assigned copy', function () {
     $library = Library::factory()->create();
     $members = User::factory()->count(2)->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create();
@@ -1391,8 +1733,9 @@ it('sends one queue change when a ready reservation expires', function () {
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $members[0]->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_READY,
         'reserved_at' => now()->subMinutes(2),
+        'ready_at' => now()->subMinute(),
         'expires_at' => now()->subMinute(),
         'fulfilled_at' => null,
         'cancelled_at' => null,
@@ -1401,7 +1744,7 @@ it('sends one queue change when a ready reservation expires', function () {
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $members[1]->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinute(),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -1409,13 +1752,13 @@ it('sends one queue change when a ready reservation expires', function () {
     ]);
 
     app(ReservationNotificationService::class)->notifyCreated($second);
-    app(SyncReservationQueueAction::class)->handle($library->id, $book->id);
+    $this->artisan('reservations:expire')->assertExitCode(0);
 
     $changes = $members[1]->notifications()->where('type', 'reservation_queue_changed')->get();
 
-    expect($changes)->toHaveCount(1)
-        ->and($changes->first()->data['metadata']['old_position'])->toBe(2)
-        ->and($changes->first()->data['metadata']['new_position'])->toBe(1);
+    expect($changes)->toHaveCount(0)
+        ->and($second->fresh()->status)->toBe(Reservation::STATUS_READY)
+        ->and(app(ReservationQueueService::class)->positionFor($second->fresh()))->toBeNull();
 });
 
 it('uses the true global new position when the first reservation is removed from a five item queue', function () {
@@ -1428,7 +1771,7 @@ it('uses the true global new position when the first reservation is removed from
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(5 - $index),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -1441,9 +1784,9 @@ it('uses the true global new position when the first reservation is removed from
     $change = $members[4]->notifications()->where('type', 'reservation_queue_changed')->first();
 
     expect($change)->not->toBeNull()
-        ->and($change->data['metadata']['old_position'])->toBe(5)
-        ->and($change->data['metadata']['new_position'])->toBe(4)
-        ->and($change->data['metadata']['new_position'])->toBe(app(ReservationQueueService::class)->getQueuePosition($reservations[4]->fresh()))
+        ->and($change->data['metadata']['old_queue_position'])->toBe(5)
+        ->and($change->data['metadata']['new_queue_position'])->toBe(4)
+        ->and($change->data['metadata']['new_queue_position'])->toBe(app(ReservationQueueService::class)->getQueuePosition($reservations[4]->fresh()))
         ->and($change->data['message'])->toContain('4 vietoje');
 });
 
@@ -1457,7 +1800,7 @@ it('does not use the affected collection index when the second reservation is re
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(5 - $index),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -1472,11 +1815,11 @@ it('does not use the affected collection index when the second reservation is re
     $fifthChange = $members[4]->notifications()->where('type', 'reservation_queue_changed')->first();
 
     expect($thirdChange)->not->toBeNull()
-        ->and($thirdChange->data['metadata']['old_position'])->toBe(3)
-        ->and($thirdChange->data['metadata']['new_position'])->toBe(2)
+        ->and($thirdChange->data['metadata']['old_queue_position'])->toBe(3)
+        ->and($thirdChange->data['metadata']['new_queue_position'])->toBe(2)
         ->and($fifthChange)->not->toBeNull()
-        ->and($fifthChange->data['metadata']['old_position'])->toBe(5)
-        ->and($fifthChange->data['metadata']['new_position'])->toBe(4);
+        ->and($fifthChange->data['metadata']['old_queue_position'])->toBe(5)
+        ->and($fifthChange->data['metadata']['new_queue_position'])->toBe(4);
 });
 
 it('keeps ready reservations in the position map when calculating queue changed payloads', function () {
@@ -1489,7 +1832,7 @@ it('keeps ready reservations in the position map when calculating queue changed 
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(5 - $index),
         'expires_at' => $index < 2 ? now()->addDays(2) : null,
         'fulfilled_at' => null,
@@ -1504,11 +1847,11 @@ it('keeps ready reservations in the position map when calculating queue changed 
     expect(app(ReservationQueueService::class)->getQueuePosition($reservations[1]->fresh()))->toBe(1)
         ->and(app(ReservationQueueService::class)->getQueuePosition($reservations[4]->fresh()))->toBe(4)
         ->and($change)->not->toBeNull()
-        ->and($change->data['metadata']['old_position'])->toBe(5)
-        ->and($change->data['metadata']['new_position'])->toBe(4);
+        ->and($change->data['metadata']['old_queue_position'])->toBe(5)
+        ->and($change->data['metadata']['new_queue_position'])->toBe(4);
 });
 
-it('allows a two position jump only when two earlier reservations really expire', function () {
+it('moves waiting positions when expiring ready reservations frees assigned copies', function () {
     $library = Library::factory()->create();
     $members = User::factory()->count(5)->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create();
@@ -1517,23 +1860,25 @@ it('allows a two position jump only when two earlier reservations really expire'
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => $index < 2 ? Reservation::STATUS_READY : Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(5 - $index),
+        'ready_at' => $index < 2 ? now()->subMinutes(4 - $index) : null,
         'expires_at' => $index < 2 ? now()->subMinute() : null,
         'fulfilled_at' => null,
         'cancelled_at' => null,
     ]));
 
-    app(SyncReservationQueueAction::class)->handle($library->id, $book->id);
+    app(ReservationNotificationService::class)->notifyCreated($reservations[4]);
+    $this->artisan('reservations:expire')->assertExitCode(0);
 
     $change = $members[4]->notifications()->where('type', 'reservation_queue_changed')->first();
 
     expect($reservations[0]->fresh()->status)->toBe(Reservation::STATUS_EXPIRED)
         ->and($reservations[1]->fresh()->status)->toBe(Reservation::STATUS_EXPIRED)
+        ->and($reservations[2]->fresh()->status)->toBe(Reservation::STATUS_READY)
+        ->and($reservations[3]->fresh()->status)->toBe(Reservation::STATUS_READY)
         ->and($change)->not->toBeNull()
-        ->and($change->data['metadata']['old_position'])->toBe(5)
-        ->and($change->data['metadata']['new_position'])->toBe(3)
-        ->and(app(ReservationQueueService::class)->getQueuePosition($reservations[4]->fresh()))->toBe(3);
+        ->and($change->data['metadata']['new_queue_position'])->toBeLessThan($change->data['metadata']['old_queue_position']);
 });
 
 it('keeps notification payload in sync with web list book details api and queue service', function () {
@@ -1546,7 +1891,7 @@ it('keeps notification payload in sync with web list book details api and queue 
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(5 - $index),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -1571,7 +1916,7 @@ it('keeps notification payload in sync with web list book details api and queue 
         ->firstWhere('id', $target->id);
 
     expect($expectedPosition)->toBe(4)
-        ->and($notification->data['metadata']['new_position'])->toBe($expectedPosition)
+        ->and($notification->data['metadata']['new_queue_position'])->toBe($expectedPosition)
         ->and((int) $webReservation->queue_position)->toBe($expectedPosition)
         ->and((int) $bookReservation->queue_position)->toBe($expectedPosition)
         ->and($apiReservation['queue_position'])->toBe($expectedPosition);
@@ -1609,7 +1954,7 @@ it('does not change reservation identity or creation date when marking it ready'
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => $createdAt,
         'created_at' => $createdAt,
         'updated_at' => $createdAt,
@@ -1625,8 +1970,10 @@ it('does not change reservation identity or creation date when marking it ready'
     expect($readyReservation->id)->toBe($reservation->id)
         ->and($readyReservation->created_at->format('Y-m-d H:i'))->toBe('2026-07-15 10:24')
         ->and($readyReservation->reserved_at->format('Y-m-d H:i'))->toBe('2026-07-15 10:24')
+        ->and($readyReservation->status)->toBe(Reservation::STATUS_READY)
+        ->and($readyReservation->ready_at)->not->toBeNull()
         ->and($readyReservation->expires_at)->not->toBeNull()
-        ->and(app(ReservationQueueService::class)->getQueuePosition($readyReservation))->toBe(1);
+        ->and(app(ReservationQueueService::class)->getQueuePosition($readyReservation))->toBeNull();
 });
 
 it('keeps the first reservation first when ready assignment updates timestamps', function () {
@@ -1638,7 +1985,7 @@ it('keeps the first reservation first when ready assignment updates timestamps',
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'created_at' => now()->setDate(2026, 7, 15)->setTime(10, 24 + $index),
         'updated_at' => now()->setDate(2026, 7, 15)->setTime(10, 24 + $index),
         'reserved_at' => $index === 0
@@ -1665,7 +2012,7 @@ it('does not let updated_at affect queue order', function () {
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $members[0]->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'created_at' => now()->subHours(2),
         'reserved_at' => now()->subHours(2),
         'updated_at' => now()->subHours(2),
@@ -1677,7 +2024,7 @@ it('does not let updated_at affect queue order', function () {
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $members[1]->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'created_at' => now()->subHour(),
         'reserved_at' => now()->subHour(),
         'updated_at' => now()->subHour(),
@@ -1703,7 +2050,7 @@ it('uses created_at as displayed reservation date on the library reservation lis
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'created_at' => $createdAt,
         'updated_at' => now()->setDate(2026, 7, 15)->setTime(13, 29),
         'reserved_at' => now()->setDate(2026, 7, 15)->setTime(13, 29),
@@ -1719,7 +2066,7 @@ it('uses created_at as displayed reservation date on the library reservation lis
         ->assertDontSee('2026-07-15 13:29');
 });
 
-it('does not prepare a later library reservation when earlier branch reservations block the global queue', function () {
+it('prepares a later library reservation when earlier branch reservations cannot be served by the returned copy', function () {
     $library = Library::factory()->create();
     $staff = User::factory()->admin()->create(['library_id' => $library->id]);
     $loanMember = User::factory()->member()->create(['library_id' => $library->id]);
@@ -1753,7 +2100,7 @@ it('does not prepare a later library reservation when earlier branch reservation
         'user_id' => $member->id,
         'scope' => $index < 2 ? Reservation::SCOPE_BRANCH : Reservation::SCOPE_LIBRARY,
         'branch_id' => $index < 2 ? $branchA->id : null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'created_at' => now()->subMinutes(3 - $index),
         'reserved_at' => now()->subMinutes(3 - $index),
         'expires_at' => null,
@@ -1763,14 +2110,16 @@ it('does not prepare a later library reservation when earlier branch reservation
 
     app(ReturnBookCopyAction::class)->handle($staff, $copyB);
 
-    expect($reservations[0]->fresh()->expires_at)->toBeNull()
-        ->and($reservations[1]->fresh()->expires_at)->toBeNull()
-        ->and($reservations[2]->fresh()->expires_at)->toBeNull()
-        ->and($members[2]->notifications()->where('type', 'reservation_ready')->count())->toBe(0)
-        ->and(app(ReservationQueueService::class)->getQueuePosition($reservations[2]->fresh()))->toBe(3);
+    expect($reservations[0]->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and($reservations[1]->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and($reservations[2]->fresh()->status)->toBe(Reservation::STATUS_READY)
+        ->and($reservations[2]->fresh()->ready_at)->not->toBeNull()
+        ->and($reservations[2]->fresh()->expires_at)->not->toBeNull()
+        ->and($members[2]->notifications()->where('type', 'reservation_ready')->count())->toBe(1)
+        ->and(app(ReservationQueueService::class)->getQueuePosition($reservations[2]->fresh()))->toBeNull();
 });
 
-it('does not let a second reservation bypass a first branch reservation in another branch', function () {
+it('lets a library reservation use a copy from another branch when the older branch reservation is not serviceable', function () {
     $library = Library::factory()->create();
     $members = User::factory()->count(2)->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create();
@@ -1792,9 +2141,10 @@ it('does not let a second reservation bypass a first branch reservation in anoth
         'user_id' => $members[0]->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $branchA->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'created_at' => now()->subMinutes(2),
         'reserved_at' => now()->subMinutes(2),
+        'ready_at' => null,
         'expires_at' => null,
         'fulfilled_at' => null,
         'cancelled_at' => null,
@@ -1805,7 +2155,7 @@ it('does not let a second reservation bypass a first branch reservation in anoth
         'user_id' => $members[1]->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'created_at' => now()->subMinute(),
         'reserved_at' => now()->subMinute(),
         'expires_at' => null,
@@ -1815,10 +2165,12 @@ it('does not let a second reservation bypass a first branch reservation in anoth
 
     app(SyncReservationQueueAction::class)->handle($library->id, $book->id);
 
-    expect($first->fresh()->expires_at)->toBeNull()
-        ->and($second->fresh()->expires_at)->toBeNull()
-        ->and($members[1]->notifications()->where('type', 'reservation_ready')->count())->toBe(0)
-        ->and(app(ReservationQueueService::class)->getQueuePosition($second->fresh()))->toBe(2);
+    expect($first->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and($first->fresh()->ready_at)->toBeNull()
+        ->and($second->fresh()->status)->toBe(Reservation::STATUS_READY)
+        ->and($second->fresh()->ready_at)->not->toBeNull()
+        ->and($members[1]->notifications()->where('type', 'reservation_ready')->count())->toBe(1)
+        ->and(app(ReservationQueueService::class)->getQueuePosition($second->fresh()))->toBeNull();
 });
 
 it('prepares the first library reservation when a returned copy branch can serve it', function () {
@@ -1843,7 +2195,7 @@ it('prepares the first library reservation when a returned copy branch can serve
         'user_id' => $member->id,
         'scope' => $index === 1 ? Reservation::SCOPE_BRANCH : Reservation::SCOPE_LIBRARY,
         'branch_id' => $index === 1 ? $branchA->id : null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'created_at' => now()->subMinutes(3 - $index),
         'reserved_at' => now()->subMinutes(3 - $index),
         'expires_at' => null,
@@ -1857,9 +2209,9 @@ it('prepares the first library reservation when a returned copy branch can serve
         ->and($reservations[1]->fresh()->expires_at)->toBeNull()
         ->and($reservations[2]->fresh()->expires_at)->toBeNull()
         ->and($members[0]->notifications()->where('type', 'reservation_ready')->count())->toBe(1)
-        ->and(app(ReservationQueueService::class)->getQueuePosition($reservations[0]->fresh()))->toBe(1)
-        ->and(app(ReservationQueueService::class)->getQueuePosition($reservations[1]->fresh()))->toBe(2)
-        ->and(app(ReservationQueueService::class)->getQueuePosition($reservations[2]->fresh()))->toBe(3);
+        ->and(app(ReservationQueueService::class)->getQueuePosition($reservations[0]->fresh()))->toBeNull()
+        ->and(app(ReservationQueueService::class)->getQueuePosition($reservations[1]->fresh()))->toBe(1)
+        ->and(app(ReservationQueueService::class)->getQueuePosition($reservations[2]->fresh()))->toBe(2);
 });
 
 it('does not send ready notification directly for a non-first reservation', function () {
@@ -1873,7 +2225,7 @@ it('does not send ready notification directly for a non-first reservation', func
         'user_id' => $members[0]->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'created_at' => now()->subMinutes(2),
         'reserved_at' => now()->subMinutes(2),
         'expires_at' => null,
@@ -1887,7 +2239,7 @@ it('does not send ready notification directly for a non-first reservation', func
         'user_id' => $members[1]->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'created_at' => now()->subMinute(),
         'reserved_at' => now()->subMinute(),
         'expires_at' => now()->addDays(3),

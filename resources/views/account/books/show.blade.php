@@ -162,10 +162,41 @@
                                             {{ $memberReservation->isCurrent() ? 'Paruošta atsiimti' : 'Laukianti eilėje' }}
                                         </div>
                                     </div>
+                                    @if($memberReservation->isPending())
+                                        <div class="rounded-lg bg-zinc-50 p-3 ring-1 ring-zinc-200 dark:bg-zinc-950/50 dark:ring-zinc-800">
+                                            <div class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Vieta eilėje</div>
+                                            <div class="mt-1 text-sm font-medium text-zinc-950 dark:text-white">
+                                                {{ $memberReservation->queue_position ?: '-' }}@if($memberReservation->queue_size) iš {{ $memberReservation->queue_size }}@endif
+                                            </div>
+                                        </div>
+                                    @endif
                                     <div class="rounded-lg bg-zinc-50 p-3 ring-1 ring-zinc-200 dark:bg-zinc-950/50 dark:ring-zinc-800">
-                                        <div class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Galioja iki</div>
-                                        <div class="mt-1 text-sm font-medium text-zinc-950 dark:text-white">{{ $memberReservation->expires_at?->format('Y-m-d H:i') ?: 'Terminas dar nepriskirtas' }}</div>
+                                        <div class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ $memberReservation->isReady() ? 'Atsiimti iki' : 'Galioja iki' }}</div>
+                                        <div class="mt-1 text-sm font-medium text-zinc-950 dark:text-white">{{ $memberReservation->isReady() ? ($memberReservation->expires_at?->format('Y-m-d H:i') ?: '-') : 'Terminas dar nepriskirtas' }}</div>
                                     </div>
+                                    @if($memberReservation->isReady())
+                                        <div class="rounded-lg bg-zinc-50 p-3 ring-1 ring-zinc-200 dark:bg-zinc-950/50 dark:ring-zinc-800">
+                                            <div class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Atsiėmimo filialas</div>
+                                            <div class="mt-1 text-sm font-medium text-zinc-950 dark:text-white">{{ $memberReservation->pickupBranch?->name ?: '-' }}</div>
+                                        </div>
+                                        <div class="rounded-lg bg-zinc-50 p-3 ring-1 ring-zinc-200 dark:bg-zinc-950/50 dark:ring-zinc-800">
+                                            <div class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Paruošta nuo</div>
+                                            <div class="mt-1 text-sm font-medium text-zinc-950 dark:text-white">{{ $memberReservation->ready_at?->format('Y-m-d H:i') ?: '-' }}</div>
+                                        </div>
+                                    @else
+                                        <div class="rounded-lg bg-zinc-50 p-3 ring-1 ring-zinc-200 dark:bg-zinc-950/50 dark:ring-zinc-800">
+                                            <div class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Rezervacijos apimtis</div>
+                                            <div class="mt-1 text-sm font-medium text-zinc-950 dark:text-white">
+                                                {{ $memberReservation->scope === \App\Models\Reservation::SCOPE_BRANCH ? 'Konkretus filialas' : 'Visa biblioteka' }}
+                                            </div>
+                                        </div>
+                                        @if($memberReservation->scope === \App\Models\Reservation::SCOPE_BRANCH)
+                                            <div class="rounded-lg bg-zinc-50 p-3 ring-1 ring-zinc-200 dark:bg-zinc-950/50 dark:ring-zinc-800">
+                                                <div class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Pasirinktas filialas</div>
+                                                <div class="mt-1 text-sm font-medium text-zinc-950 dark:text-white">{{ $memberReservation->branch?->name ?: '-' }}</div>
+                                            </div>
+                                        @endif
+                                    @endif
                                     <livewire:reservations.cancel-reservation-form :reservation="$memberReservation" :key="'member-book-reservation-'.$memberReservation->id" />
                                 </div>
                             </section>

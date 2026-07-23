@@ -363,6 +363,37 @@ class User extends Authenticatable
             && (int) $reservation->branch_id === (int) $branchId;
     }
 
+    public function canCancelReservation(Reservation $reservation): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        if (! $this->belongsToLibrary($reservation->library_id)) {
+            return false;
+        }
+
+        if ($this->role === self::ROLE_MEMBER) {
+            return (int) $reservation->user_id === (int) $this->id;
+        }
+
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        if ($this->role !== self::ROLE_STAFF) {
+            return false;
+        }
+
+        if (($reservation->scope ?: Reservation::SCOPE_LIBRARY) !== Reservation::SCOPE_BRANCH) {
+            return true;
+        }
+
+        $branchId = $this->assignedBranchId($reservation->library_id);
+
+        return $branchId !== null && (int) $reservation->branch_id === (int) $branchId;
+    }
+
     public function libraryRole(int|string|null $libraryId): ?string
     {
         if (empty($libraryId)) {

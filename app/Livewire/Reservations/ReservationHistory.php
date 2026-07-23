@@ -152,7 +152,10 @@ class ReservationHistory extends Component
             ->when($actor->role === User::ROLE_STAFF, function ($query) use ($actor) {
                 $this->scopeReservationsToStaffBranch($query, $actor);
             })
-            ->with('user:id,name,email,membership_number')
+            ->with([
+                'pickupBranch:id,name',
+                'user:id,name,email,membership_number',
+            ])
             ->get()
             ->sort(function (Reservation $left, Reservation $right) {
                 return $this->compareReservations($left, $right);
@@ -193,14 +196,18 @@ class ReservationHistory extends Component
 
     private function reservationRank(Reservation $reservation): int
     {
-        if ($reservation->isPending()) {
+        if ($reservation->isReady()) {
             return 0;
         }
 
+        if ($reservation->isPending()) {
+            return 1;
+        }
+
         return match ($reservation->status) {
-            Reservation::STATUS_CANCELLED => 1,
-            Reservation::STATUS_EXPIRED => 2,
-            Reservation::STATUS_FULFILLED => 3,
+            Reservation::STATUS_CANCELLED => 2,
+            Reservation::STATUS_EXPIRED => 3,
+            Reservation::STATUS_FULFILLED => 4,
             default => 4,
         };
     }
@@ -221,10 +228,21 @@ class ReservationHistory extends Component
         }
 
         $query = $bookCopy
-            ? app(ReservationQueueService::class)
-                ->serviceablePendingReservationsQuery($bookCopy->library_id, $bookCopy->book_id, (int) $bookCopy->branch_id)
+            ? null
             : Reservation::query()
                 ->where('book_id', $this->bookId);
+
+        if ($bookCopy) {
+            $reservation = app(ReservationQueueService::class)->getEligibleReservationForCopy($bookCopy);
+
+            if (! $reservation) {
+                return null;
+            }
+
+            $reservation->loadMissing('user:id,name,email,membership_number');
+
+            return $reservation;
+        }
 
         return $query
             ->when(! $actor->isSuperAdmin(), function ($query) use ($actor) {

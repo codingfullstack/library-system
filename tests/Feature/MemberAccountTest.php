@@ -39,9 +39,17 @@ it('shows member dashboard with own summary', function () {
         'due_at' => now()->addDays(7),
     ]);
 
+    $otherCopy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_LOANED,
+    ]);
+
     Loan::factory()->create([
         'library_id' => $library->id,
-        'book_copy_id' => $copy->id,
+        'book_copy_id' => $otherCopy->id,
         'user_id' => $otherMember->id,
         'status' => 'vėluoja',
         'returned_at' => null,
@@ -142,7 +150,7 @@ it('shows member book page without copy management details', function () {
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHour(),
         'expires_at' => now()->addDays(3),
         'fulfilled_at' => null,
@@ -210,8 +218,3 @@ it('shows books from all member libraries with library information', function ()
         ->assertDontSee('Svetima knyga')
         ->assertDontSee('Svetima biblioteka');
 });
-
-
-
-
-

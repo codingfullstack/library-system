@@ -1,5 +1,5 @@
 <div class="inline-block">
-    @if(! $reservation->isPending())
+    @if(! $reservation->isActive())
         <span class="inline-flex rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
             Atšaukta
         </span>

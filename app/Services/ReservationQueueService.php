@@ -22,6 +22,7 @@ class ReservationQueueService
             ->values()
             ->map(function (Reservation $reservation, int $index) {
                 $reservation->setAttribute('queue_position', $index + 1);
+                $reservation->setAttribute('queue_size', $this->queueSize($reservation->library_id, $reservation->book_id));
 
                 return $reservation;
             });
@@ -55,6 +56,11 @@ class ReservationQueueService
         return $position > 0 ? $position : null;
     }
 
+    public function queueSize(int $libraryId, int $bookId): int
+    {
+        return $this->pendingReservationsQuery($libraryId, $bookId)->count();
+    }
+
     /**
      * @return array<int, int>
      */
@@ -80,23 +86,15 @@ class ReservationQueueService
      */
     public function snapshotPositionsBeforeExpiringElapsed(int $libraryId, int $bookId): array
     {
-        return Reservation::query()
-            ->where('library_id', $libraryId)
-            ->where('book_id', $bookId)
-            ->where('status', Reservation::STATUS_RESERVED)
-            ->whereNull('fulfilled_at')
-            ->whereNull('cancelled_at')
-            ->orderBy('created_at')
-            ->orderBy('id')
-            ->get()
-            ->values()
-            ->mapWithKeys(fn (Reservation $reservation, int $index) => [
-                (int) $reservation->id => $index + 1,
-            ])
-            ->all();
+        return $this->snapshotPositions($libraryId, $bookId);
     }
 
     public function hasAvailableCopies(int $libraryId, int $bookId, string $scope = Reservation::SCOPE_LIBRARY, ?int $branchId = null): bool
+    {
+        return $this->availableCopiesQuery($libraryId, $bookId, $scope, $branchId)->exists();
+    }
+
+    public function availableCopiesQuery(int $libraryId, int $bookId, string $scope = Reservation::SCOPE_LIBRARY, ?int $branchId = null): Builder
     {
         return BookCopy::query()
             ->withoutGlobalScope('library')
@@ -104,7 +102,7 @@ class ReservationQueueService
             ->where('book_id', $bookId)
             ->when($scope === Reservation::SCOPE_BRANCH, fn (Builder $query) => $query->where('branch_id', $branchId))
             ->where('status', BookCopy::STATUS_AVAILABLE)
-            ->exists();
+            ->whereDoesntHave('activeReadyReservation');
     }
 
     public function activeLoanDueAt(int $libraryId, int $bookId, string $scope = Reservation::SCOPE_LIBRARY, ?int $branchId = null): ?string
@@ -132,36 +130,54 @@ class ReservationQueueService
             ->orderBy('id');
     }
 
-    public function serviceablePendingReservationsQuery(int $libraryId, int $bookId, int $branchId): Builder
+    public function activeReservationsQuery(int $libraryId, int $bookId): Builder
     {
-        return $this->pendingReservationsQuery($libraryId, $bookId)
-            ->where(function (Builder $query) use ($branchId) {
-                $this->scopeToServiceableBranch($query, $branchId);
+        return Reservation::query()
+            ->where('library_id', $libraryId)
+            ->where('book_id', $bookId)
+            ->active()
+            ->orderBy('created_at')
+            ->orderBy('id');
+    }
+
+    /**
+     * The single source of truth for selecting the FIFO reservation a physical
+     * copy can serve. Library-scope reservations match every copy; branch-scope
+     * reservations only match copies from the same branch.
+     *
+     * @param  array<int, int>  $exceptReservationIds
+     */
+    public function getEligibleReservationForCopy(BookCopy $copy, array $exceptReservationIds = [], bool $lockForUpdate = false): ?Reservation
+    {
+        $query = $this->activeReservationsQuery((int) $copy->library_id, (int) $copy->book_id)
+            ->where(function (Builder $scopeQuery) use ($copy) {
+                $this->scopeToServiceableBranch($scopeQuery, (int) $copy->branch_id);
+            })
+            ->where(function (Builder $assignmentQuery) use ($copy) {
+                $assignmentQuery->where('status', Reservation::STATUS_WAITING);
+
+                $assignmentQuery->orWhere(function (Builder $readyQuery) use ($copy) {
+                    $readyQuery
+                        ->where('status', Reservation::STATUS_READY)
+                        ->where('assigned_book_copy_id', (int) $copy->id);
+                });
             });
-    }
 
-    public function waitingForAssignmentQuery(int $libraryId, int $bookId): Builder
-    {
-        return $this->pendingReservationsQuery($libraryId, $bookId)
-            ->whereNull('expires_at');
-    }
+        if ($exceptReservationIds !== []) {
+            $query->whereNotIn('id', array_values(array_unique(array_map('intval', $exceptReservationIds))));
+        }
 
-    public function serviceableWaitingForAssignmentQuery(int $libraryId, int $bookId, int $branchId): Builder
-    {
-        return $this->waitingForAssignmentQuery($libraryId, $bookId)
-            ->where(function (Builder $query) use ($branchId) {
-                $this->scopeToServiceableBranch($query, $branchId);
-            });
-    }
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
 
-    public function firstWaitingForAssignmentIfServiceableByBranch(int $libraryId, int $bookId, int $branchId): ?Reservation
-    {
-        $reservation = $this->waitingForAssignmentQuery($libraryId, $bookId)
-            ->lockForUpdate()
-            ->first();
+        $reservation = $query->first();
 
-        if (! $reservation || ! $this->canBeServedByBranch($reservation, $branchId)) {
-            return null;
+        if ($reservation?->isPending()) {
+            $reservation->setAttribute('queue_position', $this->getQueuePosition($reservation));
+            $reservation->syncOriginalAttribute('queue_position');
+            $reservation->setAttribute('queue_size', $this->queueSize((int) $reservation->library_id, (int) $reservation->book_id));
+            $reservation->syncOriginalAttribute('queue_size');
         }
 
         return $reservation;
@@ -175,20 +191,6 @@ class ReservationQueueService
 
         return ($reservation->scope ?: Reservation::SCOPE_LIBRARY) === Reservation::SCOPE_LIBRARY
             && $reservation->branch_id === null;
-    }
-
-    public function hasWaitingReservationBefore(Reservation $reservation): bool
-    {
-        return $this->waitingForAssignmentQuery($reservation->library_id, $reservation->book_id)
-            ->where(function (Builder $query) use ($reservation) {
-                $query->where('created_at', '<', $reservation->created_at)
-                    ->orWhere(function (Builder $sameTimeQuery) use ($reservation) {
-                        $sameTimeQuery
-                            ->where('created_at', '=', $reservation->created_at)
-                            ->where('id', '<', $reservation->id);
-                    });
-            })
-            ->exists();
     }
 
     private function scopeToServiceableBranch(Builder $query, int $branchId): void

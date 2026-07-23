@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Notifications\Concerns\BuildsLibraryNotificationPayload;
+use App\Support\Notifications\NotificationType;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -16,7 +17,7 @@ class LibraryNotification extends Notification implements ShouldQueue
      * @param  array<string, mixed>  $metadata
      */
     public function __construct(
-        public string $kind,
+        public NotificationType|string $kind,
         public string $title,
         public string $message,
         public string $url = '',

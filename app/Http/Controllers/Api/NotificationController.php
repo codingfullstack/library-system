@@ -6,23 +6,27 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\UserNotificationResource;
 use App\Queries\Notifications\GetUserNotificationsQuery;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
 
 class NotificationController extends Controller
 {
-    public function index(Request $request, GetUserNotificationsQuery $getUserNotificationsQuery): JsonResponse
+    public function index(Request $request, GetUserNotificationsQuery $getUserNotificationsQuery): AnonymousResourceCollection
     {
         $user = $request->user();
+        $validated = $request->validate([
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+
         $notifications = $getUserNotificationsQuery->handle(
             $user,
-            (int) $request->query('per_page', 100)
+            (int) ($validated['per_page'] ?? 100)
         );
 
-        return response()->json([
-            'items' => UserNotificationResource::collection(collect($notifications->items()))->resolve(),
-            'unread_count' => $user->unreadNotifications()->count(),
-        ]);
+        return UserNotificationResource::collection($notifications)
+            ->additional(['unread_count' => $user->unreadNotifications()->count()]);
     }
 
     public function unreadCount(Request $request): JsonResponse

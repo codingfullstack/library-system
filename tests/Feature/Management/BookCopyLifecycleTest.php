@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\Library;
 use App\Models\Loan;
 use App\Models\Location;
+use App\Models\Reservation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use App\Livewire\Manage\BookCopies\BookCopyForm;
@@ -185,6 +186,44 @@ test('staff can delete book copy from own library', function () {
         ->assertRedirect(route('books.index'));
 
     $this->assertDatabaseMissing('book_copies', [
+        'id' => $copy->id,
+    ]);
+});
+
+test('staff can not delete book copy with reservation history', function () {
+    $library = Library::factory()->create();
+    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $book = Book::factory()->create();
+    $copy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+    ]);
+
+    Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $member->id,
+        'branch_id' => $branch->id,
+        'pickup_branch_id' => $branch->id,
+        'assigned_book_copy_id' => $copy->id,
+        'status' => Reservation::STATUS_FULFILLED,
+        'ready_at' => now()->subDays(3),
+        'expires_at' => now()->addDays(11),
+        'fulfilled_at' => now()->subDay(),
+    ]);
+
+    $this->actingAs($staff)
+        ->from(route('book-copies.show', $copy))
+        ->delete(route('manage.book-copies.destroy', $copy))
+        ->assertRedirect(route('book-copies.show', $copy))
+        ->assertSessionHas('error');
+
+    $this->assertDatabaseHas('book_copies', [
         'id' => $copy->id,
     ]);
 });

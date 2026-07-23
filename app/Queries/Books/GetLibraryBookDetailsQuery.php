@@ -63,6 +63,7 @@ class GetLibraryBookDetailsQuery
                     ->with([
                         'user:id,name,email,membership_number',
                         'branch:id,name',
+                        'pickupBranch:id,name',
                     ])
                     ->orderBy('created_at')
                     ->orderBy('id');
@@ -133,6 +134,7 @@ class GetLibraryBookDetailsQuery
         $book->reservations->each(function ($reservation) use ($queueService) {
             if ($reservation->isPending()) {
                 $reservation->setAttribute('queue_position', $queueService->positionFor($reservation));
+                $reservation->setAttribute('queue_size', $queueService->queueSize($reservation->library_id, $reservation->book_id));
             }
         });
 

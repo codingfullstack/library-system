@@ -32,8 +32,6 @@ class CreateReservationForm extends Component
 
     public int|string|null $branchId = null;
 
-    public ?string $expiresAt = null;
-
     public string $notes = '';
 
     public ?string $successMessage = null;
@@ -126,7 +124,6 @@ class CreateReservationForm extends Component
             'scope.required' => 'Pasirinkite rezervacijos apimtį.',
             'scope.in' => 'Pasirinkite galiojančią rezervacijos apimtį.',
             'branchId.required_if' => 'Pasirinkite filialą.',
-            'expiresAt.after' => 'Galiojimo data turi būti ateityje.',
             'notes.max' => 'Pastabos negali viršyti 1000 simbolių.',
         ]);
 
@@ -136,7 +133,6 @@ class CreateReservationForm extends Component
                 'user_id' => $this->selectedMemberId,
                 'scope' => $this->scope,
                 'branch_id' => $this->selectedScopeBranchId($actor),
-                'expires_at' => $this->hasQueueAhead() ? null : $this->expiresAt,
                 'notes' => $this->notes,
             ]);
         } catch (ValidationException $exception) {
@@ -148,7 +144,6 @@ class CreateReservationForm extends Component
         }
 
         $this->clearMember();
-        $this->expiresAt = null;
         $this->notes = '';
         $this->successMessage = 'Rezervacija sėkmingai sukurta.';
 
@@ -192,7 +187,6 @@ class CreateReservationForm extends Component
 
         if ($this->usesMemberSearch($actor)) {
             $rules['selectedMemberId'] = ['required', 'integer'];
-            $rules['expiresAt'] = ['nullable', 'date', 'after:now'];
         }
 
         return $rules;
@@ -266,7 +260,6 @@ class CreateReservationForm extends Component
     {
         return match ($field) {
             'user_id' => 'selectedMemberId',
-            'expires_at' => 'expiresAt',
             'branch_id' => 'branchId',
             default => $field,
         };

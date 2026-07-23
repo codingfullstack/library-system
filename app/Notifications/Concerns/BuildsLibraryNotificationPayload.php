@@ -3,6 +3,8 @@
 namespace App\Notifications\Concerns;
 
 use App\Notifications\Channels\FcmChannel;
+use App\Support\Notifications\NotificationMetadataBuilder;
+use App\Support\Notifications\NotificationType;
 use App\Support\Notifications\NotificationUiConfig;
 use Illuminate\Notifications\Messages\BroadcastMessage;
 
@@ -14,17 +16,20 @@ trait BuildsLibraryNotificationPayload
     public function payload(): array
     {
         $notificationId = (string) ($this->id ?? '');
-        $ui = NotificationUiConfig::for($this->kind);
+        $kind = NotificationType::normalize($this->kind);
+        $ui = NotificationUiConfig::for($kind);
 
         return [
-            'kind' => $this->kind,
-            'type' => $ui['type'],
+            'kind' => $kind->value,
+            'type' => $kind->value,
             'ui' => $ui,
             'category' => $ui['category'],
             'icon' => $ui['icon'],
             'color' => $ui['color'],
+            'badge' => $ui['badge'],
+            'priority' => $ui['priority'],
             'notification_id' => $notificationId,
-            'title' => $this->title,
+            'title' => $this->title ?: $kind->defaultTitle(),
             'body' => $this->message,
             'message' => $this->message,
             'url' => $this->url,
@@ -32,7 +37,7 @@ trait BuildsLibraryNotificationPayload
             'created_at' => now()->toIso8601String(),
             'related_type' => $this->relatedType,
             'related_id' => $this->relatedId,
-            'metadata' => $this->metadata,
+            'metadata' => NotificationMetadataBuilder::compact($this->metadata),
         ];
     }
 
@@ -81,11 +86,11 @@ trait BuildsLibraryNotificationPayload
 
     public function databaseType(object $notifiable): string
     {
-        return $this->kind;
+        return NotificationType::normalize($this->kind)->value;
     }
 
     public function broadcastType(): string
     {
-        return $this->kind;
+        return NotificationType::normalize($this->kind)->value;
     }
 }

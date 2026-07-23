@@ -17,9 +17,15 @@ class ReservationResource extends JsonResource
         $safe = [
             'status' => $this->status,
             'status_label' => $this->statusLabel(),
+            'is_active' => $this->isActive(),
             'is_pending' => $this->isPending(),
+            'is_ready' => $this->isReady(),
             'is_current' => $this->isCurrent(),
-            'queue_position' => $this->queue_position ?? null,
+            'queue_position' => $this->isPending() ? ($this->queue_position ?? null) : null,
+            'queue_size' => $this->isPending() ? ($this->queue_size ?? null) : null,
+            'reservation_scope' => $this->scope,
+            'ready_at' => $this->ready_at,
+            'expires_at' => $this->expires_at,
             'book' => $this->whenLoaded('book', function () {
                 return [
                     'id' => $this->book->id,
@@ -40,6 +46,12 @@ class ReservationResource extends JsonResource
                     'name' => $this->branch->name,
                 ] : null;
             }),
+            'pickup_branch' => $this->whenLoaded('pickupBranch', function () {
+                return $this->isReady() && $this->pickupBranch ? [
+                    'id' => $this->pickupBranch->id,
+                    'name' => $this->pickupBranch->name,
+                ] : null;
+            }),
         ];
 
         if (! $canViewSensitiveDetails) {
@@ -53,9 +65,12 @@ class ReservationResource extends JsonResource
             'user_id' => $this->user_id,
             'scope' => $this->scope,
             'branch_id' => $this->branch_id,
+            'pickup_branch_id' => $this->pickup_branch_id,
+            'assigned_book_copy_id' => $this->assigned_book_copy_id,
+            // Deprecated API compatibility alias. Internal code must use assigned_book_copy_id.
+            'book_copy_id' => $this->assigned_book_copy_id,
             'created_at' => $this->created_at,
             'reserved_at' => $this->reserved_at,
-            'expires_at' => $this->expires_at,
             'fulfilled_at' => $this->fulfilled_at,
             'cancelled_at' => $this->cancelled_at,
             'notes' => $this->notes,

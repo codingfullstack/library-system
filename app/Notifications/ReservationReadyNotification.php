@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Notifications\Concerns\BuildsLibraryNotificationPayload;
+use App\Support\Notifications\NotificationType;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -22,7 +23,7 @@ class ReservationReadyNotification extends Notification implements ShouldQueue
         public array $metadata = [],
         public ?string $relatedType = null,
         public int|string|null $relatedId = null,
-        public string $kind = 'reservation_ready',
+        public NotificationType|string $kind = NotificationType::RESERVATION_READY,
     ) {
         $this->afterCommit();
     }

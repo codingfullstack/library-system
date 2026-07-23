@@ -23,14 +23,15 @@
                     @php
                         $isCurrent = $reservation->id === $currentReservationId;
                         $isPending = $reservation->isPending();
-                        $status = $isPending ? 'rezervuota' : $reservation->status;
+                        $status = $reservation->status;
                         $statusLabel = match (true) {
+                            $reservation->isReady() => 'Paruošta atsiimti',
                             $isCurrent => 'Rezervuota',
                             $isPending => 'Laukia eilėje',
                             $reservation->status === 'įvykdyta' => 'Įvykdyta',
                             $reservation->status === 'atšaukta' => 'Atšaukta',
                             $reservation->status === 'pasibaigusi' => 'Pasibaigusi',
-                            default => $reservation->status,
+                            default => $reservation->statusLabel(),
                         };
                     @endphp
 
@@ -68,6 +69,13 @@
                                     @endif
                                 </p>
                             </div>
+
+                            <div class="app-muted-card">
+                                <p class="app-label">Atsiėmimo filialas</p>
+                                <p class="mt-1 text-sm font-medium text-zinc-950 dark:text-white">
+                                    {{ $reservation->isReady() ? ($reservation->pickupBranch?->name ?: '-') : '-' }}
+                                </p>
+                            </div>
                         </div>
 
                         @if ($reservation->notes)
@@ -94,7 +102,7 @@
                             </div>
                         @endif
 
-                        @if ($isPending && $canManage)
+                        @if ($reservation->isActive() && $canManage)
                             <div class="mt-4 flex justify-end">
                                 <livewire:reservations.cancel-reservation-form
                                     :reservation="$reservation"

@@ -4,7 +4,6 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use App\Models\Reservation;
 use App\Services\ReservationQueueService;
 
 class BookCopyDetailsResource extends JsonResource
@@ -24,18 +23,14 @@ class BookCopyDetailsResource extends JsonResource
         $canViewOwnLoan = $this->activeLoan && $this->activeLoan->user_id === $user?->id;
         $currentReservation = null;
 
-        if ($canViewOperationalDetails && $this->relationLoaded('book') && $this->book && $this->book->relationLoaded('reservations')) {
-            $currentReservation = $this->book->reservations
-                ->filter(fn ($reservation) => $reservation->isPending() && $this->reservationAppliesToCopy($reservation))
-                ->sortBy([['created_at', 'asc'], ['id', 'asc']])
-                ->first();
-        }
-
-        if ($canViewOperationalDetails && ! $currentReservation && $this->book_id && $this->library_id) {
+        if ($canViewOperationalDetails && $this->book_id && $this->library_id) {
             $currentReservation = app(ReservationQueueService::class)
-                ->serviceablePendingReservationsQuery($this->library_id, $this->book_id, (int) $this->branch_id)
-                ->with('user:id,name,email,membership_number')
-                ->first();
+                ->getEligibleReservationForCopy($this->resource);
+
+            $currentReservation?->loadMissing([
+                'pickupBranch:id,name',
+                'user:id,name,email,membership_number',
+            ]);
         }
 
         return [
@@ -118,21 +113,7 @@ class BookCopyDetailsResource extends JsonResource
         ];
     }
 
-    private function reservationAppliesToCopy(Reservation $reservation): bool
-    {
-        if ((int) $reservation->library_id !== (int) $this->library_id) {
-            return false;
-        }
-
-        if ($reservation->scope === Reservation::SCOPE_BRANCH) {
-            return (int) $reservation->branch_id === (int) $this->branch_id;
-        }
-
-        return ($reservation->scope ?: Reservation::SCOPE_LIBRARY) === Reservation::SCOPE_LIBRARY;
-    }
 }
-
-
 
 
 

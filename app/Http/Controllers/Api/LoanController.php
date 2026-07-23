@@ -14,6 +14,7 @@ use App\Queries\Loans\GetActiveLibraryLoansQuery;
 use App\Queries\Loans\GetMemberLoansQuery;
 use App\Queries\Users\SearchLibraryMembersQuery;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -23,7 +24,7 @@ class LoanController extends Controller
         Request $request,
         GetActiveLibraryLoansQuery $getActiveLibraryLoansQuery,
         GetMemberLoansQuery $getMemberLoansQuery
-    ): JsonResponse
+    ): AnonymousResourceCollection
     {
         $user = $request->user();
         $validated = $request->validate([
@@ -39,6 +40,7 @@ class LoanController extends Controller
             'overdue' => ['nullable', Rule::in(['yes', 'no'])],
             'library_id' => ['nullable', 'integer', 'exists:libraries,id'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $filters = [
@@ -55,9 +57,7 @@ class LoanController extends Controller
             ? $getMemberLoansQuery->handle($user, $filters)
             : $getActiveLibraryLoansQuery->handle($user, $filters);
 
-        return response()->json(
-            LoanResource::collection(collect($loans->items()))->resolve()
-        );
+        return LoanResource::collection($loans);
     }
 
     public function searchMembers(Request $request, SearchLibraryMembersQuery $searchLibraryMembersQuery): JsonResponse
@@ -102,8 +102,6 @@ class LoanController extends Controller
         return response()->json($result);
     }
 }
-
-
 
 
 

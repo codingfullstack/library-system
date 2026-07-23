@@ -280,8 +280,10 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 'library_id' => $library->id,
                 'book_id' => $faultInOurStars->id,
                 'user_id' => $member4->id,
-                'status' => Reservation::STATUS_RESERVED,
+                'status' => Reservation::STATUS_READY,
+                'pickup_branch_id' => $childrenBranch->id,
                 'reserved_at' => $now->subHours(3),
+                'ready_at' => $now->subHours(2),
                 'expires_at' => $now->addDays(3),
                 'fulfilled_at' => null,
                 'cancelled_at' => null,
@@ -518,7 +520,7 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 0 => Reservation::STATUS_FULFILLED,
                 1 => Reservation::STATUS_CANCELLED,
                 2 => Reservation::STATUS_EXPIRED,
-                default => Reservation::STATUS_RESERVED,
+                default => Reservation::STATUS_WAITING,
             };
 
             Reservation::create([
@@ -527,7 +529,8 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 'user_id' => $member->id,
                 'status' => $status,
                 'reserved_at' => $reservedAt,
-                'expires_at' => in_array($status, [Reservation::STATUS_RESERVED, Reservation::STATUS_EXPIRED], true)
+                'ready_at' => $status === Reservation::STATUS_READY ? $reservedAt : null,
+                'expires_at' => in_array($status, [Reservation::STATUS_READY, Reservation::STATUS_EXPIRED], true)
                     ? $reservedAt->addDays(5)
                     : null,
                 'fulfilled_at' => $status === Reservation::STATUS_FULFILLED ? $reservedAt->addDays(2) : null,

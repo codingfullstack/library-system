@@ -43,9 +43,23 @@ it('returns dashboard summary counts for the active library', function () {
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now(),
         'expires_at' => now()->addDay(),
+    ]);
+
+    Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $member->id,
+        'pickup_branch_id' => $copies[2]->branch_id,
+        'assigned_book_copy_id' => $copies[2]->id,
+        'status' => Reservation::STATUS_READY,
+        'reserved_at' => now()->subHour(),
+        'ready_at' => now()->subMinutes(30),
+        'expires_at' => now()->addDay(),
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
     ]);
 
     $this->actingAs($staff)
@@ -53,6 +67,6 @@ it('returns dashboard summary counts for the active library', function () {
         ->assertOk()
         ->assertJsonPath('summary.book_copies_count', 3)
         ->assertJsonPath('summary.active_loans_count', 2)
-        ->assertJsonPath('summary.active_reservations_count', 1)
+        ->assertJsonPath('summary.active_reservations_count', 2)
         ->assertJsonPath('summary.overdue_loans_count', 1);
 });

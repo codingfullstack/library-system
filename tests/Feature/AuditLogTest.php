@@ -2,6 +2,7 @@
 
 use App\Actions\Loans\BorrowBookCopyAction;
 use App\Actions\Reservations\CreateReservationAction;
+use App\Actions\Reservations\SyncReservationQueueAction;
 use App\Actions\AuditLogs\RecordAuditLogAction;
 use App\Models\Book;
 use App\Models\BookCopy;
@@ -228,6 +229,8 @@ it('shows related reservation and issue audit logs on the book page for superadm
     ]);
 
     $bookCopy->update(['status' => BookCopy::STATUS_AVAILABLE]);
+
+    app(SyncReservationQueueAction::class)->handle($library->id, $book->id);
 
     app(BorrowBookCopyAction::class)->handle($staff, $bookCopy, [
         'user_id' => $member->id,

@@ -30,11 +30,12 @@ class ReservationSummary extends Component
         if (! $actor) {
             return view('livewire.reservations.reservation-summary', [
                 'activeCount' => 0,
-                'firstActiveReservation' => null,
+                'readyReservations' => collect(),
+                'waitingReservations' => collect(),
             ]);
         }
 
-        $currentReservations = Reservation::query()
+        $activeReservations = Reservation::query()
             ->where('book_id', $this->bookId)
             ->when(! $actor->isSuperAdmin(), function ($query) use ($actor) {
                 $query->where('library_id', $actor->activeLibraryId());
@@ -63,14 +64,15 @@ class ReservationSummary extends Component
                 });
             })
             ->with('user:id,name,email,membership_number')
-            ->pending()
+            ->active()
             ->orderBy('created_at')
             ->orderBy('id')
             ->get();
 
         return view('livewire.reservations.reservation-summary', [
-            'activeCount' => $currentReservations->count(),
-            'firstActiveReservation' => $currentReservations->first(),
+            'activeCount' => $activeReservations->count(),
+            'readyReservations' => $activeReservations->filter->isReady()->values(),
+            'waitingReservations' => $activeReservations->filter->isPending()->values(),
         ]);
     }
 }

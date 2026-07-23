@@ -97,19 +97,6 @@
             <x-ui.alert type="info" class="mb-0">
                 Šiai knygai jau yra aktyvi rezervacija. Nauja rezervacija bus įtraukta į eilę, o galiojimo terminas bus priskirtas, kai ateis jos eilė.
             </x-ui.alert>
-        @elseif($isReservable)
-            <div>
-                <label for="reservation-expires-at" class="app-label">Galioja iki</label>
-                <input
-                    id="reservation-expires-at"
-                    type="datetime-local"
-                    wire:model="expiresAt"
-                    class="app-input mt-2"
-                >
-                @error('expiresAt')
-                    <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
-                @enderror
-            </div>
         @endif
 
         @if($actor?->isSuperAdmin() && $selectedLibraryName)

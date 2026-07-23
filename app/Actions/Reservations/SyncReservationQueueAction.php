@@ -6,9 +6,9 @@ use App\Models\Reservation;
 use App\Services\ReservationNotificationService;
 use App\Services\ReservationQueueDebugService;
 use App\Services\ReservationQueueService;
-use App\Models\BookCopy;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class SyncReservationQueueAction
 {
@@ -22,131 +22,115 @@ class SyncReservationQueueAction
     public function handle(int $libraryId, int $bookId): void
     {
         DB::transaction(function () use ($libraryId, $bookId): void {
-            $positionsBeforeExpiration = $this->queueService->snapshotPositionsBeforeExpiringElapsed($libraryId, $bookId);
+            $positionsBefore = $this->queueService->snapshotPositions($libraryId, $bookId);
 
-            app(ReservationQueueDebugService::class)->logSnapshot('before_expiration', $libraryId, $bookId, [
-                'old_positions' => $positionsBeforeExpiration,
-            ]);
-
-            $this->expireElapsedReservations($libraryId, $bookId);
-
-            $this->notificationService->notifyQueuePositionsChangedFromSnapshot(
-                $libraryId,
-                $bookId,
-                $positionsBeforeExpiration
-            );
-
-            app(ReservationQueueDebugService::class)->logSnapshot('after_expiration', $libraryId, $bookId, [
-                'old_positions' => $positionsBeforeExpiration,
-                'new_positions' => $this->queueService->getPositionsForBook($libraryId, $bookId),
+            app(ReservationQueueDebugService::class)->logSnapshot('before_queue_sync', $libraryId, $bookId, [
+                'old_positions' => $positionsBefore,
             ]);
 
             $this->syncQueue($libraryId, $bookId);
+
+            DB::afterCommit(function () use ($libraryId, $bookId, $positionsBefore): void {
+                $this->notificationService->notifyQueuePositionsChangedFromSnapshot(
+                    $libraryId,
+                    $bookId,
+                    $positionsBefore
+                );
+            });
+
+            app(ReservationQueueDebugService::class)->logSnapshot('after_queue_sync', $libraryId, $bookId, [
+                'old_positions' => $positionsBefore,
+                'new_positions' => $this->queueService->getPositionsForBook($libraryId, $bookId),
+            ]);
         });
     }
 
     private function syncQueue(int $libraryId, int $bookId): void
     {
-        $pendingReservations = $this->queueService
-            ->pendingReservationsQuery($libraryId, $bookId)
-            ->with(['user:id,name,email', 'book:id,slug,title'])
+        $hasActiveReservations = $this->queueService
+            ->activeReservationsQuery($libraryId, $bookId)
             ->lockForUpdate()
-            ->get()
-            ->values()
-            ->map(function (Reservation $reservation, int $index) {
-                $reservation->setAttribute('queue_position', $index + 1);
+            ->exists();
 
-                return $reservation;
-            });
+        if (! $hasActiveReservations) {
+            return;
+        }
 
-        $availableCopiesByBranch = BookCopy::query()
-            ->withoutGlobalScope('library')
-            ->where('library_id', $libraryId)
-            ->where('book_id', $bookId)
-            ->where('status', BookCopy::STATUS_AVAILABLE)
+        $availableCopies = $this->queueService
+            ->availableCopiesQuery($libraryId, $bookId)
             ->whereNotNull('branch_id')
-            ->selectRaw('branch_id, COUNT(*) as copies_count')
-            ->groupBy('branch_id')
             ->orderBy('branch_id')
-            ->pluck('copies_count', 'branch_id');
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
 
-        if ($pendingReservations->isEmpty()) {
+        if ($availableCopies->isEmpty()) {
             return;
         }
 
-        if ($availableCopiesByBranch->isEmpty()) {
-            return;
-        }
+        $servedReservationIds = [];
 
-        $readyReservationIds = [];
+        foreach ($availableCopies as $copy) {
+            $reservation = $this->queueService->getEligibleReservationForCopy($copy, $servedReservationIds, true);
 
-        foreach ($availableCopiesByBranch as $branchId => $copyCount) {
-            for ($copyIndex = 0; $copyIndex < (int) $copyCount; $copyIndex++) {
-                $readyReservation = $this->queueService
-                    ->firstWaitingForAssignmentIfServiceableByBranch($libraryId, $bookId, (int) $branchId);
+            if (! $reservation) {
+                continue;
+            }
 
-                if (! $readyReservation) {
-                    break;
+            $servedReservationIds[] = (int) $reservation->id;
+
+            if (! $reservation->isPending()) {
+                continue;
+            }
+
+            app(ReservationQueueDebugService::class)->logSnapshot('before_ready_assignment', $libraryId, $bookId, [
+                'triggering_reservation_id' => $reservation->id,
+                'triggering_copy_id' => $copy->id,
+                'triggering_branch_id' => (int) $copy->branch_id,
+                'global_position' => $this->queueService->getQueuePosition($reservation),
+            ]);
+
+            $readyAttributes = [
+                'status' => Reservation::STATUS_READY,
+                'pickup_branch_id' => (int) $copy->branch_id,
+                'assigned_book_copy_id' => (int) $copy->id,
+                'ready_at' => now(),
+                'expires_at' => now()->addDays(self::DEFAULT_WINDOW_DAYS),
+            ];
+
+            try {
+                $reservation->update($readyAttributes);
+            } catch (QueryException $exception) {
+                if (! $this->isActiveReadyCopyUniqueConstraintViolation($exception)) {
+                    throw $exception;
                 }
 
-                app(ReservationQueueDebugService::class)->logSnapshot('before_ready_assignment', $libraryId, $bookId, [
-                    'triggering_reservation_id' => $readyReservation->id,
-                    'triggering_branch_id' => (int) $branchId,
-                    'available_copy_index' => $copyIndex + 1,
-                    'serviceable_index' => $copyIndex + 1,
-                    'global_position' => $this->queueService->getQueuePosition($readyReservation),
-                ]);
-
-                $readyReservationIds[] = (int) $readyReservation->id;
-                $position = $pendingReservations->search(fn (Reservation $reservation) => (int) $reservation->id === (int) $readyReservation->id);
-                $currentPosition = $this->queueService->getQueuePosition($readyReservation);
-
-                if ($currentPosition !== 1 || $this->queueService->hasWaitingReservationBefore($readyReservation)) {
-                    Log::warning('Attempted to prepare non-first reservation', [
-                        'reservation_id' => $readyReservation->id,
-                        'position' => $currentPosition,
-                        'library_id' => $libraryId,
-                        'book_id' => $bookId,
-                        'branch_id' => (int) $branchId,
-                    ]);
-
-                    break;
-                }
-
-                $readyReservation = Reservation::query()
-                    ->with(['user:id,name,email', 'book:id,slug,title'])
-                    ->findOrFail($readyReservation->id);
-
-                $readyReservation->update([
-                    'expires_at' => now()->addDays(self::DEFAULT_WINDOW_DAYS),
-                ]);
-
-                $readyReservation->refresh();
-                $readyReservation->setAttribute('queue_position', $position === false ? $this->queueService->positionFor($readyReservation) : $position + 1);
-
-                $this->notificationService->notifyReady($readyReservation);
-
-                app(ReservationQueueDebugService::class)->logSnapshot('after_ready_assignment', $libraryId, $bookId, [
-                    'triggering_reservation_id' => $readyReservation->id,
-                    'triggering_branch_id' => (int) $branchId,
-                    'serviceable_index' => $copyIndex + 1,
-                    'global_position' => $this->queueService->getQueuePosition($readyReservation),
+                throw ValidationException::withMessages([
+                    'reservation' => ['Si kopija jau priskirta kitai paruostai rezervacijai. Pakartokite eiles sinchronizavima.'],
                 ]);
             }
-        }
 
+            $readyReservation = Reservation::query()
+                ->with(['user:id,name,email', 'book:id,slug,title'])
+                ->findOrFail($reservation->id);
+
+            DB::afterCommit(fn () => $this->notificationService->notifyReady($readyReservation));
+
+            app(ReservationQueueDebugService::class)->logSnapshot('after_ready_assignment', $libraryId, $bookId, [
+                'triggering_reservation_id' => $reservation->id,
+                'triggering_copy_id' => $copy->id,
+                'triggering_branch_id' => (int) $copy->branch_id,
+                'global_position' => $this->queueService->getQueuePosition($reservation),
+            ]);
+        }
     }
 
-    private function expireElapsedReservations(int $libraryId, int $bookId): void
+    private function isActiveReadyCopyUniqueConstraintViolation(QueryException $exception): bool
     {
-        Reservation::query()
-            ->where('library_id', $libraryId)
-            ->where('book_id', $bookId)
-            ->where('status', Reservation::STATUS_RESERVED)
-            ->whereNull('fulfilled_at')
-            ->whereNull('cancelled_at')
-            ->whereNotNull('expires_at')
-            ->where('expires_at', '<=', now())
-            ->update(['status' => Reservation::STATUS_EXPIRED]);
+        $message = $exception->getMessage();
+
+        return str_contains($message, 'reservations_active_ready_book_copy_unique')
+            || str_contains($message, 'reservations.active_ready_book_copy_id')
+            || str_contains($message, 'active_ready_book_copy_id');
     }
 }

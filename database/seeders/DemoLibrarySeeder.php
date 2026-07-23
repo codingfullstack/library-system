@@ -18,6 +18,7 @@ use App\Models\Reservation;
 use App\Models\ScanLog;
 use App\Models\User;
 use App\Support\GeneratesSlugs;
+use App\Support\Notifications\NotificationType;
 use App\Support\Notifications\NotificationUiConfig;
 use App\Support\UserManagement;
 use Carbon\CarbonInterface;
@@ -876,9 +877,9 @@ class DemoLibrarySeeder extends Seeder
                     $library,
                     $book,
                     $member,
-                    Reservation::STATUS_RESERVED,
+                    Reservation::STATUS_WAITING,
                     (clone $reservedAt)->addMinutes($position * 20),
-                    now()->addDays(rand(2, 6)),
+                    null,
                     'Narys laukia, kol atsiras laisva šios knygos kopija.'
                 );
             }
@@ -924,8 +925,16 @@ class DemoLibrarySeeder extends Seeder
             'book_id' => $book->id,
             'user_id' => $member->id,
             'status' => $status,
+            'pickup_branch_id' => $status === Reservation::STATUS_READY
+                ? $book->bookCopies()
+                    ->where('library_id', $library->id)
+                    ->whereNotNull('branch_id')
+                    ->orderBy('branch_id')
+                    ->value('branch_id')
+                : null,
             'reserved_at' => $reservedAt,
-            'expires_at' => in_array($status, [Reservation::STATUS_RESERVED, Reservation::STATUS_EXPIRED], true)
+            'ready_at' => $status === Reservation::STATUS_READY ? $reservedAt : null,
+            'expires_at' => in_array($status, [Reservation::STATUS_READY, Reservation::STATUS_EXPIRED], true)
                 ? ($expiresAt ?? now()->addDays(4))
                 : null,
             'fulfilled_at' => $status === Reservation::STATUS_FULFILLED ? now()->subDays(rand(1, 5)) : null,
@@ -1048,71 +1057,75 @@ class DemoLibrarySeeder extends Seeder
 
         $bookTitle = $books->first()?->title ?: 'Demo knyga';
         $notificationDefinitions = [
-            'reservation_created' => [
+            NotificationType::RESERVATION_CREATED->value => [
                 'title' => 'Rezervacija sukurta',
                 'message' => sprintf('Jūs sėkmingai rezervavote knygą "%s". Jūsų vieta eilėje: 1.', $bookTitle),
             ],
-            'reservation_queue_changed' => [
+            NotificationType::RESERVATION_QUEUE_CHANGED->value => [
                 'title' => 'Rezervacijos eilė pasikeitė',
                 'message' => sprintf('Knygos "%s" rezervacijos eilėje dabar esate 1 vietoje.', $bookTitle),
             ],
-            'reservation_ready' => [
+            NotificationType::RESERVATION_READY->value => [
                 'title' => 'Rezervacija paruošta',
                 'message' => sprintf('Knyga "%s" jau laukia jūsų. Atsiimkite iki rytojaus darbo pabaigos.', $bookTitle),
             ],
-            'reservation_cancelled' => [
+            NotificationType::RESERVATION_CANCELLED->value => [
                 'title' => 'Rezervacija atšaukta',
                 'message' => sprintf('Jūsų rezervacija knygai "%s" buvo atšaukta bibliotekos darbuotojo.', $bookTitle),
             ],
-            'reservation_fulfilled' => [
+            NotificationType::RESERVATION_EXPIRED->value => [
+                'title' => 'Rezervacijos galiojimas baigėsi',
+                'message' => sprintf('Rezervacijos knygai "%s" atsiėmimo terminas baigėsi.', $bookTitle),
+            ],
+            NotificationType::RESERVATION_FULFILLED->value => [
                 'title' => 'Rezervacija įvykdyta',
                 'message' => sprintf('Pagal jūsų rezervaciją išduota knyga "%s".', $bookTitle),
             ],
-            'loan_overdue' => [
+            NotificationType::LOAN_OVERDUE->value => [
                 'title' => 'Vėluojate grąžinti knygą',
                 'message' => sprintf('Knygos "%s" grąžinimo terminas jau praėjo. Prašome susisiekti su biblioteka.', $bookTitle),
             ],
-            'book_due_soon' => [
+            NotificationType::BOOK_DUE_SOON->value => [
                 'title' => 'Artėja grąžinimo terminas',
                 'message' => sprintf('Knygą "%s" reikės grąžinti per artimiausias 2 dienas.', $bookTitle),
             ],
-            'book_returned' => [
+            NotificationType::BOOK_RETURNED->value => [
                 'title' => 'Knyga grąžinta',
                 'message' => sprintf('Knyga "%s" sėkmingai grąžinta. Ačiū, kad naudojatės biblioteka.', $bookTitle),
             ],
-            'library_membership_added' => [
+            NotificationType::LIBRARY_MEMBERSHIP_ADDED->value => [
                 'title' => 'Pridėta bibliotekos narystė',
                 'message' => sprintf('Jūs buvote pridėta prie bibliotekos "%s".', $library->name),
             ],
-            'system' => [
+            NotificationType::SYSTEM->value => [
                 'title' => 'Sistemos pranešimas',
                 'message' => 'Bibliotekos sistema atnaujino jūsų paskyros informaciją.',
             ],
-            'new_user' => [
+            NotificationType::NEW_USER->value => [
                 'title' => 'Paskyra aktyvuota',
                 'message' => 'Jūsų skaitytojo paskyra aktyvuota ir paruošta naudojimui.',
             ],
-            'qr_scan' => [
+            NotificationType::QR_SCAN->value => [
                 'title' => 'QR kodas nuskaitytas',
                 'message' => 'Jūsų skaitytojo QR kodas sėkmingai nuskaitytas bibliotekoje.',
             ],
-            'report_ready' => [
+            NotificationType::REPORT_READY->value => [
                 'title' => 'Ataskaita paruošta',
                 'message' => 'Jūsų prašyta bibliotekos ataskaita paruošta peržiūrai.',
             ],
-            'issuance_summary' => [
+            NotificationType::ISSUANCE_SUMMARY->value => [
                 'title' => 'Išdavimo suvestinė',
                 'message' => 'Paruošta nauja jūsų išduotų ir grąžintų knygų suvestinė.',
             ],
-            'system_warning' => [
+            NotificationType::SYSTEM_WARNING->value => [
                 'title' => 'Sistemos įspėjimas',
                 'message' => 'Sistemai reikalingas jūsų dėmesys: patikrinkite paskyros duomenis.',
             ],
-            'system_error' => [
+            NotificationType::SYSTEM_ERROR->value => [
                 'title' => 'Sistemos klaida',
                 'message' => 'Nepavyko atlikti vieno veiksmo. Bandykite dar kartą arba kreipkitės į biblioteką.',
             ],
-            'account_security' => [
+            NotificationType::ACCOUNT_SECURITY->value => [
                 'title' => 'Paskyros saugumas',
                 'message' => 'Užfiksuotas naujas prisijungimas prie jūsų paskyros.',
             ],
@@ -1155,7 +1168,7 @@ class DemoLibrarySeeder extends Seeder
                         ],
                     ],
                 ],
-                'read_at' => $kind === 'system' ? $createdAt->copy()->addMinutes(5) : null,
+                'read_at' => $kind === NotificationType::SYSTEM->value ? $createdAt->copy()->addMinutes(5) : null,
                 'created_at' => $createdAt,
                 'updated_at' => $createdAt,
             ]);

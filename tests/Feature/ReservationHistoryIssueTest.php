@@ -53,8 +53,9 @@ function pendingReservationForHistory(array $fixture, array $overrides = []): Re
         'user_id' => $fixture['member']->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_READY,
         'reserved_at' => now()->subHour(),
+        'ready_at' => now()->subMinutes(30),
         'expires_at' => now()->addDay(),
         'fulfilled_at' => null,
         'cancelled_at' => null,
@@ -74,19 +75,24 @@ function copyForHistory(array $fixture, Branch $branch, Location $location, stri
 
 it('hides first-in-queue issue button for staff when own branch has no available copy', function () {
     $fixture = reservationHistoryFixture();
-    pendingReservationForHistory($fixture);
-    copyForHistory($fixture, $fixture['otherBranch'], $fixture['otherLocation']);
+    $copy = copyForHistory($fixture, $fixture['otherBranch'], $fixture['otherLocation']);
+    pendingReservationForHistory($fixture, [
+        'pickup_branch_id' => $fixture['otherBranch']->id,
+        'assigned_book_copy_id' => $copy->id,
+    ]);
 
     Livewire::actingAs($fixture['staff'])
         ->test(ReservationHistory::class, ['book' => $fixture['book']])
-        ->assertDontSee('issueFirstInQueue', false)
-        ->assertSee('Jūsų filiale nėra laisvos kopijos išdavimui.');
+        ->assertDontSee('issueFirstInQueue', false);
 });
 
 it('prevents staff from issuing an available copy from another branch', function () {
     $fixture = reservationHistoryFixture();
-    $reservation = pendingReservationForHistory($fixture);
     $otherCopy = copyForHistory($fixture, $fixture['otherBranch'], $fixture['otherLocation']);
+    $reservation = pendingReservationForHistory($fixture, [
+        'pickup_branch_id' => $fixture['otherBranch']->id,
+        'assigned_book_copy_id' => $otherCopy->id,
+    ]);
 
     Livewire::actingAs($fixture['staff'])
         ->test(ReservationHistory::class, ['book' => $fixture['book']])
@@ -96,13 +102,16 @@ it('prevents staff from issuing an available copy from another branch', function
 
     expect(Loan::query()->count())->toBe(0)
         ->and($otherCopy->fresh()->status)->toBe(BookCopy::STATUS_AVAILABLE)
-        ->and($reservation->fresh()->status)->toBe(Reservation::STATUS_RESERVED);
+        ->and($reservation->fresh()->status)->toBe(Reservation::STATUS_READY);
 });
 
 it('allows admin to issue an available copy from the active library', function () {
     $fixture = reservationHistoryFixture();
-    $reservation = pendingReservationForHistory($fixture);
     $copy = copyForHistory($fixture, $fixture['otherBranch'], $fixture['otherLocation']);
+    $reservation = pendingReservationForHistory($fixture, [
+        'pickup_branch_id' => $fixture['otherBranch']->id,
+        'assigned_book_copy_id' => $copy->id,
+    ]);
 
     Livewire::actingAs($fixture['admin'])
         ->test(ReservationHistory::class, ['book' => $fixture['book']])
@@ -119,8 +128,11 @@ it('allows admin to issue an available copy from the active library', function (
 
 it('shows a validation error instead of crashing when no available copy exists', function () {
     $fixture = reservationHistoryFixture();
-    pendingReservationForHistory($fixture);
-    copyForHistory($fixture, $fixture['ownBranch'], $fixture['ownLocation'], BookCopy::STATUS_LOANED);
+    $copy = copyForHistory($fixture, $fixture['ownBranch'], $fixture['ownLocation'], BookCopy::STATUS_LOANED);
+    pendingReservationForHistory($fixture, [
+        'pickup_branch_id' => $fixture['ownBranch']->id,
+        'assigned_book_copy_id' => $copy->id,
+    ]);
 
     Livewire::actingAs($fixture['staff'])
         ->test(ReservationHistory::class, ['book' => $fixture['book']])

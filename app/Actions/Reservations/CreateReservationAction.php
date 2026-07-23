@@ -11,6 +11,7 @@ use App\Models\Reservation;
 use App\Models\User;
 use App\Services\ReservationNotificationService;
 use App\Services\ReservationQueueService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class CreateReservationAction
@@ -76,28 +77,24 @@ class CreateReservationAction
             ]);
         }
 
-        $hasQueueAhead = $queueService
-            ->pendingReservationsQuery($libraryId, $book->id, $scope, $branchId)
-            ->exists();
-
         $reservation = Reservation::create([
             'library_id' => $libraryId,
             'book_id' => $book->id,
             'user_id' => $member->id,
             'scope' => $scope,
             'branch_id' => $branchId,
-            'status' => Reservation::STATUS_RESERVED,
+            'pickup_branch_id' => null,
+            'status' => Reservation::STATUS_WAITING,
             'reserved_at' => now(),
-            'expires_at' => $hasQueueAhead
-                ? null
-                : ($actor->hasAnyEffectiveRole(['superadministratorius', 'administratorius', 'darbuotojas']) ? ($data['expires_at'] ?? null) : null),
+            'ready_at' => null,
+            'expires_at' => null,
             'fulfilled_at' => null,
             'cancelled_at' => null,
             'notes' => $data['notes'] ?? null,
         ]);
 
         app(SyncReservationQueueAction::class)->handle($libraryId, $book->id);
-        app(ReservationNotificationService::class)->notifyCreated($reservation->fresh());
+        DB::afterCommit(fn () => app(ReservationNotificationService::class)->notifyCreated($reservation->fresh()));
 
         app(RecordAuditLogAction::class)->handle(
             $actor,

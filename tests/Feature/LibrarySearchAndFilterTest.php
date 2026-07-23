@@ -386,7 +386,7 @@ it('filters reservations by queue and library', function () {
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $firstMember->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHours(2),
         'expires_at' => now()->addDays(2),
         'fulfilled_at' => null,
@@ -397,7 +397,7 @@ it('filters reservations by queue and library', function () {
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $secondMember->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHour(),
         'expires_at' => now()->addDays(2),
         'fulfilled_at' => null,
@@ -408,7 +408,7 @@ it('filters reservations by queue and library', function () {
         'library_id' => $otherLibrary->id,
         'book_id' => $book->id,
         'user_id' => $otherLibraryMember->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHours(3),
         'expires_at' => now()->addDays(2),
         'fulfilled_at' => null,
@@ -442,7 +442,7 @@ it('filters library reservations by branch for administrators', function () {
         'user_id' => $matchingMember->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $matchingBranch->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHour(),
         'expires_at' => now()->addDays(2),
         'fulfilled_at' => null,
@@ -455,7 +455,7 @@ it('filters library reservations by branch for administrators', function () {
         'user_id' => $otherMember->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $otherBranch->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(30),
         'expires_at' => now()->addDays(2),
         'fulfilled_at' => null,
@@ -472,7 +472,7 @@ it('filters library reservations by branch for administrators', function () {
     $response->assertDontSee('Kito filialo narys');
 });
 
-it('does not show expired reserved reservations as active on the reservations page', function () {
+it('filters explicitly expired reservations separately from waiting reservations', function () {
     $library = Library::factory()->create();
     $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create(['library_id' => $library->id, 'name' => 'Lukas Petrauskas']);
@@ -482,8 +482,9 @@ it('does not show expired reserved reservations as active on the reservations pa
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_EXPIRED,
         'reserved_at' => now()->subDays(10),
+        'ready_at' => now()->subDays(9),
         'expires_at' => now()->subDay(),
         'fulfilled_at' => null,
         'cancelled_at' => null,
@@ -492,7 +493,7 @@ it('does not show expired reserved reservations as active on the reservations pa
     $this->actingAs($staff)
         ->get(route('reservations.index', [
             'search' => 'haris',
-            'status' => Reservation::STATUS_RESERVED,
+            'status' => Reservation::STATUS_WAITING,
         ]))
         ->assertOk()
         ->assertDontSee('Haris Poteris ir Išminties akmuo');
