@@ -111,7 +111,7 @@ it('shows library scoped reservations in branch filters by serviceable branch in
         'user_id' => $fixture['member']->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $fixture['branchA']->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHours(3),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -123,7 +123,7 @@ it('shows library scoped reservations in branch filters by serviceable branch in
         'user_id' => $memberB->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $fixture['branchB']->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHours(2),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -135,7 +135,7 @@ it('shows library scoped reservations in branch filters by serviceable branch in
         'user_id' => $memberLibrary->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHour(),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -219,7 +219,7 @@ it('calculates branch scoped queue position in the shared library book queue', f
         'user_id' => $otherMember->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $fixture['branchB']->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHours(3),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -232,7 +232,7 @@ it('calculates branch scoped queue position in the shared library book queue', f
         'user_id' => $fixture['member']->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $fixture['branchA']->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHours(2),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -245,7 +245,7 @@ it('calculates branch scoped queue position in the shared library book queue', f
         'user_id' => $thirdMember->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $fixture['branchA']->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHour(),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -269,7 +269,7 @@ it('calculates library scoped queue position in the shared library book queue', 
         'user_id' => $otherMember->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $fixture['branchA']->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHours(3),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -282,7 +282,7 @@ it('calculates library scoped queue position in the shared library book queue', 
         'user_id' => $fixture['member']->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHours(2),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -295,7 +295,7 @@ it('calculates library scoped queue position in the shared library book queue', 
         'user_id' => $thirdMember->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHour(),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -326,7 +326,7 @@ it('keeps one shared queue for mixed branch and library reservations', function 
             'user_id' => $members[$index]->id,
             'scope' => $scope[0],
             'branch_id' => $scope[1],
-            'status' => Reservation::STATUS_RESERVED,
+            'status' => Reservation::STATUS_WAITING,
             'reserved_at' => now()->subMinutes(10 - $index),
             'expires_at' => null,
             'fulfilled_at' => null,
@@ -369,8 +369,9 @@ it('does not include expired cancelled or fulfilled reservations in queue positi
         'user_id' => $members[2]->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_EXPIRED,
         'reserved_at' => now()->subMinutes(2),
+        'ready_at' => now()->subMinute(),
         'expires_at' => now()->subMinute(),
     ]);
     $activeReservation = Reservation::factory()->create([
@@ -379,7 +380,7 @@ it('does not include expired cancelled or fulfilled reservations in queue positi
         'user_id' => $members[3]->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $fixture['branchB']->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinute(),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -400,7 +401,7 @@ it('moves queue positions forward after the first reservation is cancelled', fun
         'user_id' => $members[0]->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(3),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -412,7 +413,7 @@ it('moves queue positions forward after the first reservation is cancelled', fun
         'user_id' => $members[1]->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $fixture['branchA']->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(2),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -424,7 +425,7 @@ it('moves queue positions forward after the first reservation is cancelled', fun
         'user_id' => $members[2]->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $fixture['branchB']->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinute(),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -444,7 +445,7 @@ it('moves queue positions forward after the first reservation is cancelled', fun
         ->and($queue->positionFor($third->fresh()))->toBe(2);
 });
 
-it('does not prepare a later serviceable reservation when an earlier reservation blocks the shared queue', function () {
+it('prepares the oldest reservation that the available copy can serve', function () {
     $fixture = reservationScopeFixture();
     $fixture['copyB']->update(['status' => BookCopy::STATUS_AVAILABLE]);
     $members = User::factory()->count(3)->member()->create(['library_id' => $fixture['library']->id]);
@@ -455,7 +456,7 @@ it('does not prepare a later serviceable reservation when an earlier reservation
         'user_id' => $members[0]->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $fixture['branchA']->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(3),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -467,7 +468,7 @@ it('does not prepare a later serviceable reservation when an earlier reservation
         'user_id' => $members[1]->id,
         'scope' => Reservation::SCOPE_LIBRARY,
         'branch_id' => null,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinutes(2),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -479,7 +480,7 @@ it('does not prepare a later serviceable reservation when an earlier reservation
         'user_id' => $members[2]->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $fixture['branchB']->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subMinute(),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -488,12 +489,16 @@ it('does not prepare a later serviceable reservation when an earlier reservation
 
     app(SyncReservationQueueAction::class)->handle($fixture['library']->id, $fixture['book']->id);
 
-    expect($branchAOnly->fresh()->expires_at)->toBeNull()
-        ->and($libraryWide->fresh()->expires_at)->toBeNull()
-        ->and($branchBOnly->fresh()->expires_at)->toBeNull()
-        ->and(app(ReservationQueueService::class)->positionFor($libraryWide->fresh()))->toBe(2);
+    expect($branchAOnly->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and($branchAOnly->fresh()->ready_at)->toBeNull()
+        ->and($libraryWide->fresh()->status)->toBe(Reservation::STATUS_READY)
+        ->and($libraryWide->fresh()->ready_at)->not->toBeNull()
+        ->and($libraryWide->fresh()->expires_at)->not->toBeNull()
+        ->and($branchBOnly->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and($branchBOnly->fresh()->ready_at)->toBeNull()
+        ->and(app(ReservationQueueService::class)->positionFor($libraryWide->fresh()))->toBeNull();
 
-    expect($members[1]->notifications()->where('type', 'reservation_ready')->count())->toBe(0)
+    expect($members[1]->notifications()->where('type', 'reservation_ready')->count())->toBe(1)
         ->and($members[2]->notifications()->where('type', 'reservation_ready')->count())->toBe(0);
 });
 
@@ -507,7 +512,7 @@ it('sends ready notifications according to reservation scope', function () {
         'user_id' => $fixture['member']->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $fixture['branchA']->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHour(),
         'expires_at' => null,
         'fulfilled_at' => null,
@@ -520,7 +525,9 @@ it('sends ready notifications according to reservation scope', function () {
         'notifiable_id' => $fixture['member']->id,
         'type' => 'reservation_ready',
     ]);
-    expect($reservation->fresh()->expires_at)->toBeNull();
+    expect($reservation->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and($reservation->fresh()->ready_at)->toBeNull()
+        ->and($reservation->fresh()->expires_at)->toBeNull();
 
     $fixture['copyA']->update(['status' => BookCopy::STATUS_AVAILABLE]);
 
@@ -530,7 +537,9 @@ it('sends ready notifications according to reservation scope', function () {
         'notifiable_id' => $fixture['member']->id,
         'type' => 'reservation_ready',
     ]);
-    expect($reservation->fresh()->expires_at)->not->toBeNull();
+    expect($reservation->fresh()->status)->toBe(Reservation::STATUS_READY)
+        ->and($reservation->fresh()->ready_at)->not->toBeNull()
+        ->and($reservation->fresh()->expires_at)->not->toBeNull();
 });
 
 it('allows admins to create branch scoped reservations in any branch of their library', function () {
@@ -590,8 +599,11 @@ it('shows copy reservation details on the web book details page', function () {
         'user_id' => $fixture['member']->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $fixture['branchA']->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'pickup_branch_id' => $fixture['branchA']->id,
+        'assigned_book_copy_id' => $fixture['copyA']->id,
+        'status' => Reservation::STATUS_READY,
         'reserved_at' => now()->subHour(),
+        'ready_at' => now()->subMinutes(30),
         'expires_at' => now()->addDay(),
         'fulfilled_at' => null,
         'cancelled_at' => null,
@@ -605,9 +617,10 @@ it('shows copy reservation details on the web book details page', function () {
         ->assertSee('Rezervavo')
         ->assertSee($fixture['member']->name)
         ->assertSee($fixture['member']->membership_number)
-        ->assertSee('Galioja iki')
+        ->assertSee('Atsiimti iki')
+        ->assertSee('Atsiėmimo filialas')
         ->assertSee('Aktyvus išdavimas')
-        ->assertSee('Rezervacijos pozicija')
+        ->assertDontSee('Rezervacijos pozicija')
         ->assertSee('Rezervacijos statusas')
-        ->assertSee('Rezervacijos sukūrimo data');
+        ->assertSee('Paruošta nuo');
 });
