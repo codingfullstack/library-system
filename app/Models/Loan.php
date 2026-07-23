@@ -2,18 +2,27 @@
 
 namespace App\Models;
 
+use App\Concerns\BelongsToLibrary;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use App\Concerns\BelongsToLibrary;
+
 class Loan extends Model
 {
-    use HasFactory, BelongsToLibrary;
+    use BelongsToLibrary, HasFactory;
 
     public const STATUS_ACTIVE = 'aktyvi';
+
     public const STATUS_RETURNED = 'grąžinta';
+
     public const STATUS_OVERDUE = 'vėluoja';
+
     public const STATUS_LOST = 'prarasta';
+
+    public const ACTIVE_STATUSES = [
+        self::STATUS_ACTIVE,
+        self::STATUS_OVERDUE,
+    ];
 
     protected $fillable = [
         'library_id',
@@ -37,7 +46,8 @@ class Loan extends Model
             'returned_at' => 'datetime',
         ];
     }
-     protected $appends = [
+
+    protected $appends = [
         'is_overdue',
         'overdue_days',
     ];
@@ -52,10 +62,10 @@ class Loan extends Model
         return $this->belongsTo(BookCopy::class);
     }
 
-   public function user(): BelongsTo
-{
-    return $this->belongsTo(User::class);
-}
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     public function issuer(): BelongsTo
     {
@@ -65,6 +75,13 @@ class Loan extends Model
     public function receiver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'received_by');
+    }
+
+    public function scopeActive($query)
+    {
+        return $query
+            ->whereNull('returned_at')
+            ->whereIn('status', self::ACTIVE_STATUSES);
     }
 
     public function isOverdue(): bool
@@ -132,12 +149,4 @@ class Loan extends Model
     {
         return $this->overdueDays();
     }
-
 }
-
-
-
-
-
-
-
