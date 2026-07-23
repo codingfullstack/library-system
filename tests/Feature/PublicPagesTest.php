@@ -22,7 +22,7 @@ it('shows public home statistics from the database', function () {
 
     $branch = Branch::factory()->create(['library_id' => $library->id]);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
-    BookCopy::factory()->count(4)->create([
+    $copies = BookCopy::factory()->count(4)->create([
         'library_id' => $library->id,
         'book_id' => $book->id,
         'branch_id' => $branch->id,
@@ -41,7 +41,7 @@ it('shows public home statistics from the database', function () {
         'library_id' => $library->id,
         'book_id' => $book->id,
         'user_id' => $member->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now(),
         'expires_at' => now()->addDay(),
         'fulfilled_at' => null,
@@ -55,6 +55,19 @@ it('shows public home statistics from the database', function () {
         'reserved_at' => now(),
         'expires_at' => now()->addDay(),
         'cancelled_at' => now(),
+    ]);
+    Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $member->id,
+        'pickup_branch_id' => $branch->id,
+        'assigned_book_copy_id' => $copies[0]->id,
+        'status' => Reservation::STATUS_READY,
+        'reserved_at' => now(),
+        'ready_at' => now(),
+        'expires_at' => now()->addDay(),
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
     ]);
 
     $response = $this->get(route('home'));
@@ -71,11 +84,11 @@ it('shows public home statistics from the database', function () {
         'copies' => 4,
         'members' => $memberCount,
         'libraries' => Library::query()->where('is_active', true)->where('is_public', true)->count(),
-        'activeReservations' => Reservation::query()->pending()->count(),
+        'activeReservations' => Reservation::query()->active()->count(),
     ]);
     $response->assertSee(number_format(1));
     $response->assertSee(number_format($memberCount));
-    $response->assertSee(number_format(Reservation::query()->pending()->count()));
+    $response->assertSee(number_format(Reservation::query()->active()->count()));
 });
 
 it('passes database statistics to the about page', function () {

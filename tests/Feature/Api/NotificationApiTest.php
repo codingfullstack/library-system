@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Support\Notifications\NotificationType;
 use App\Support\Notifications\NotificationUiConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\DatabaseNotification;
@@ -39,14 +40,26 @@ it('returns notifications and unread count for the authenticated user', function
         ->getJson('/api/auth/notifications')
         ->assertOk()
         ->assertJsonPath('unread_count', 1)
-        ->assertJsonCount(1, 'items')
-        ->assertJsonPath('items.0.type', 'RESERVATION')
-        ->assertJsonPath('items.0.kind', 'reservation_ready')
-        ->assertJsonPath('items.0.title', 'Mano pranešimas')
-        ->assertJsonPath('items.0.ui.type', 'RESERVATION')
-        ->assertJsonPath('items.0.category', 'Rezervacija')
-        ->assertJsonPath('items.0.icon', 'bookmark')
-        ->assertJsonPath('items.0.color', 'Indigo');
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.type', 'reservation_ready')
+        ->assertJsonPath('data.0.kind', 'reservation_ready')
+        ->assertJsonPath('data.0.title', 'Mano pranešimas')
+        ->assertJsonPath('data.0.ui.type', 'RESERVATION')
+        ->assertJsonPath('data.0.category', 'Rezervacija')
+        ->assertJsonPath('data.0.icon', 'bookmark')
+        ->assertJsonPath('data.0.color', 'Indigo')
+        ->assertJsonPath('data.0.badge', 'reservation')
+        ->assertJsonPath('data.0.priority', 'medium')
+        ->assertJsonStructure([
+            'data',
+            'links' => ['first', 'last', 'prev', 'next'],
+            'meta' => ['current_page', 'last_page', 'per_page', 'total'],
+        ]);
+});
+
+it('uses NotificationType as the event type registry', function () {
+    expect(array_map(fn (NotificationType $type) => $type->value, NotificationType::cases()))
+        ->toBe(array_keys(NotificationUiConfig::all()));
 });
 
 it('defines complete UI metadata for every notification type', function () {
@@ -60,6 +73,10 @@ it('defines complete UI metadata for every notification type', function () {
             ->and($config['category_key'])->not->toBeEmpty()
             ->and($config['icon'])->not->toBeEmpty()
             ->and($config['color'])->not->toBeEmpty()
+            ->and($config['title'])->not->toBeEmpty()
+            ->and($config['subtitle'])->not->toBeEmpty()
+            ->and($config['badge'])->not->toBeEmpty()
+            ->and($config['priority'])->toBeIn(['normal', 'medium', 'high'])
             ->and($config['web']['badge'])->not->toBeEmpty()
             ->and($config['web']['icon_wrap'])->not->toBeEmpty()
             ->and($config['web']['icon'])->not->toBeEmpty()
@@ -81,6 +98,7 @@ it('maps the required notification types to the shared UI specification', functi
     'reservation created' => ['reservation_created', 'Rezervacija', 'Indigo', 'bookmark'],
     'reservation position changed' => ['reservation_queue_changed', 'Rezervacija', 'Indigo', 'bookmark'],
     'reservation ready' => ['reservation_ready', 'Rezervacija', 'Indigo', 'bookmark'],
+    'reservation expired' => ['reservation_expired', 'Rezervacija', 'Indigo', 'bookmark'],
     'reservation fulfilled' => ['reservation_fulfilled', 'Rezervacija', 'Indigo', 'bookmark'],
     'book returned' => ['book_returned', 'Paskola', 'Teal', 'schedule'],
     'loan due soon' => ['book_due_soon', 'Paskola', 'Teal', 'schedule'],
@@ -120,7 +138,7 @@ it('returns current UI metadata instead of stale stored notification data', func
     $items = $this->actingAs($user)
         ->getJson('/api/auth/notifications')
         ->assertOk()
-        ->json('items');
+        ->json('data');
 
     $itemsByKind = collect($items)->keyBy('kind');
 
@@ -130,6 +148,56 @@ it('returns current UI metadata instead of stale stored notification data', func
         ->and($itemsByKind['reservation_fulfilled']['ui']['category'])->toBe('Rezervacija')
         ->and($itemsByKind['reservation_fulfilled']['ui']['color'])->toBe('Indigo')
         ->and($itemsByKind['reservation_fulfilled']['ui']['icon'])->toBe('bookmark');
+});
+
+it('returns branch notification metadata for mobile clients without parsing text', function () {
+    $user = User::factory()->member()->create();
+
+    createApiNotification($user, [
+        'kind' => 'reservation_ready',
+        'type' => 'reservation_ready',
+        'title' => 'Rezervacija paruošta',
+        'message' => 'Knyga laukia atsiėmimo.',
+        'metadata' => [
+            'reservation_id' => 15,
+            'book_title' => 'Testinė knyga',
+            'pickup_branch_id' => 5,
+            'pickup_branch_name' => 'Centrinis filialas',
+            'expires_at' => '2026-07-20 12:00:00',
+        ],
+    ]);
+
+    $this->actingAs($user)
+        ->getJson('/api/auth/notifications')
+        ->assertOk()
+        ->assertJsonPath('data.0.metadata.pickup_branch_id', 5)
+        ->assertJsonPath('data.0.metadata.pickup_branch_name', 'Centrinis filialas')
+        ->assertJsonPath('data.0.metadata.book_title', 'Testinė knyga');
+});
+
+it('uses the standardized notification metadata keys', function () {
+    $user = User::factory()->member()->create();
+
+    createApiNotification($user, [
+        'kind' => NotificationType::RESERVATION_QUEUE_CHANGED->value,
+        'type' => NotificationType::RESERVATION_QUEUE_CHANGED->value,
+        'metadata' => [
+            'reservation_id' => 10,
+            'book_id' => 20,
+            'book_title' => 'Queue book',
+            'queue_position' => 2,
+            'old_queue_position' => 3,
+            'new_queue_position' => 2,
+        ],
+    ]);
+
+    $metadata = $this->actingAs($user)
+        ->getJson('/api/auth/notifications')
+        ->assertOk()
+        ->json('data.0.metadata');
+
+    expect($metadata)->toHaveKeys(['old_queue_position', 'new_queue_position'])
+        ->and($metadata)->not->toHaveKeys(['old_position', 'new_position', 'pickup_expires_at', 'book_copy_id', 'inventory_code']);
 });
 
 it('returns a safe fallback for unknown notification types without using success', function () {
@@ -144,9 +212,9 @@ it('returns a safe fallback for unknown notification types without using success
     $this->actingAs($user)
         ->getJson('/api/auth/notifications')
         ->assertOk()
-        ->assertJsonPath('items.0.ui.category', 'Informacinis')
-        ->assertJsonPath('items.0.ui.color', 'Blue')
-        ->assertJsonPath('items.0.ui.icon', 'info');
+        ->assertJsonPath('data.0.ui.category', 'Informacinis')
+        ->assertJsonPath('data.0.ui.color', 'Blue')
+        ->assertJsonPath('data.0.ui.icon', 'info');
 });
 
 it('keeps web notification screen free from per-type UI mappers', function () {

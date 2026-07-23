@@ -80,7 +80,7 @@ it('does not return other branch reservations to staff reservation api', functio
         'user_id' => $member->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $otherBranch->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHour(),
     ]);
 
@@ -112,9 +112,9 @@ it('keeps own branch loan details visible to staff', function () {
     $this->actingAs($staff)
         ->getJson('/api/auth/loans/active')
         ->assertOk()
-        ->assertJsonPath('0.id', $loan->id)
-        ->assertJsonPath('0.user.id', $member->id)
-        ->assertJsonPath('0.user.email', $member->email);
+        ->assertJsonPath('data.0.id', $loan->id)
+        ->assertJsonPath('data.0.user.id', $member->id)
+        ->assertJsonPath('data.0.user.email', $member->email);
 });
 
 it('keeps other branch reader data out of reservation exports and dashboard member counts', function () {
@@ -131,7 +131,7 @@ it('keeps other branch reader data out of reservation exports and dashboard memb
         'user_id' => $member->id,
         'scope' => Reservation::SCOPE_BRANCH,
         'branch_id' => $otherBranch->id,
-        'status' => Reservation::STATUS_RESERVED,
+        'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now(),
     ]);
 
