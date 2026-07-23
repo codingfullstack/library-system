@@ -104,7 +104,9 @@
                             <div class="xl:w-48">
                                 <select id="status" name="status" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
                                     <option value="">Būsena</option>
-                                    <option value="rezervuota" @selected(request('status') === 'rezervuota')>Aktyvios</option>
+                                    <option value="active" @selected(request('status') === 'active')>Aktyvios</option>
+                                    <option value="rezervuota" @selected(request('status') === 'rezervuota')>Laukiančios</option>
+                                    <option value="paruošta" @selected(request('status') === 'paruošta')>Paruoštos atsiimti</option>
                                     <option value="įvykdyta" @selected(request('status') === 'įvykdyta')>Įvykdytos</option>
                                     <option value="atšaukta" @selected(request('status') === 'atšaukta')>Atšauktos</option>
                                     <option value="pasibaigusi" @selected(request('status') === 'pasibaigusi')>Pasibaigusios</option>
@@ -144,10 +146,11 @@
                                         <th class="px-4 py-3 text-left"><input type="checkbox" class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"></th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Knyga</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Biblioteka</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Atsiėmimo filialas</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Rezervacijos data</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Būsena</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Galioja iki</th>
-                                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Eilės nr.</th>
+                                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Vieta eilėje</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Veiksmai</th>
                                     </tr>
                                 </thead>
@@ -159,19 +162,20 @@
                                                 $reservation->status === 'atšaukta' || ! is_null($reservation->cancelled_at) => 'Atšaukta',
                                                 $reservation->isCurrent() => 'Paruošta atsiimti',
                                                 $reservation->isPending() => 'Aktyvi',
-                                                default => 'Pasibaigusi',
+                                                default => $reservation->statusLabel(),
                                             };
 
                                             $statusClasses = match (true) {
                                                 $reservation->status === 'įvykdyta' || ! is_null($reservation->fulfilled_at) => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
                                                 $reservation->status === 'atšaukta' || ! is_null($reservation->cancelled_at) => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300',
+                                                $reservation->isReady() => 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300',
                                                 ! $reservation->isPending() => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
                                                 default => $reservation->isCurrent()
                                                     ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300'
                                                     : 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
                                             };
 
-                                            $daysUntilExpiry = $reservation->expires_at
+                                            $daysUntilExpiry = $reservation->isReady() && $reservation->expires_at
                                                 ? now()->startOfDay()->diffInDays($reservation->expires_at->copy()->startOfDay(), false)
                                                 : null;
                                         @endphp
@@ -195,6 +199,13 @@
                                                 </div>
                                             </td>
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">{{ $reservation->library?->name ?: '-' }}</td>
+                                            <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">
+                                                @if($reservation->isReady() && $reservation->pickupBranch)
+                                                    <span class="font-medium text-zinc-900 dark:text-zinc-100">Atsiimti: {{ $reservation->pickupBranch->name }}</span>
+                                                @else
+                                                    -
+                                                @endif
+                                            </td>
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">{{ $reservation->created_at?->format('Y-m-d H:i') ?: '-' }}</td>
                                             <td class="px-4 py-4 align-middle">
                                                 <span x-show="! cancelled" class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClasses }}">
@@ -205,7 +216,7 @@
                                                 </span>
                                             </td>
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">
-                                                @if($reservation->expires_at)
+                                                @if($reservation->isReady())
                                                     <div>{{ $reservation->expires_at->format('Y-m-d') }}</div>
                                                     <div class="mt-1 text-xs font-semibold {{ ($daysUntilExpiry !== null && $daysUntilExpiry < 0) ? 'text-red-600 dark:text-red-300' : 'text-emerald-600 dark:text-emerald-300' }}">
                                                         @if($daysUntilExpiry !== null && $daysUntilExpiry >= 0)
@@ -219,7 +230,13 @@
                                                 @endif
                                             </td>
                                             <td class="px-4 py-4 align-middle text-center text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                                                <span x-show="! cancelled">{{ $reservation->isPending() && $reservation->queue_position ? $reservation->queue_position : '-' }}</span>
+                                                <span x-show="! cancelled">
+                                                    @if($reservation->isPending() && $reservation->queue_position)
+                                                        {{ $reservation->queue_position }}@if($reservation->queue_size) iš {{ $reservation->queue_size }}@endif
+                                                    @else
+                                                        -
+                                                    @endif
+                                                </span>
                                                 <span x-cloak x-show="cancelled">-</span>
                                             </td>
                                             <td class="px-4 py-4 align-middle">

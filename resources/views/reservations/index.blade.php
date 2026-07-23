@@ -122,7 +122,9 @@
                             <div class="xl:w-48">
                                 <select id="status" name="status" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
                                     <option value="">Būsena</option>
-                                    <option value="rezervuota" {{ request('status') === 'rezervuota' ? 'selected' : '' }}>Aktyvios</option>
+                                    <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Aktyvios</option>
+                                    <option value="rezervuota" {{ request('status') === 'rezervuota' ? 'selected' : '' }}>Laukiančios</option>
+                                    <option value="paruošta" {{ request('status') === 'paruošta' ? 'selected' : '' }}>Paruoštos atsiimti</option>
                                     <option value="įvykdyta" {{ request('status') === 'įvykdyta' ? 'selected' : '' }}>Įvykdytos</option>
                                     <option value="atšaukta" {{ request('status') === 'atšaukta' ? 'selected' : '' }}>Atšauktos</option>
                                     <option value="pasibaigusi" {{ request('status') === 'pasibaigusi' ? 'selected' : '' }}>Pasibaigusios</option>
@@ -190,9 +192,10 @@
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Vartotojas</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Rezervacijos data</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Apimtis</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Atsiėmimo filialas</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Būsena</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Galioja iki</th>
-                                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Eilės nr.</th>
+                                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Vieta eilėje</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Veiksmai</th>
                                     </tr>
                                 </thead>
@@ -202,10 +205,11 @@
                                             $statusMeta = match (true) {
                                                 $reservation->status === 'įvykdyta' || $reservation->fulfilled_at !== null => ['label' => 'Įvykdyta', 'classes' => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'],
                                                 $reservation->status === 'atšaukta' || $reservation->cancelled_at !== null => ['label' => 'Atšaukta', 'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300'],
-                                                $reservation->isPending() => ['label' => 'Aktyvi', 'classes' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'],
-                                                default => ['label' => 'Pasibaigusi', 'classes' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'],
+                                                $reservation->isReady() => ['label' => 'Paruošta atsiimti', 'classes' => 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300'],
+                                                $reservation->isPending() => ['label' => 'Laukia eilėje', 'classes' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'],
+                                                default => ['label' => $reservation->statusLabel(), 'classes' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'],
                                             };
-                                            $daysUntilExpiry = $reservation->expires_at ? now()->startOfDay()->diffInDays($reservation->expires_at->copy()->startOfDay(), false) : null;
+                                            $daysUntilExpiry = $reservation->isReady() && $reservation->expires_at ? now()->startOfDay()->diffInDays($reservation->expires_at->copy()->startOfDay(), false) : null;
                                             $isBranchScoped = $reservation->scope === \App\Models\Reservation::SCOPE_BRANCH;
                                         @endphp
                                         <tr
@@ -261,6 +265,13 @@
                                                     </div>
                                                 @endif
                                             </td>
+                                            <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">
+                                                @if($reservation->isReady() && $reservation->pickupBranch)
+                                                    <div class="font-medium text-zinc-900 dark:text-zinc-100">{{ $reservation->pickupBranch->name }}</div>
+                                                @else
+                                                    -
+                                                @endif
+                                            </td>
                                             <td class="px-4 py-4 align-middle">
                                                 <span x-show="! cancelled" class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusMeta['classes'] }}">
                                                     {{ $statusMeta['label'] }}
@@ -270,7 +281,7 @@
                                                 </span>
                                             </td>
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">
-                                                @if($reservation->expires_at)
+                                                @if($reservation->isReady())
                                                     <div>{{ $reservation->expires_at->format('Y-m-d') }}</div>
                                                     <div class="mt-1 text-xs font-semibold {{ ($daysUntilExpiry !== null && $daysUntilExpiry < 0) ? 'text-red-600 dark:text-red-300' : 'text-emerald-600 dark:text-emerald-300' }}">
                                                         @if($daysUntilExpiry !== null && $daysUntilExpiry >= 0)
@@ -286,7 +297,7 @@
                                             <td class="px-4 py-4 align-middle text-center text-sm font-medium text-zinc-800 dark:text-zinc-200">
                                                 <span x-show="! cancelled">
                                                     @if($reservation->isPending() && $reservation->queue_position)
-                                                        {{ $reservation->queue_position }}
+                                                        {{ $reservation->queue_position }}@if($reservation->queue_size) iš {{ $reservation->queue_size }}@endif
                                                     @else
                                                         -
                                                     @endif

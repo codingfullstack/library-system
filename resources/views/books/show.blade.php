@@ -3,23 +3,19 @@
         $authUser = auth()->user();
         $canEditBooks = $authUser?->isSuperAdmin();
 
-        $preferredReservation = $book->reservations
-            ->filter(fn ($reservation) => $reservation->isPending())
-            ->sortBy([['created_at', 'asc'], ['id', 'asc']])
-            ->first();
-
         $visibleCopies = $book->bookCopies;
         $availableCopies = $visibleCopies->where('status', 'laisva')->count();
         $loanedCopies = $visibleCopies->where('status', 'išduota')->count();
         $unavailableCopies = $visibleCopies->whereIn('status', ['prarasta', 'sugadinta', 'tvarkoma', 'nurašyta'])->count();
-        $activeReservationsCount = $book->reservations->filter(fn ($reservation) => $reservation->isPending())->count();
+        $hasActiveReservations = $book->reservations->contains(fn ($reservation) => $reservation->isActive());
+        $activeReservationsCount = $book->reservations->filter(fn ($reservation) => $reservation->isActive())->count();
         $hasOnlyUnavailableCopies = $visibleCopies->isNotEmpty() && $unavailableCopies === $visibleCopies->count();
 
         [$availabilityLabel, $availabilityClasses] = match (true) {
             $availableCopies > 0 => ['Aktyvi', 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'],
             $loanedCopies > 0 => ['Išduota', 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'],
             $hasOnlyUnavailableCopies => ['Neprieinama', 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300'],
-            $preferredReservation => ['Rezervuojama', 'bg-violet-100 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300'],
+            $hasActiveReservations => ['Rezervuojama', 'bg-violet-100 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300'],
             default => ['Neprieinama', 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300'],
         };
 
@@ -383,16 +379,7 @@
                                 @foreach($bookCopies as $copy)
                                     @php
                                         $status = $copy->status ?: 'unknown';
-                                        $preferredReservationForCopy = $book->reservations
-                                            ->filter(fn ($reservation) => $reservation->isPending()
-                                                && (int) $reservation->library_id === (int) $copy->library_id
-                                                && (
-                                                    ($reservation->scope === \App\Models\Reservation::SCOPE_BRANCH && (int) $reservation->branch_id === (int) $copy->branch_id)
-                                                    || (($reservation->scope ?: \App\Models\Reservation::SCOPE_LIBRARY) === \App\Models\Reservation::SCOPE_LIBRARY && $reservation->branch_id === null)
-                                                ))
-                                            ->where('library_id', $copy->library_id)
-                                            ->sortBy([['created_at', 'asc'], ['id', 'asc']])
-                                            ->first();
+                                        $preferredReservationForCopy = $copy->getAttribute('eligible_reservation');
                                         $copyLocationText = $copy->location
                                             ? collect([$copy->location->name, $copy->location->room, $copy->location->shelf])->filter()->join(' / ')
                                             : '';
@@ -422,7 +409,7 @@
                                             'padėvėta', 'padeveta' => 'text-amber-700 dark:text-amber-300',
                                             default => 'text-rose-700 dark:text-rose-300',
                                         };
-                                        $reservationDaysLeft = $preferredReservationForCopy?->expires_at
+                                        $reservationDaysLeft = $preferredReservationForCopy?->isReady() && $preferredReservationForCopy?->expires_at
                                             ? now()->startOfDay()->diffInDays($preferredReservationForCopy->expires_at->copy()->startOfDay(), false)
                                             : null;
                                     @endphp
@@ -475,7 +462,7 @@
                                                         {{ $reservationBadge['label'] }}
                                                     </button>
                                                 @endif
-                                                @if($preferredReservationForCopy)
+                                                @if($preferredReservationForCopy?->isReady())
                                                     <div class="pt-1">
                                                         <p class="text-xs text-zinc-500 dark:text-zinc-400">Rezervuota iki</p>
                                                         <p class="mt-1 flex items-center gap-2 text-sm font-semibold text-violet-700 dark:text-violet-300">
@@ -538,8 +525,17 @@
                                                                     </div>
                                                                 </div>
                                                                 <div class="w-fit rounded-2xl bg-violet-50 px-8 py-5 text-center text-violet-900 dark:bg-violet-500/10 dark:text-violet-200">
-                                                                    <p class="text-2xl font-bold">{{ $preferredReservationForCopy->queue_position ?: '-' }}</p>
-                                                                    <p class="mt-1 text-sm font-medium">Eilėje</p>
+                                                                    <p class="text-sm font-bold uppercase tracking-wide">Būsena</p>
+                                                                    <p class="mt-2 text-base font-bold">{{ $preferredReservationForCopy->isReady() ? 'Paruošta atsiimti' : 'Laukianti eilėje' }}</p>
+                                                                    @if($preferredReservationForCopy->isPending())
+                                                                        <p class="mt-3 text-2xl font-bold">
+                                                                            {{ $preferredReservationForCopy->queue_position ?: '-' }}
+                                                                            @if($preferredReservationForCopy->queue_size)
+                                                                                <span class="text-base font-semibold">iš {{ $preferredReservationForCopy->queue_size }}</span>
+                                                                            @endif
+                                                                        </p>
+                                                                        <p class="mt-1 text-sm font-medium">Vieta eilėje</p>
+                                                                    @endif
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -551,8 +547,8 @@
                                                                         <flux:icon.calendar-days class="size-6" />
                                                                     </span>
                                                                     <div>
-                                                                        <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Galioja iki</p>
-                                                                        <p class="mt-1 text-base font-bold text-zinc-950 dark:text-white">{{ $preferredReservationForCopy->expires_at?->format('Y-m-d H:i') ?: '-' }}</p>
+                                                                        <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ $preferredReservationForCopy->isReady() ? 'Atsiimti iki' : 'Galioja iki' }}</p>
+                                                                        <p class="mt-1 text-base font-bold text-zinc-950 dark:text-white">{{ $preferredReservationForCopy->isReady() ? ($preferredReservationForCopy->expires_at?->format('Y-m-d H:i') ?: '-') : 'Terminas dar nepriskirtas' }}</p>
                                                                     </div>
                                                                 </div>
                                                                 @if($reservationDaysLeft !== null)
@@ -574,11 +570,19 @@
                                                         <div class="rounded-2xl bg-sky-50/70 px-6 py-5 dark:bg-sky-500/10">
                                                             <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                                                                 <div>
-                                                                    <p class="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Filialas</p>
+                                                                    <p class="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ $preferredReservationForCopy->isReady() ? 'Atsiėmimo filialas' : 'Rezervacijos apimtis' }}</p>
                                                                     <p class="mt-3 flex items-center gap-2 text-sm font-semibold text-zinc-950 dark:text-white">
                                                                         <flux:icon.building-library class="size-4 text-zinc-500 dark:text-zinc-400" />
-                                                                        {{ $copy->branch?->name ?: $preferredReservationForCopy->branch?->name ?: '-' }}
+                                                                        @if($preferredReservationForCopy->isReady())
+                                                                            {{ $preferredReservationForCopy->pickupBranch?->name ?: '-' }}
+                                                                        @else
+                                                                            {{ $preferredReservationForCopy->scope === \App\Models\Reservation::SCOPE_BRANCH ? 'Konkretus filialas' : 'Visa biblioteka' }}
+                                                                        @endif
                                                                     </p>
+                                                                    @if($preferredReservationForCopy->isPending() && $preferredReservationForCopy->scope === \App\Models\Reservation::SCOPE_BRANCH)
+                                                                        <p class="mt-8 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Pasirinktas filialas</p>
+                                                                        <p class="mt-3 text-sm font-semibold text-zinc-950 dark:text-white">{{ $preferredReservationForCopy->branch?->name ?: '-' }}</p>
+                                                                    @endif
                                                                     <p class="mt-8 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Aktyvavimo statusas</p>
                                                                     <span class="mt-3 inline-flex rounded-full bg-emerald-100 px-3 py-1 text-sm font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
                                                                         {{ $preferredReservationForCopy->statusLabel() }}
@@ -591,10 +595,10 @@
                                                                         <flux:icon.map-pin class="size-4 text-zinc-500 dark:text-zinc-400" />
                                                                         {{ $copyLocationText }}
                                                                     </p>
-                                                                    <p class="mt-8 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Rezervacijos sukūrimo data</p>
+                                                                    <p class="mt-8 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ $preferredReservationForCopy->isReady() ? 'Paruošta nuo' : 'Rezervuota' }}</p>
                                                                     <p class="mt-3 flex items-center gap-2 text-sm font-semibold text-zinc-950 dark:text-white">
                                                                         <flux:icon.calendar-days class="size-4 text-zinc-500 dark:text-zinc-400" />
-                                                                        {{ $preferredReservationForCopy->created_at?->format('Y-m-d H:i') ?: '-' }}
+                                                                        {{ $preferredReservationForCopy->isReady() ? ($preferredReservationForCopy->ready_at?->format('Y-m-d H:i') ?: '-') : ($preferredReservationForCopy->reserved_at?->format('Y-m-d H:i') ?: '-') }}
                                                                     </p>
                                                                 </div>
 
@@ -604,8 +608,15 @@
                                                                 </div>
 
                                                                 <div>
-                                                                    <p class="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Rezervacijos pozicija</p>
-                                                                    <p class="mt-3 text-sm font-semibold text-zinc-950 dark:text-white">{{ $preferredReservationForCopy->queue_position ?: '-' }}</p>
+                                                                    @if($preferredReservationForCopy->isPending())
+                                                                        <p class="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Vieta eilėje</p>
+                                                                        <p class="mt-3 text-sm font-semibold text-zinc-950 dark:text-white">
+                                                                            {{ $preferredReservationForCopy->queue_position ?: '-' }}
+                                                                            @if($preferredReservationForCopy->queue_size)
+                                                                                iš {{ $preferredReservationForCopy->queue_size }}
+                                                                            @endif
+                                                                        </p>
+                                                                    @endif
                                                                     <p class="mt-8 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Rezervacijos statusas</p>
                                                                     <p class="mt-3 text-sm font-semibold text-zinc-950 dark:text-white">{{ $preferredReservationForCopy->statusLabel() }}</p>
                                                                 </div>
@@ -639,16 +650,7 @@
                                             @foreach($bookCopies as $copy)
                                                 @php
                                                     $status = $copy->status ?: 'unknown';
-                                                    $preferredReservationForCopy = $book->reservations
-                                                        ->filter(fn ($reservation) => $reservation->isPending()
-                                                            && (int) $reservation->library_id === (int) $copy->library_id
-                                                            && (
-                                                                ($reservation->scope === \App\Models\Reservation::SCOPE_BRANCH && (int) $reservation->branch_id === (int) $copy->branch_id)
-                                                                || (($reservation->scope ?: \App\Models\Reservation::SCOPE_LIBRARY) === \App\Models\Reservation::SCOPE_LIBRARY && $reservation->branch_id === null)
-                                                            ))
-                                                        ->where('library_id', $copy->library_id)
-                                                        ->sortBy([['created_at', 'asc'], ['id', 'asc']])
-                                                        ->first();
+                                                    $preferredReservationForCopy = $copy->getAttribute('eligible_reservation');
                                                     $copyLocationText = $copy->location
                                                         ? collect([$copy->location->name, $copy->location->room, $copy->location->shelf])->filter()->join(' / ')
                                                         : '';
@@ -697,9 +699,11 @@
                                                                     <span>{{ $reservationBadge['label'] }}</span>
                                                                     <flux:icon.chevron-right class="size-3 transition-transform" x-bind:class="openReservationCopy === {{ $copy->id }} ? 'rotate-90' : ''" />
                                                                 </button>
+                                                                @if($preferredReservationForCopy->isReady())
                                                                 <span class="text-xs text-violet-700 dark:text-violet-300">
                                                                     Rezervuota iki: {{ $preferredReservationForCopy->expires_at?->format('Y-m-d H:i') ?: '-' }}
                                                                 </span>
+                                                                @endif
                                                             @endif
                                                         </div>
                                                     </td>

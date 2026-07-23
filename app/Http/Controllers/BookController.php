@@ -9,6 +9,7 @@ use App\Queries\Books\GetLibraryBookDetailsQuery;
 use App\Queries\Books\GetLibraryBooksQuery;
 use App\Queries\Management\AuditLogs\GetRecentAuditLogsForBookQuery;
 use App\Services\ReservationQueueDebugService;
+use App\Services\ReservationQueueService;
 use App\Services\SeoService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
@@ -64,12 +65,12 @@ class BookController extends Controller
 
         if ($actor->effectiveRole() === 'narys') {
             $currentReservation = $book->reservations
-                ->filter(fn ($reservation) => $reservation->isPending())
+                ->filter(fn ($reservation) => $reservation->isActive())
                 ->sortBy([['created_at', 'asc'], ['id', 'asc']])
                 ->first();
 
             $memberReservation = $book->reservations
-                ->first(fn ($reservation) => (int) $reservation->user_id === (int) $actor->id && $reservation->isPending());
+                ->first(fn ($reservation) => (int) $reservation->user_id === (int) $actor->id && $reservation->isActive());
 
             return view('account.books.show', [
                 'book' => $book,
@@ -82,6 +83,12 @@ class BookController extends Controller
         $copyPage = max((int) $request->query('copy-page', 1), 1);
         $copyPerPage = 10;
         $filteredBookCopies = $book->bookCopies->values();
+        $queueService = app(ReservationQueueService::class);
+
+        $filteredBookCopies->each(function ($copy) use ($queueService): void {
+            $copy->setAttribute('eligible_reservation', $queueService->getEligibleReservationForCopy($copy));
+        });
+
         $bookCopies = new LengthAwarePaginator(
             $filteredBookCopies->forPage($copyPage, $copyPerPage)->values(),
             $filteredBookCopies->count(),

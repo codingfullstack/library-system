@@ -160,7 +160,7 @@ class PublicPageController extends Controller
                     ->count('users.id'),
                 'libraries' => $publicLibraryIds->count(),
                 'activeReservations' => Reservation::query()
-                    ->pending()
+                    ->active()
                     ->whereIn('library_id', $publicLibraryIds)
                     ->count(),
             ];

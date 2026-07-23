@@ -133,7 +133,7 @@ class BorrowBookCopyForm extends Component
         try {
             app(BorrowBookCopyAction::class)->handle($actor, $this->bookCopy->fresh(), [
                 'user_id' => $this->preferredReservation->user_id,
-                'due_at' => $this->preferredReservation->expires_at?->toDateString(),
+                'due_at' => null,
                 'no_due_date' => false,
                 'notes' => 'Išduota pagal aktyvią rezervaciją.',
             ]);
@@ -272,7 +272,7 @@ class BorrowBookCopyForm extends Component
     private function canIssuePreferred(): bool
     {
         return $this->canBorrow()
-            && $this->preferredReservation?->isPending()
+            && $this->preferredReservation?->isReady()
             && $this->preferredReservation?->user !== null;
     }
 
@@ -282,13 +282,21 @@ class BorrowBookCopyForm extends Component
             return null;
         }
 
-        return Reservation::query()
+        $reservation = Reservation::query()
             ->with('user')
             ->whereKey($this->preferredReservationId)
             ->where('library_id', $this->bookCopy->library_id)
             ->where('book_id', $this->bookCopy->book_id)
-            ->pending()
             ->first();
+
+        $eligibleReservation = app(\App\Services\ReservationQueueService::class)
+            ->getEligibleReservationForCopy($this->bookCopy);
+
+        if (! $reservation || ! $eligibleReservation || (int) $reservation->id !== (int) $eligibleReservation->id) {
+            return null;
+        }
+
+        return $reservation;
     }
 
     private function mapActionField(string $field): string
@@ -297,6 +305,7 @@ class BorrowBookCopyForm extends Component
             'user_id' => 'selectedMemberId',
             'due_at' => 'dueAt',
             'book_copy' => 'bookCopy',
+            'reservation' => 'preferredReservation',
             'reservation_override' => 'overrideReservation',
             'override_reason' => 'overrideReason',
             default => $field,
