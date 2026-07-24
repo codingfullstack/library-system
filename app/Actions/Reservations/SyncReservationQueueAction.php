@@ -2,11 +2,13 @@
 
 namespace App\Actions\Reservations;
 
+use App\Models\BookCopy;
 use App\Models\Reservation;
 use App\Services\ReservationNotificationService;
 use App\Services\ReservationQueueDebugService;
 use App\Services\ReservationQueueService;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -22,6 +24,8 @@ class SyncReservationQueueAction
     public function handle(int $libraryId, int $bookId): void
     {
         DB::transaction(function () use ($libraryId, $bookId): void {
+            $this->queueService->lockQueueContext($libraryId, $bookId);
+
             $positionsBefore = $this->queueService->snapshotPositions($libraryId, $bookId);
 
             app(ReservationQueueDebugService::class)->logSnapshot('before_queue_sync', $libraryId, $bookId, [
@@ -47,12 +51,12 @@ class SyncReservationQueueAction
 
     private function syncQueue(int $libraryId, int $bookId): void
     {
-        $hasActiveReservations = $this->queueService
+        $lockedReservations = $this->queueService
             ->activeReservationsQuery($libraryId, $bookId)
             ->lockForUpdate()
-            ->exists();
+            ->get();
 
-        if (! $hasActiveReservations) {
+        if ($lockedReservations->isEmpty()) {
             return;
         }
 
@@ -71,7 +75,7 @@ class SyncReservationQueueAction
         $servedReservationIds = [];
 
         foreach ($availableCopies as $copy) {
-            $reservation = $this->queueService->getEligibleReservationForCopy($copy, $servedReservationIds, true);
+            $reservation = $this->eligibleLockedReservationForCopy($lockedReservations, $copy, $servedReservationIds);
 
             if (! $reservation) {
                 continue;
@@ -123,6 +127,32 @@ class SyncReservationQueueAction
                 'global_position' => $this->queueService->getQueuePosition($reservation),
             ]);
         }
+    }
+
+    /**
+     * @param  Collection<int, Reservation>  $lockedReservations
+     * @param  array<int, int>  $exceptReservationIds
+     */
+    private function eligibleLockedReservationForCopy(Collection $lockedReservations, BookCopy $copy, array $exceptReservationIds): ?Reservation
+    {
+        $excluded = array_fill_keys(array_map('intval', $exceptReservationIds), true);
+
+        return $lockedReservations->first(function (Reservation $reservation) use ($copy, $excluded): bool {
+            if (isset($excluded[(int) $reservation->id])) {
+                return false;
+            }
+
+            if (! $this->queueService->canBeServedByBranch($reservation, (int) $copy->branch_id)) {
+                return false;
+            }
+
+            if ($reservation->status === Reservation::STATUS_WAITING) {
+                return true;
+            }
+
+            return $reservation->status === Reservation::STATUS_READY
+                && (int) $reservation->assigned_book_copy_id === (int) $copy->id;
+        });
     }
 
     private function isActiveReadyCopyUniqueConstraintViolation(QueryException $exception): bool

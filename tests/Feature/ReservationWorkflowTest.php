@@ -1616,7 +1616,7 @@ it('does not duplicate ready or queue changed notifications on repeated sync', f
         ->and(app(ReservationQueueService::class)->positionFor($reservations[1]->fresh()))->toBe(1);
 });
 
-it('rolls back and returns a domain error when ready copy assignment hits the unique constraint', function () {
+it('selects ready candidates from the locked reservation set instead of a late eligible query', function () {
     if (! in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
         $this->markTestSkipped('The active READY copy unique constraint is enforced by the MySQL/MariaDB generated column.');
     }
@@ -1678,13 +1678,13 @@ it('rolls back and returns a domain error when ready copy assignment hits the un
 
     $action = new SyncReservationQueueAction($queueService, app(ReservationNotificationService::class));
 
-    expect(fn () => $action->handle($library->id, $book->id))
-        ->toThrow(ValidationException::class, 'Si kopija jau priskirta kitai paruostai rezervacijai');
+    $action->handle($library->id, $book->id);
 
-    expect($reservation->fresh()->status)->toBe(Reservation::STATUS_WAITING)
-        ->and($reservation->fresh()->assigned_book_copy_id)->toBeNull()
-        ->and(Reservation::query()->where('status', Reservation::STATUS_READY)->where('assigned_book_copy_id', $copy->id)->count())->toBe(0)
-        ->and($member->notifications()->where('type', 'reservation_ready')->count())->toBe(0);
+    expect($queueService->insertedConflict)->toBeFalse()
+        ->and($reservation->fresh()->status)->toBe(Reservation::STATUS_READY)
+        ->and($reservation->fresh()->assigned_book_copy_id)->toBe($copy->id)
+        ->and(Reservation::query()->where('status', Reservation::STATUS_READY)->where('assigned_book_copy_id', $copy->id)->count())->toBe(1)
+        ->and($member->notifications()->where('type', 'reservation_ready')->count())->toBe(1);
 });
 
 it('sends one queue change when a reservation is cancelled', function () {

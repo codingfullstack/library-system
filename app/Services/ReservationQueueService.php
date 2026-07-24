@@ -99,15 +99,10 @@ class ReservationQueueService
     }
 
     /**
-     * Critical reservation/loan flows must lock in this order:
-     * 1. library+book queue context (reservation_queues row)
-     * 2. reservation rows
-     * 3. individual book copy rows
-     * 4. loan rows
-     *
-     * The context row is the stable mutex for one reservation queue. It is
-     * independent from physical book copies, which may be created, moved, or
-     * deleted while the library/book queue identity remains the same.
+     * Every mutation of one library/book reservation queue must acquire this
+     * queue mutex first. Later row locks must stay inside the same queue
+     * context; plain validation reads without FOR UPDATE are not part of the
+     * lock sequence.
      */
     public function lockQueueContext(int $libraryId, int $bookId): ReservationQueue
     {
