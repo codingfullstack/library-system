@@ -5,9 +5,13 @@ namespace App\Services;
 use App\Models\BookCopy;
 use App\Models\Loan;
 use App\Models\Reservation;
+use App\Models\ReservationQueue;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use LogicException;
 
 class ReservationQueueService
 {
@@ -92,6 +96,47 @@ class ReservationQueueService
     public function hasAvailableCopies(int $libraryId, int $bookId, string $scope = Reservation::SCOPE_LIBRARY, ?int $branchId = null): bool
     {
         return $this->availableCopiesQuery($libraryId, $bookId, $scope, $branchId)->exists();
+    }
+
+    /**
+     * Critical reservation/loan flows must lock in this order:
+     * 1. library+book queue context (reservation_queues row)
+     * 2. reservation rows
+     * 3. individual book copy rows
+     * 4. loan rows
+     *
+     * The context row is the stable mutex for one reservation queue. It is
+     * independent from physical book copies, which may be created, moved, or
+     * deleted while the library/book queue identity remains the same.
+     */
+    public function lockQueueContext(int $libraryId, int $bookId): ReservationQueue
+    {
+        if (DB::transactionLevel() < 1) {
+            throw new LogicException('Reservation queue context must be locked inside an active database transaction.');
+        }
+
+        try {
+            ReservationQueue::query()->create([
+                'library_id' => $libraryId,
+                'book_id' => $bookId,
+            ]);
+        } catch (QueryException $exception) {
+            if (! $this->isReservationQueueUniqueConstraintViolation($exception)) {
+                throw $exception;
+            }
+        }
+
+        $queue = ReservationQueue::query()
+            ->where('library_id', $libraryId)
+            ->where('book_id', $bookId)
+            ->lockForUpdate()
+            ->first();
+
+        if (! $queue) {
+            throw new LogicException('Reservation queue context could not be created or locked.');
+        }
+
+        return $queue;
     }
 
     public function availableCopiesQuery(int $libraryId, int $bookId, string $scope = Reservation::SCOPE_LIBRARY, ?int $branchId = null): Builder
@@ -204,5 +249,11 @@ class ReservationQueueService
                 ->where('scope', Reservation::SCOPE_BRANCH)
                 ->where('branch_id', $branchId);
         });
+    }
+
+    private function isReservationQueueUniqueConstraintViolation(QueryException $exception): bool
+    {
+        return ($exception->errorInfo[0] ?? null) === '23000'
+            && str_contains($exception->getMessage(), 'reservation_queues_library_book_unique');
     }
 }
