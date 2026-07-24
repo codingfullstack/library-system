@@ -14,8 +14,6 @@ return new class extends Migration
             $table->foreignId('library_id')->constrained()->cascadeOnDelete();
             $table->foreignId('book_id')->constrained()->cascadeOnDelete();
             $table->timestamps();
-
-            $table->unique(['library_id', 'book_id'], 'reservation_queues_library_book_unique');
         });
 
         $now = now();
@@ -41,6 +39,10 @@ return new class extends Migration
                     ->all()
             );
         }
+
+        Schema::table('reservation_queues', function (Blueprint $table) {
+            $table->unique(['library_id', 'book_id'], 'reservation_queues_library_book_unique');
+        });
     }
 
     public function down(): void
