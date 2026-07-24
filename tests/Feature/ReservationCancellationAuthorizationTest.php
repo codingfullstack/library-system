@@ -64,6 +64,7 @@ function branchCancellationFixture(bool $assignStaffBranch = true): array
     $admin = User::factory()->admin()->create(['library_id' => $library->id]);
     $superAdmin = User::factory()->superAdmin()->create();
     $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $otherMember = User::factory()->member()->create(['library_id' => $library->id]);
 
     $staff->libraryMemberships()
         ->where('library_id', $library->id)
@@ -74,7 +75,7 @@ function branchCancellationFixture(bool $assignStaffBranch = true): array
         'admin' => $admin,
         'superAdmin' => $superAdmin,
         'ownReservation' => branchReservation($library->id, $book->id, $member->id, $ownBranch->id),
-        'otherReservation' => branchReservation($library->id, $book->id, $member->id, $otherBranch->id),
+        'otherReservation' => branchReservation($library->id, $book->id, $otherMember->id, $otherBranch->id),
     ];
 }
 

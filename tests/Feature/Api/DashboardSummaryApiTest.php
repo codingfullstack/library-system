@@ -14,6 +14,7 @@ it('returns dashboard summary counts for the active library', function () {
     $library = Library::factory()->create();
     $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $readyMember = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create();
 
     $copies = BookCopy::factory()->count(3)->create([
@@ -51,7 +52,7 @@ it('returns dashboard summary counts for the active library', function () {
     Reservation::factory()->create([
         'library_id' => $library->id,
         'book_id' => $book->id,
-        'user_id' => $member->id,
+        'user_id' => $readyMember->id,
         'pickup_branch_id' => $copies[2]->branch_id,
         'assigned_book_copy_id' => $copies[2]->id,
         'status' => Reservation::STATUS_READY,

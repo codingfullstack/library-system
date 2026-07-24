@@ -37,6 +37,7 @@ it('shows public home statistics from the database', function () {
     User::factory()->staff()->create(['library_id' => $library->id]);
 
     $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $readyMember = User::factory()->member()->create(['library_id' => $library->id]);
     Reservation::factory()->create([
         'library_id' => $library->id,
         'book_id' => $book->id,
@@ -59,7 +60,7 @@ it('shows public home statistics from the database', function () {
     Reservation::factory()->create([
         'library_id' => $library->id,
         'book_id' => $book->id,
-        'user_id' => $member->id,
+        'user_id' => $readyMember->id,
         'pickup_branch_id' => $branch->id,
         'assigned_book_copy_id' => $copies[0]->id,
         'status' => Reservation::STATUS_READY,

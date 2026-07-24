@@ -2,17 +2,26 @@
 
 namespace Tests\Unit;
 
+use App\Actions\Reservations\CreateReservationAction;
 use App\Models\Book;
 use App\Models\BookCopy;
 use App\Models\Branch;
 use App\Models\Library;
 use App\Models\Location;
 use App\Models\Reservation;
+use App\Models\ReservationQueue;
 use App\Models\User;
+use App\Services\ReservationQueueService;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\Process\Process;
 use Tests\Support\UsesTemporaryMariaDbDatabase;
 use Tests\TestCase;
 
+#[Group('mariadb')]
+#[Group('concurrency')]
+#[Group('database-invariants')]
 class ReservationConcurrencyProcessTest extends TestCase
 {
     use UsesTemporaryMariaDbDatabase;
@@ -84,6 +93,150 @@ class ReservationConcurrencyProcessTest extends TestCase
         $this->assertNull($reservations[1]->fresh()->assigned_book_copy_id);
     }
 
+    public function test_same_library_book_queue_context_uses_one_row_and_serializes_processes(): void
+    {
+        $library = Library::factory()->create();
+        $book = Book::factory()->create();
+        $releaseFile = $this->signalFile('release_same_queue');
+        $firstAcquiredFile = $this->signalFile('first_acquired_same_queue');
+        $secondAcquiredFile = $this->signalFile('second_acquired_same_queue');
+
+        $first = $this->queueLockProcess($library->id, $book->id, $releaseFile, $firstAcquiredFile);
+        $second = $this->queueLockProcess($library->id, $book->id, null, $secondAcquiredFile);
+
+        $first->start();
+        $this->waitForSignalFile($firstAcquiredFile);
+
+        $startedAt = microtime(true);
+        $second->start();
+        usleep(300 * 1000);
+
+        $this->assertTrue($second->isRunning(), $second->getErrorOutput().$second->getOutput());
+        $this->assertFileDoesNotExist($secondAcquiredFile);
+
+        touch($releaseFile);
+        $first->wait();
+        $second->wait();
+        $elapsed = microtime(true) - $startedAt;
+
+        $this->assertTrue($first->isSuccessful(), $first->getErrorOutput().$first->getOutput());
+        $this->assertTrue($second->isSuccessful(), $second->getErrorOutput().$second->getOutput());
+        $this->assertFileExists($secondAcquiredFile);
+        $this->assertGreaterThanOrEqual(0.25, $elapsed);
+
+        $firstQueueId = (int) file_get_contents($firstAcquiredFile);
+        $secondQueueId = (int) file_get_contents($secondAcquiredFile);
+
+        $this->assertSame($firstQueueId, $secondQueueId);
+        $this->assertSame($firstQueueId, ReservationQueue::query()
+            ->where('library_id', $library->id)
+            ->where('book_id', $book->id)
+            ->value('id'));
+    }
+
+    public function test_different_library_book_queue_contexts_do_not_block_each_other(): void
+    {
+        $library = Library::factory()->create();
+        $firstBook = Book::factory()->create();
+        $secondBook = Book::factory()->create();
+        $releaseFile = $this->signalFile('release_different_queue');
+        $firstAcquiredFile = $this->signalFile('first_acquired_different_queue');
+        $secondAcquiredFile = $this->signalFile('second_acquired_different_queue');
+
+        $first = $this->queueLockProcess($library->id, $firstBook->id, $releaseFile, $firstAcquiredFile);
+        $second = $this->queueLockProcess($library->id, $secondBook->id, null, $secondAcquiredFile);
+
+        $first->start();
+        $this->waitForSignalFile($firstAcquiredFile);
+
+        $startedAt = microtime(true);
+        $second->start();
+        $second->wait();
+        $elapsed = microtime(true) - $startedAt;
+
+        touch($releaseFile);
+        $first->wait();
+
+        $this->assertTrue($first->isSuccessful(), $first->getErrorOutput().$first->getOutput());
+        $this->assertTrue($second->isSuccessful(), $second->getErrorOutput().$second->getOutput());
+        $this->assertFileExists($secondAcquiredFile);
+        $this->assertLessThan(1.0, $elapsed);
+        $this->assertNotSame(
+            (int) file_get_contents($firstAcquiredFile),
+            (int) file_get_contents($secondAcquiredFile)
+        );
+    }
+
+    public function test_queue_context_can_be_locked_when_book_has_no_copies_but_reservation_creation_is_rejected(): void
+    {
+        $library = Library::factory()->create();
+        $book = Book::factory()->create();
+        $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+        $member = User::factory()->member()->create(['library_id' => $library->id]);
+
+        $queue = DB::transaction(fn () => app(ReservationQueueService::class)
+            ->lockQueueContext($library->id, $book->id));
+
+        $this->assertSame($library->id, (int) $queue->library_id);
+        $this->assertSame($book->id, (int) $queue->book_id);
+        $this->assertSame(0, BookCopy::query()
+            ->where('library_id', $library->id)
+            ->where('book_id', $book->id)
+            ->count());
+
+        try {
+            app(CreateReservationAction::class)->handle($staff, [
+                'book_id' => $book->id,
+                'user_id' => $member->id,
+                'scope' => Reservation::SCOPE_LIBRARY,
+            ]);
+
+            $this->fail('Reservation creation should reject books without library copies.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('book_id', $exception->errors());
+        }
+    }
+
+    public function test_two_independent_processes_do_not_create_duplicate_active_reservations(): void
+    {
+        $library = Library::factory()->create();
+        $book = Book::factory()->create();
+        $branch = Branch::factory()->create(['library_id' => $library->id]);
+        $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+        $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+        $member = User::factory()->member()->create(['library_id' => $library->id]);
+
+        BookCopy::factory()->create([
+            'library_id' => $library->id,
+            'book_id' => $book->id,
+            'branch_id' => $branch->id,
+            'location_id' => $location->id,
+            'status' => BookCopy::STATUS_LOANED,
+        ]);
+
+        $first = $this->createReservationProcess($staff->id, $member->id, $book->id);
+        $second = $this->createReservationProcess($staff->id, $member->id, $book->id);
+
+        $first->start();
+        $second->start();
+        $first->wait();
+        $second->wait();
+
+        $this->assertTrue($first->isSuccessful(), $first->getErrorOutput().$first->getOutput());
+        $this->assertTrue($second->isSuccessful(), $second->getErrorOutput().$second->getOutput());
+
+        $outputs = [$first->getOutput(), $second->getOutput()];
+
+        $this->assertContains('created', $outputs);
+        $this->assertContains('validation', $outputs);
+        $this->assertSame(1, Reservation::query()
+            ->where('library_id', $library->id)
+            ->where('book_id', $book->id)
+            ->where('user_id', $member->id)
+            ->active()
+            ->count());
+    }
+
     private function syncProcess(int $libraryId, int $bookId): Process
     {
         $process = new Process([
@@ -98,5 +251,119 @@ class ReservationConcurrencyProcessTest extends TestCase
         $process->setTimeout(60);
 
         return $process;
+    }
+
+    private function createReservationProcess(int $actorId, int $memberId, int $bookId): Process
+    {
+        $code = <<<'PHP'
+require 'vendor/autoload.php';
+$app = require 'bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+try {
+    app(App\Actions\Reservations\CreateReservationAction::class)->handle(
+        App\Models\User::query()->findOrFail((int) $argv[1]),
+        [
+            'book_id' => (int) $argv[3],
+            'user_id' => (int) $argv[2],
+            'scope' => App\Models\Reservation::SCOPE_LIBRARY,
+        ],
+    );
+
+    echo 'created';
+} catch (Illuminate\Validation\ValidationException) {
+    echo 'validation';
+}
+PHP;
+
+        $process = new Process([
+            PHP_BINARY,
+            '-r',
+            $code,
+            (string) $actorId,
+            (string) $memberId,
+            (string) $bookId,
+        ], base_path(), $this->temporaryDatabaseEnvironment());
+
+        $process->setTimeout(60);
+
+        return $process;
+    }
+
+    private function queueLockProcess(int $libraryId, int $bookId, ?string $releaseFile = null, ?string $acquiredFile = null): Process
+    {
+        $code = <<<'PHP'
+require 'vendor/autoload.php';
+$app = require 'bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+Illuminate\Support\Facades\DB::beginTransaction();
+
+try {
+    $queue = app(App\Services\ReservationQueueService::class)->lockQueueContext((int) $argv[1], (int) $argv[2]);
+    echo 'locked:'.$queue->id.PHP_EOL;
+    flush();
+
+    if ($argv[4] !== '') {
+        file_put_contents($argv[4], (string) $queue->id);
+    }
+
+    if ($argv[3] !== '') {
+        $deadline = microtime(true) + 10;
+
+        while (! file_exists($argv[3])) {
+            if (microtime(true) > $deadline) {
+                throw new RuntimeException('Timed out waiting for release signal.');
+            }
+
+            usleep(20 * 1000);
+        }
+    }
+
+    Illuminate\Support\Facades\DB::commit();
+} catch (Throwable $exception) {
+    Illuminate\Support\Facades\DB::rollBack();
+    fwrite(STDERR, $exception::class.': '.$exception->getMessage().PHP_EOL);
+    exit(1);
+}
+PHP;
+
+        $process = new Process([
+            PHP_BINARY,
+            '-r',
+            $code,
+            (string) $libraryId,
+            (string) $bookId,
+            $releaseFile ?? '',
+            $acquiredFile ?? '',
+        ], base_path(), $this->temporaryDatabaseEnvironment());
+
+        $process->setTimeout(60);
+
+        return $process;
+    }
+
+    private function signalFile(string $name): string
+    {
+        $directory = storage_path('framework/testing');
+
+        if (! is_dir($directory)) {
+            mkdir($directory, 0777, true);
+        }
+
+        return $directory.'/'.$name.'_'.getmypid().'_'.bin2hex(random_bytes(4)).'.signal';
+    }
+
+    private function waitForSignalFile(string $path): void
+    {
+        $deadline = microtime(true) + 10;
+
+        while (! file_exists($path)) {
+            if (microtime(true) > $deadline) {
+                $this->fail("Timed out waiting for signal file [{$path}].");
+            }
+
+            usleep(20 * 1000);
+        }
     }
 }

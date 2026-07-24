@@ -61,6 +61,7 @@ it('returns waiting and ready reservations for the active api filter', function 
     $library = Library::factory()->create();
     $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $readyMember = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create();
 
     $waitingReservation = Reservation::factory()->create([
@@ -74,7 +75,7 @@ it('returns waiting and ready reservations for the active api filter', function 
     $readyReservation = Reservation::factory()->create([
         'library_id' => $library->id,
         'book_id' => $book->id,
-        'user_id' => $member->id,
+        'user_id' => $readyMember->id,
         'status' => Reservation::STATUS_READY,
         'reserved_at' => now()->subHour(),
         'ready_at' => now()->subMinutes(30),
