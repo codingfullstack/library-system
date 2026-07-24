@@ -86,7 +86,7 @@
 
                 <section class="overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                     <div class="px-5 py-4">
-                        <form method="GET" action="{{ route('manage.book-copies.index') }}" class="grid gap-3 xl:grid-cols-[minmax(320px,1.4fr)_220px_220px_auto_auto] xl:items-center">
+                        <form method="GET" action="{{ route('manage.book-copies.index') }}" class="grid gap-3 xl:grid-cols-[minmax(320px,1.4fr)_190px_190px_190px_auto_auto] xl:items-center">
                             <div class="relative xl:min-w-0">
                                 <input
                                     type="text"
@@ -105,6 +105,15 @@
                                     <option value="">Būsena</option>
                                     @foreach($statusLabels as $statusValue => $statusLabel)
                                         <option value="{{ $statusValue }}" @selected(request('status') === $statusValue)>{{ $statusLabel }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="xl:min-w-0">
+                                <select name="condition_status" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
+                                    <option value="">Fizinė būklė</option>
+                                    @foreach($conditionLabels as $conditionValue => $conditionLabel)
+                                        <option value="{{ $conditionValue }}" @selected(request('condition_status') === $conditionValue)>{{ $conditionLabel }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -154,7 +163,6 @@
                                                 \App\Models\BookCopy::STATUS_AVAILABLE => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
                                                 \App\Models\BookCopy::STATUS_LOANED => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
                                                 \App\Models\BookCopy::STATUS_LOST => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300',
-                                                \App\Models\BookCopy::STATUS_DAMAGED => 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300',
                                                 \App\Models\BookCopy::STATUS_MAINTENANCE => 'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300',
                                                 default => 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300',
                                             };

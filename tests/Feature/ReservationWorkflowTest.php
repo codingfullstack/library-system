@@ -94,7 +94,7 @@ it('cancels a reservation through livewire without redirecting to the update end
     expect($reservation->fresh()->status)->toBe(Reservation::STATUS_CANCELLED);
 });
 
-it('requires an override before issuing a copy when another member has an active reservation', function () {
+it('rejects issuing a copy to another member when fifo has an active reservation', function () {
     $library = Library::factory()->create();
     $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $reservedMember = User::factory()->member()->create(['library_id' => $library->id]);
@@ -129,13 +129,12 @@ it('requires an override before issuing a copy when another member has an active
         'notes' => null,
     ]))->toThrow(ValidationException::class);
 });
-
-it('allows reservation override with a required reason and records it in audit log', function () {
+it('rejects reservation override fields and keeps fifo reservation untouched', function () {
     $library = Library::factory()->create();
     $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $reservedMember = User::factory()->member()->create(['library_id' => $library->id]);
     $otherMember = User::factory()->member()->create(['library_id' => $library->id]);
-    $book = Book::factory()->create(['title' => 'Override leidziama']);
+    $book = Book::factory()->create(['title' => 'FIFO enforced']);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $bookCopy = BookCopy::factory()->create([
@@ -143,7 +142,7 @@ it('allows reservation override with a required reason and records it in audit l
         'book_id' => $book->id,
         'branch_id' => $branch->id,
         'location_id' => $location->id,
-        'inventory_code' => 'INV-OVERRIDE-001',
+        'inventory_code' => 'INV-FIFO-001',
         'status' => BookCopy::STATUS_AVAILABLE,
     ]);
 
@@ -153,47 +152,29 @@ it('allows reservation override with a required reason and records it in audit l
         'user_id' => $reservedMember->id,
         'status' => Reservation::STATUS_WAITING,
         'reserved_at' => now()->subHour(),
-        'expires_at' => now()->addDay(),
+        'ready_at' => null,
+        'expires_at' => null,
         'fulfilled_at' => null,
         'cancelled_at' => null,
     ]);
 
-    $result = app(BorrowBookCopyAction::class)->handle($staff, $bookCopy, [
+    expect(fn () => app(BorrowBookCopyAction::class)->handle($staff, $bookCopy, [
         'user_id' => $otherMember->id,
         'due_at' => now()->addDays(14)->toDateString(),
         'no_due_date' => false,
-        'notes' => 'Skubu išduoti kitam nariui.',
+        'notes' => 'Client attempted stale override fields.',
         'override_reservation' => true,
-        'override_reason' => 'Narys atvyko į vietą, rezervavęs narys dar neatvyko.',
-    ]);
+        'override_reason' => 'Ignored stale client field.',
+    ]))->toThrow(ValidationException::class);
 
-    expect($result['loan'])->not->toBeNull();
-    expect($reservation->refresh()->status)->toBe(Reservation::STATUS_WAITING)
-        ->and($reservation->ready_at)->toBeNull()
-        ->and($reservation->cancelled_at)->toBeNull()
-        ->and($reservation->expires_at)->toBeNull()
-        ->and($reservation->isPending())->toBeTrue()
-        ->and(app(ReservationQueueService::class)->positionFor($reservation))->toBe(1);
+    expect($reservation->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and($bookCopy->fresh()->status)->toBe(BookCopy::STATUS_AVAILABLE)
+        ->and(Loan::query()->where('book_copy_id', $bookCopy->id)->count())->toBe(0);
 
-    $this->assertDatabaseHas('audit_logs', [
+    $this->assertDatabaseMissing('audit_logs', [
         'action' => 'reservation_override_issued',
-        'auditable_type' => Reservation::class,
-        'auditable_id' => $reservation->id,
-    ]);
-
-    $this->assertDatabaseMissing('notifications', [
-        'notifiable_type' => $otherMember->getMorphClass(),
-        'notifiable_id' => $otherMember->id,
-        'type' => 'reservation_fulfilled',
-    ]);
-
-    $this->assertDatabaseMissing('notifications', [
-        'notifiable_type' => $reservedMember->getMorphClass(),
-        'notifiable_id' => $reservedMember->id,
-        'type' => 'reservation_cancelled',
     ]);
 });
-
 it('promotes waiting reservations to ready without cancelling expiring or fulfilling them', function () {
     $library = Library::factory()->create();
     $member = User::factory()->member()->create(['library_id' => $library->id]);

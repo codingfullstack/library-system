@@ -334,7 +334,6 @@ class BookCopyForm extends Component
     {
         return [
             BookCopy::STATUS_AVAILABLE => 'Laisva',
-            BookCopy::STATUS_DAMAGED => 'Sugadinta',
             BookCopy::STATUS_MAINTENANCE => 'Tvarkoma',
             BookCopy::STATUS_LOST => 'Prarasta',
             BookCopy::STATUS_WITHDRAWN => 'Nurašytas fondas',

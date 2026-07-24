@@ -9,6 +9,7 @@ use App\Actions\Reservations\SyncReservationQueueAction;
 use App\Models\BookCopy;
 use App\Models\User;
 use App\Services\ReservationQueueDebugService;
+use App\Services\ReservationQueueService;
 use App\Support\Notifications\NotificationMessageBuilder;
 use App\Support\Notifications\NotificationMetadataBuilder;
 use App\Support\Notifications\NotificationType;
@@ -23,6 +24,16 @@ class ReturnBookCopyAction
     public function handle(User $authUser, BookCopy $bookCopy): array
     {
         return DB::transaction(function () use ($authUser, $bookCopy): array {
+            $bookCopyContext = BookCopy::query()
+                ->withoutGlobalScope('library')
+                ->whereKey($bookCopy->getKey())
+                ->firstOrFail();
+
+            app(ReservationQueueService::class)->lockQueueContext(
+                (int) $bookCopyContext->library_id,
+                (int) $bookCopyContext->book_id
+            );
+
             $bookCopy = BookCopy::query()
                 ->whereKey($bookCopy->getKey())
                 ->lockForUpdate()

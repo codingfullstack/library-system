@@ -15,6 +15,7 @@ class GetManageBookCopiesQuery
     {
         $search = trim((string) ($filters['search'] ?? ''));
         $status = filled($filters['status'] ?? null) ? (string) $filters['status'] : null;
+        $conditionStatus = filled($filters['condition_status'] ?? null) ? (string) $filters['condition_status'] : null;
         $branchId = filled($filters['branch_id'] ?? null) ? (int) $filters['branch_id'] : null;
         $perPage = (int) ($filters['per_page'] ?? 10);
 
@@ -34,6 +35,7 @@ class GetManageBookCopiesQuery
                 });
             })
             ->when($status, fn (Builder $query) => $query->where('status', $status))
+            ->when($conditionStatus, fn (Builder $query) => $query->where('condition_status', $conditionStatus))
             ->when($branchId, fn (Builder $query) => $query->where('branch_id', $branchId))
             ->latest('updated_at')
             ->latest('id')
@@ -50,7 +52,6 @@ class GetManageBookCopiesQuery
         $loaned = (clone $query)->where('status', BookCopy::STATUS_LOANED)->count();
         $unavailable = (clone $query)->whereIn('status', [
             BookCopy::STATUS_LOST,
-            BookCopy::STATUS_DAMAGED,
             BookCopy::STATUS_MAINTENANCE,
             BookCopy::STATUS_WITHDRAWN,
         ])->count();

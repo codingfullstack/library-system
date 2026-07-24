@@ -24,7 +24,6 @@ return new class extends Migration
                 'laisva',
                 'išduota',
                 'prarasta',
-                'sugadinta',
                 'tvarkoma',
                 'nurašyta',
             ])->default('laisva');

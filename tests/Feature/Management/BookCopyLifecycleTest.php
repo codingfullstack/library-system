@@ -102,6 +102,7 @@ test('staff can change book copy lifecycle and see status history', function () 
     $response->assertSessionHas('success');
 
     expect($copy->fresh()->status)->toBe(BookCopy::STATUS_MAINTENANCE);
+    expect($copy->fresh()->condition_status)->toBe(BookCopy::CONDITION_DAMAGED);
 
     $this->assertDatabaseHas('book_copy_status_histories', [
         'book_copy_id' => $copy->id,
@@ -117,6 +118,124 @@ test('staff can change book copy lifecycle and see status history', function () 
         ->assertSee('Būsenos istorija')
         ->assertSee('Išsiųstas tvarkymui')
         ->assertSee('Siunčiama tvarkyti del suluzušio virselio.');
+});
+
+test('damaged remains a physical condition and is not a lifecycle status', function () {
+    expect(BookCopy::conditionLabels())
+        ->toHaveKey(BookCopy::CONDITION_DAMAGED)
+        ->and(BookCopy::conditionLabels()[BookCopy::CONDITION_DAMAGED])
+        ->toBe('Sugadinta')
+        ->and(BookCopy::statusLabels())
+        ->not->toHaveKey(BookCopy::CONDITION_DAMAGED);
+});
+
+test('staff marks physical condition as damaged without changing lifecycle status', function () {
+    $library = Library::factory()->create();
+    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $book = Book::factory()->create();
+    $copy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_AVAILABLE,
+        'condition_status' => BookCopy::CONDITION_GOOD,
+    ]);
+
+    $this->actingAs($staff)
+        ->patch(route('manage.book-copies.lifecycle.update', $copy), [
+            'target_status' => BookCopy::LIFECYCLE_MARK_CONDITION_DAMAGED,
+            'reason_notes' => 'Apžiūros metu apgadintas viršelis.',
+        ])
+        ->assertRedirect(route('book-copies.show', $copy));
+
+    $fresh = $copy->fresh();
+
+    expect($fresh->status)->toBe(BookCopy::STATUS_AVAILABLE)
+        ->and($fresh->condition_status)->toBe(BookCopy::CONDITION_DAMAGED);
+
+    $this->assertDatabaseHas('book_copy_status_histories', [
+        'book_copy_id' => $copy->id,
+        'from_status' => BookCopy::STATUS_AVAILABLE,
+        'to_status' => BookCopy::STATUS_AVAILABLE,
+        'reason_code' => 'marked_damaged',
+    ]);
+});
+
+test('edit form can not directly change lifecycle status', function () {
+    $library = Library::factory()->create();
+    $admin = User::factory()->admin()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $book = Book::factory()->create();
+    $copy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_AVAILABLE,
+        'condition_status' => BookCopy::CONDITION_GOOD,
+    ]);
+
+    $this->actingAs($admin)
+        ->put(route('manage.book-copies.update', $copy), [
+            'library_id' => $library->id,
+            'book_id' => $book->id,
+            'branch_id' => $branch->id,
+            'location_id' => $location->id,
+            'inventory_code' => $copy->inventory_code,
+            'barcode' => $copy->barcode,
+            'status' => BookCopy::STATUS_WITHDRAWN,
+            'condition_status' => BookCopy::CONDITION_DAMAGED,
+            'acquired_at' => $copy->acquired_at?->format('Y-m-d'),
+            'notes' => 'Atnaujinta tik fizinė būklė.',
+        ])
+        ->assertRedirect(route('book-copies.show', $copy->id));
+
+    $fresh = $copy->fresh();
+
+    expect($fresh->status)->toBe(BookCopy::STATUS_AVAILABLE)
+        ->and($fresh->condition_status)->toBe(BookCopy::CONDITION_DAMAGED);
+});
+
+test('maintenance and withdrawn copies can not be borrowed', function () {
+    $library = Library::factory()->create();
+    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $book = Book::factory()->create();
+    $maintenanceCopy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+    ]);
+    $maintenanceCopy->update(['status' => BookCopy::STATUS_MAINTENANCE]);
+
+    expect(fn () => app(\App\Actions\Loans\BorrowBookCopyAction::class)->handle($staff, $maintenanceCopy->fresh(), [
+        'user_id' => $member->id,
+        'due_at' => now()->addDays(14)->toDateString(),
+        'no_due_date' => false,
+        'notes' => null,
+    ]))->toThrow(\Illuminate\Validation\ValidationException::class);
+
+    $withdrawnCopy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+    ]);
+    $withdrawnCopy->update(['status' => BookCopy::STATUS_WITHDRAWN]);
+
+    expect(fn () => app(\App\Actions\Loans\BorrowBookCopyAction::class)->handle($staff, $withdrawnCopy->fresh(), [
+        'user_id' => $member->id,
+        'due_at' => now()->addDays(14)->toDateString(),
+        'no_due_date' => false,
+        'notes' => null,
+    ]))->toThrow(\Illuminate\Validation\ValidationException::class);
 });
 
 test('book copy lifecycle can not be changed while copy has active loan', function () {

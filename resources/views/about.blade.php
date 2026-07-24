@@ -13,7 +13,7 @@
 
             $sections = [
                 ['icon' => 'book-open-text', 'title' => 'Katalogas ir kopijos', 'text' => 'Knygos, jų kopijos, kategorijos, leidyklos, filialai ir vietos valdomi vienoje struktūroje.'],
-                ['icon' => 'calendar-days', 'title' => 'Išdavimai ir rezervacijos', 'text' => 'Sistema palaiko išdavimus, grąžinimus, rezervacijų eiles ir darbuotojų override sprendimus.'],
+                ['icon' => 'calendar-days', 'title' => 'Išdavimai ir rezervacijos', 'text' => 'Sistema palaiko išdavimus, grąžinimus, rezervacijų eiles ir FIFO taisykles.'],
                 ['icon' => 'users', 'title' => 'Rolės ir matomumas', 'text' => 'Superadministratorius, administratorius, darbuotojas ir narys mato tik tai, kas jiems aktualu pagal bibliotekos teises.'],
                 ['icon' => 'clipboard-document', 'title' => 'Istorija ir ataskaitos', 'text' => 'Veiksmų istorija, dashboard metrikos, eksportai ir filtrai padeda sekti bibliotekos darbą.'],
             ];

@@ -45,6 +45,12 @@ class CancelReservationAction
         $reservation = DB::transaction(function () use ($reservation, $normalizedReason, &$wasReady, &$pickupBranchId, &$pickupBranchName): Reservation {
             $queueService = app(ReservationQueueService::class);
 
+            $reservationContext = Reservation::query()
+                ->whereKey($reservation->id)
+                ->firstOrFail();
+
+            $queueService->lockQueueContext((int) $reservationContext->library_id, (int) $reservationContext->book_id);
+
             $lockedReservation = Reservation::query()
                 ->with('pickupBranch:id,name')
                 ->whereKey($reservation->id)

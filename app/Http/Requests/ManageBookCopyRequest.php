@@ -68,7 +68,11 @@ class ManageBookCopyRequest extends FormRequest
                     ->where(fn ($query) => $query->where('library_id', $libraryId))
                     ->ignore($bookCopyId),
             ],
-            'status' => ['required', Rule::in(array_keys(BookCopy::statusLabels()))],
+            'status' => [
+                Rule::requiredIf(fn () => ! $this->currentBookCopy()),
+                'nullable',
+                Rule::in(array_keys(BookCopy::statusLabels())),
+            ],
             'condition_status' => ['required', Rule::in(BookCopy::conditionValues())],
             'acquired_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],

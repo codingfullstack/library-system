@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\BookCopy;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use App\Services\ReservationQueueService;
@@ -40,6 +41,7 @@ class BookCopyDetailsResource extends JsonResource
             'qr_code' => $this->qr_code,
             'barcode' => $this->barcode,
             'status' => $this->status,
+            'status_label' => $this->statusLabel(),
             'condition_status' => $this->condition_status,
             'condition_label' => $this->conditionLabel(),
             'acquired_at' => $this->acquired_at,
@@ -111,9 +113,14 @@ class BookCopyDetailsResource extends JsonResource
             'available_lifecycle_transitions' => method_exists($this->resource, 'availableLifecycleTransitions')
                 ? $this->availableLifecycleTransitions()
                 : [],
+            'lifecycle_transition_labels' => method_exists($this->resource, 'availableLifecycleTransitions')
+                ? collect($this->availableLifecycleTransitions())
+                    ->mapWithKeys(fn ($transition) => [
+                        $transition => BookCopy::lifecycleTargetLabels()[$transition] ?? $transition,
+                    ])
+                    ->all()
+                : [],
         ];
     }
 
 }
-
-

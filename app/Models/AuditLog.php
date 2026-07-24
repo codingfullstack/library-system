@@ -80,7 +80,6 @@ class AuditLog extends Model
             'reservation_created' => 'Rezervacija sukurta',
             'reservation_cancelled' => 'Rezervacija atšaukta',
             'reservation_fulfilled' => 'Rezervacija įvykdyta',
-            'reservation_override_issued' => 'Apeita rezervacija išdavimo metu',
             'user_created' => 'Vartotojas sukurtas',
             'user_updated' => 'Vartotojas atnaujintas',
             'user_deleted' => 'Vartotojas ištrintas',

@@ -29,6 +29,16 @@ class BorrowBookCopyAction
     public function handle(User $authUser, BookCopy $bookCopy, array $validated): array
     {
         return DB::transaction(function () use ($authUser, $bookCopy, $validated): array {
+            $bookCopyContext = BookCopy::query()
+                ->withoutGlobalScope('library')
+                ->whereKey($bookCopy->getKey())
+                ->firstOrFail();
+
+            app(ReservationQueueService::class)->lockQueueContext(
+                (int) $bookCopyContext->library_id,
+                (int) $bookCopyContext->book_id
+            );
+
             $bookCopy = BookCopy::query()
                 ->whereKey($bookCopy->getKey())
                 ->lockForUpdate()
@@ -47,34 +57,13 @@ class BorrowBookCopyAction
     {
         if (! $authUser->canManageBookCopy($bookCopy)) {
             throw ValidationException::withMessages([
-                'book_copy' => ['Neturite teisės išduoti kito filialo kopijos.'],
+                'book_copy' => ['Neturite teises isduoti kito filialo kopijos.'],
             ]);
         }
 
         if ($bookCopy->status !== BookCopy::STATUS_AVAILABLE) {
             throw ValidationException::withMessages([
-                'book_copy' => ['Šios kopijos išduoti negalima.'],
-            ]);
-        }
-
-        if ($bookCopy->activeLoan()->lockForUpdate()->exists()) {
-            throw ValidationException::withMessages([
-                'book_copy' => ['Ši kopija jau turi aktyvią paskolą.'],
-            ]);
-        }
-
-        $member = User::query()
-            ->where('id', $validated['user_id'])
-            ->whereHas('libraryMemberships', fn ($membershipQuery) => $membershipQuery
-                ->where('library_id', $bookCopy->library_id)
-                ->where('is_active', true))
-            ->where('role', 'narys')
-            ->where('is_active', true)
-            ->first();
-
-        if (! $member) {
-            throw ValidationException::withMessages([
-                'user_id' => ['Narys nerastas šioje bibliotekoje.'],
+                'book_copy' => ['Sios kopijos isduoti negalima.'],
             ]);
         }
 
@@ -82,6 +71,8 @@ class BorrowBookCopyAction
         $notificationService = app(ReservationNotificationService::class);
 
         $assignedReadyReservation = Reservation::query()
+            ->where('library_id', $bookCopy->library_id)
+            ->where('book_id', $bookCopy->book_id)
             ->where('assigned_book_copy_id', $bookCopy->id)
             ->where('status', Reservation::STATUS_READY)
             ->whereNull('fulfilled_at')
@@ -89,25 +80,38 @@ class BorrowBookCopyAction
             ->lockForUpdate()
             ->first();
 
-        if ($assignedReadyReservation && (int) $assignedReadyReservation->user_id !== (int) $member->id) {
-            throw ValidationException::withMessages([
-                'reservation_override' => ['Å i kopija priskirta kitam nariui paruoÅ¡tai rezervacijai.'],
-            ]);
-        }
-
         $priorityReservation = $queueService->getEligibleReservationForCopy($bookCopy, [], true);
 
-        $overrideReservation = $priorityReservation && $priorityReservation->user_id !== $member->id;
+        $member = User::query()
+            ->where('id', $validated['user_id'])
+            ->whereHas('libraryMemberships', fn ($membershipQuery) => $membershipQuery
+                ->where('library_id', $bookCopy->library_id)
+                ->where('is_active', true))
+            ->where('role', User::ROLE_MEMBER)
+            ->where('is_active', true)
+            ->first();
 
-        if ($overrideReservation && ! ($validated['override_reservation'] ?? false)) {
+        if (! $member) {
             throw ValidationException::withMessages([
-                'reservation_override' => ['Ši knyga turi aktyvią rezervaciją kitam nariui.'],
+                'user_id' => ['Narys nerastas sioje bibliotekoje.'],
             ]);
         }
 
-        if ($overrideReservation && trim((string) ($validated['override_reason'] ?? '')) === '') {
+        if ($assignedReadyReservation && (int) $assignedReadyReservation->user_id !== (int) $member->id) {
             throw ValidationException::withMessages([
-                'override_reason' => ['Nurodykite, kodėl apeinate aktyvią rezervaciją.'],
+                'reservation' => ['Si kopija priskirta kitam nariui paruostai rezervacijai.'],
+            ]);
+        }
+
+        if ($priorityReservation && (int) $priorityReservation->user_id !== (int) $member->id) {
+            throw ValidationException::withMessages([
+                'reservation' => ['Si kopija pagal FIFO priklauso kitam rezervacijos nariui.'],
+            ]);
+        }
+
+        if ($bookCopy->activeLoan()->lockForUpdate()->exists()) {
+            throw ValidationException::withMessages([
+                'book_copy' => ['Si kopija jau turi aktyvia paskola.'],
             ]);
         }
 
@@ -126,21 +130,19 @@ class BorrowBookCopyAction
         if ($reservation) {
             if (! $reservation->isReady()) {
                 throw ValidationException::withMessages([
-                    'reservation' => ['Rezervacija dar neparuošta atsiėmimui.'],
+                    'reservation' => ['Rezervacija dar neparuosta atsiemimui.'],
                 ]);
             }
 
             if ($reservation->expires_at !== null && $reservation->expires_at->lte(now())) {
-                $expiredAttributes = [
+                $reservation->update([
                     'status' => Reservation::STATUS_EXPIRED,
                     'pickup_branch_id' => null,
                     'assigned_book_copy_id' => null,
-                ];
-
-                $reservation->update($expiredAttributes);
+                ]);
 
                 throw ValidationException::withMessages([
-                    'reservation' => ['Rezervacijos atsiėmimo terminas pasibaigė.'],
+                    'reservation' => ['Rezervacijos atsiemimo terminas pasibaige.'],
                 ]);
             }
         }
@@ -162,7 +164,7 @@ class BorrowBookCopyAction
             }
 
             throw ValidationException::withMessages([
-                'book_copy' => ['Ši kopija jau turi aktyvią paskolą.'],
+                'book_copy' => ['Si kopija jau turi aktyvia paskola.'],
             ]);
         }
 
@@ -177,13 +179,11 @@ class BorrowBookCopyAction
                 'old_positions' => $positionsBeforeFulfillment,
             ]);
 
-            $fulfilledAttributes = [
+            $reservation->update([
                 'status' => Reservation::STATUS_FULFILLED,
                 'assigned_book_copy_id' => (int) $bookCopy->id,
                 'fulfilled_at' => now(),
-            ];
-
-            $reservation->update($fulfilledAttributes);
+            ]);
 
             DB::afterCommit(fn () => app(CreateUserNotificationAction::class)->handle(
                 $member,
@@ -205,8 +205,8 @@ class BorrowBookCopyAction
                 'reservation_fulfilled',
                 $reservation,
                 sprintf(
-                    'Rezervacija knygai "%s" įvykdyta nariui %s.',
-                    $bookCopy->book?->title ?: 'nežinoma knyga',
+                    'Rezervacija knygai "%s" ivykdyta nariui %s.',
+                    $bookCopy->book?->title ?: 'nezinoma knyga',
                     $member->name
                 ),
                 [
@@ -253,7 +253,7 @@ class BorrowBookCopyAction
             'loan_issued',
             $loan,
             sprintf(
-                'Kopija %s išduota nariui %s.',
+                'Kopija %s isduota nariui %s.',
                 $bookCopy->inventory_code,
                 $member->name
             ),
@@ -271,45 +271,20 @@ class BorrowBookCopyAction
             $bookCopy->library_id
         );
 
-        if ($overrideReservation) {
-            app(RecordAuditLogAction::class)->handle(
-                $authUser,
-                'reservation_override_issued',
-                $priorityReservation,
-                sprintf(
-                    'Apeita aktyvi rezervacija knygai "%s" ir kopija %s išduota nariui %s.',
-                    $bookCopy->book?->title ?: 'nežinoma knyga',
-                    $bookCopy->inventory_code,
-                    $member->name
-                ),
-                [
-                    'reservation_id' => $priorityReservation->id,
-                    'book_id' => $bookCopy->book_id,
-                    'book_title' => $bookCopy->book?->title,
-                    'book_copy_id' => $bookCopy->id,
-                    'inventory_code' => $bookCopy->inventory_code,
-                    'reserved_for_user_id' => $priorityReservation->user_id,
-                    'issued_to_user_id' => $member->id,
-                    'issued_to_user_name' => $member->name,
-                    'override_reason' => trim((string) $validated['override_reason']),
-                    'loan_id' => $loan->id,
-                ],
-                $bookCopy->library_id
-            );
-        }
-
         return [
-            'message' => 'Kopija sėkmingai išduota.',
+            'message' => 'Kopija sekmingai isduota.',
             'loan' => $loan,
         ];
     }
 
     private function isActiveLoanUniqueConstraintViolation(QueryException $exception): bool
     {
+        $errorInfo = $exception->errorInfo;
         $message = $exception->getMessage();
 
-        return str_contains($message, 'loans_active_book_copy_unique')
-            || str_contains($message, 'loans.active_book_copy_id')
-            || str_contains($message, 'active_book_copy_id');
+        return ($errorInfo[0] ?? null) === '23000'
+            && (str_contains($message, 'loans_active_book_copy_unique')
+                || str_contains($message, 'loans.active_book_copy_id')
+                || str_contains($message, 'active_book_copy_id'));
     }
 }

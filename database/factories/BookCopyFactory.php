@@ -76,7 +76,6 @@ class BookCopyFactory extends Factory
                 BookCopy::STATUS_AVAILABLE,
                 BookCopy::STATUS_LOANED,
                 BookCopy::STATUS_MAINTENANCE,
-                BookCopy::STATUS_DAMAGED,
                 BookCopy::STATUS_LOST,
             ]),
             'condition_status' => fake()->randomElement([

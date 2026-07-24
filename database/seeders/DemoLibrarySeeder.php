@@ -764,13 +764,11 @@ class DemoLibrarySeeder extends Seeder
                     BookCopy::STATUS_LOANED,
                     BookCopy::STATUS_LOANED,
                     BookCopy::STATUS_MAINTENANCE,
-                    BookCopy::STATUS_DAMAGED,
                     BookCopy::STATUS_LOST,
                     BookCopy::STATUS_WITHDRAWN,
                 ])->random();
 
                 $condition = match ($targetStatus) {
-                    BookCopy::STATUS_DAMAGED => BookCopy::CONDITION_DAMAGED,
                     BookCopy::STATUS_MAINTENANCE => collect([BookCopy::CONDITION_WORN, BookCopy::CONDITION_DAMAGED])->random(),
                     BookCopy::STATUS_LOST => collect([BookCopy::CONDITION_GOOD, BookCopy::CONDITION_WORN])->random(),
                     default => collect([BookCopy::CONDITION_NEW, BookCopy::CONDITION_GOOD, BookCopy::CONDITION_GOOD, BookCopy::CONDITION_WORN])->random(),
@@ -807,7 +805,6 @@ class DemoLibrarySeeder extends Seeder
 
                 [$reasonCode, $notes] = match ($targetStatus) {
                     BookCopy::STATUS_MAINTENANCE => ['sent_to_maintenance', 'Kopija laikinai perduotas tvarkymui.'],
-                    BookCopy::STATUS_DAMAGED => ['marked_damaged', 'Apžiūros metu nustatyti fiziniai pažeidimai.'],
                     BookCopy::STATUS_LOST => ['marked_lost', 'Kopija nerasta po inventorizacijos.'],
                     BookCopy::STATUS_WITHDRAWN => ['nurašyta', 'Kopija nurašytas dėl nusidėvėjimo.'],
                     default => ['status_adjusted', 'Statusas atnaujintas demo duomenims.'],
@@ -1194,7 +1191,6 @@ class DemoLibrarySeeder extends Seeder
             ])->random(),
             BookCopy::STATUS_LOANED => 'Kopija šiuo metu išduota skaitytojui.',
             BookCopy::STATUS_MAINTENANCE => 'Laukiama smulkaus taisymo arba perklijavimo.',
-            BookCopy::STATUS_DAMAGED => 'Matomi susidėvėjimo požymiai, reikia įvertinti būklę.',
             BookCopy::STATUS_LOST => 'Nepavyko rasti per paskutinę inventorizaciją.',
             BookCopy::STATUS_WITHDRAWN => 'Kopija nebepriklauso aktyviam bibliotekos fondui.',
             default => null,

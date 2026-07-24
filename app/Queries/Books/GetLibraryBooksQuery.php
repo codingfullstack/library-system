@@ -105,7 +105,6 @@ class GetLibraryBooksQuery
 
                     $copyQuery->whereIn('status', [
                         BookCopy::STATUS_LOST,
-                        BookCopy::STATUS_DAMAGED,
                         BookCopy::STATUS_MAINTENANCE,
                         BookCopy::STATUS_WITHDRAWN,
                     ]);

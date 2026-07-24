@@ -89,6 +89,60 @@ it('allows staff to create a library scoped reservation in own library', functio
         ->and($reservation->branch_id)->toBeNull();
 });
 
+it('rejects a second active reservation for the same user book pair through the action', function () {
+    $fixture = reservationScopeFixture();
+
+    app(CreateReservationAction::class)->handle($fixture['staff'], [
+        'book_id' => $fixture['book']->id,
+        'user_id' => $fixture['member']->id,
+        'scope' => Reservation::SCOPE_LIBRARY,
+    ]);
+
+    expect(fn () => app(CreateReservationAction::class)->handle($fixture['staff'], [
+        'book_id' => $fixture['book']->id,
+        'user_id' => $fixture['member']->id,
+        'scope' => Reservation::SCOPE_LIBRARY,
+    ]))->toThrow(ValidationException::class);
+
+    expect(Reservation::query()
+        ->where('library_id', $fixture['library']->id)
+        ->where('book_id', $fixture['book']->id)
+        ->where('user_id', $fixture['member']->id)
+        ->active()
+        ->count())->toBe(1);
+});
+
+it('allows the same user to reserve again after the previous reservation is terminal', function (string $status) {
+    $fixture = reservationScopeFixture();
+
+    $reservation = app(CreateReservationAction::class)->handle($fixture['staff'], [
+        'book_id' => $fixture['book']->id,
+        'user_id' => $fixture['member']->id,
+        'scope' => Reservation::SCOPE_LIBRARY,
+    ]);
+
+    $reservation->update([
+        'status' => $status,
+        'cancelled_at' => $status === Reservation::STATUS_CANCELLED ? now() : null,
+        'fulfilled_at' => $status === Reservation::STATUS_FULFILLED ? now() : null,
+        'pickup_branch_id' => null,
+        'assigned_book_copy_id' => null,
+    ]);
+
+    $newReservation = app(CreateReservationAction::class)->handle($fixture['staff'], [
+        'book_id' => $fixture['book']->id,
+        'user_id' => $fixture['member']->id,
+        'scope' => Reservation::SCOPE_LIBRARY,
+    ]);
+
+    expect($newReservation->id)->not->toBe($reservation->id)
+        ->and($newReservation->isActive())->toBeTrue();
+})->with([
+    Reservation::STATUS_CANCELLED,
+    Reservation::STATUS_EXPIRED,
+    Reservation::STATUS_FULFILLED,
+]);
+
 it('shows library scoped reservations in branch filters by serviceable branch instead of creator branch', function () {
     $fixture = reservationScopeFixture();
     $branchC = Branch::factory()->create(['library_id' => $fixture['library']->id, 'name' => 'Trecias filialas']);

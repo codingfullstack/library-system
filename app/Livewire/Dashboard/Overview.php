@@ -257,7 +257,7 @@ class Overview extends Component
             [
                 'title' => $report['summary']['damaged_book_copies_count'] . ' sugadintos kopijos',
                 'description' => 'Peržiūrėk būkles ir nuspręsk, ką reikia tvarkyti ar nurašyti.',
-                'route' => route('manage.book-copies.index', ['status' => BookCopy::STATUS_DAMAGED]),
+                'route' => route('manage.book-copies.index', ['condition_status' => BookCopy::CONDITION_DAMAGED]),
                 'link' => 'Peržiūrėti',
                 'tone' => 'warning',
             ],
@@ -316,7 +316,7 @@ class Overview extends Component
                         'laisva' => '#0f9f6e',
                         'išduota' => '#2563eb',
                         'prarasta' => '#f97316',
-                        'sugadinta' => '#ef4444',
+                        'tvarkoma' => '#ef4444',
                         default => '#d4d4d8',
                     },
                 ];
@@ -385,7 +385,6 @@ class Overview extends Component
             ->count();
     }
 }
-
 
 
 

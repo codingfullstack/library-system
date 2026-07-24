@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Actions\Notifications\CreateUserNotificationAction;
 use App\Actions\Reservations\SyncReservationQueueAction;
 use App\Models\Reservation;
+use App\Services\ReservationQueueService;
 use App\Support\Notifications\NotificationMessageBuilder;
 use App\Support\Notifications\NotificationMetadataBuilder;
 use App\Support\Notifications\NotificationType;
@@ -30,6 +31,19 @@ class ExpireReservationsCommand extends Command
             ->chunkById(100, function ($reservations) use (&$expiredCount): void {
                 foreach ($reservations as $reservationStub) {
                     $bookToSync = DB::transaction(function () use ($reservationStub, &$expiredCount): ?array {
+                        $reservationContext = Reservation::query()
+                            ->whereKey($reservationStub->id)
+                            ->first();
+
+                        if (! $reservationContext) {
+                            return null;
+                        }
+
+                        app(ReservationQueueService::class)->lockQueueContext(
+                            (int) $reservationContext->library_id,
+                            (int) $reservationContext->book_id
+                        );
+
                         $reservation = Reservation::query()
                             ->with(['book:id,title', 'pickupBranch:id,name', 'user:id,name,email'])
                             ->whereKey($reservationStub->id)

@@ -64,9 +64,11 @@
                         </button>
                     @endif
 
-                    <button type="button" wire:click="open" class="app-button-secondary">
-                        {{ $canIssuePreferred ? 'Išduoti kitam nariui' : 'Išduoti' }}
-                    </button>
+                    @unless($canIssuePreferred)
+                        <button type="button" wire:click="open" class="app-button-secondary">
+                            Išduoti
+                        </button>
+                    @endunless
                 </div>
             @else
                 <div class="fixed inset-0 z-50 bg-zinc-950/50" wire:key="borrow-modal-{{ $bookCopy->id }}">
@@ -203,43 +205,6 @@
                                     <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                                 @enderror
                             </div>
-
-                            @if($canIssuePreferred && $preferredReservation && $selectedMemberId && (int) $selectedMemberId !== (int) $preferredReservation->user_id)
-                                <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-500/10">
-                                    <div class="space-y-3">
-                                        <div>
-                                            <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">
-                                                Ši knyga turi aktyvią rezervaciją kitam nariui
-                                            </p>
-                                            <p class="mt-1 text-sm text-amber-800 dark:text-amber-300">
-                                                Jei tęsite išdavimą, tai bus laikoma rezervacijos override veiksmu ir bus įrašyta į auditą.
-                                            </p>
-                                        </div>
-
-                                        <label class="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-                                            <input type="checkbox" wire:model.live="overrideReservation" class="rounded border-zinc-300 text-amber-700 focus:ring-amber-600 dark:border-zinc-700 dark:bg-zinc-900">
-                                            Patvirtinu, kad noriu apeiti aktyvią rezervaciją
-                                        </label>
-
-                                        <div>
-                                            <label for="borrow-override-reason-{{ $bookCopy->id }}" class="app-label">Komentaras</label>
-                                            <textarea
-                                                id="borrow-override-reason-{{ $bookCopy->id }}"
-                                                wire:model="overrideReason"
-                                                rows="3"
-                                                class="app-input mt-2"
-                                                placeholder="Paaiškinkite, kodėl apeinama aktyvi rezervacija"
-                                            ></textarea>
-                                            @error('overrideReason')
-                                                <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
-                                            @enderror
-                                            @error('overrideReservation')
-                                                <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
-                                            @enderror
-                                        </div>
-                                    </div>
-                                </div>
-                            @endif
 
                             @error('bookCopy')
                                 <p class="text-sm text-red-600 dark:text-red-400">{{ $message }}</p>

@@ -16,7 +16,6 @@ return new class extends Migration
                     'laisva',
                     'išduota',
                     'prarasta',
-                    'sugadinta',
                     'tvarkoma',
                     'nurašyta'
                 ) NOT NULL DEFAULT 'laisva'
@@ -37,7 +36,6 @@ return new class extends Migration
                     'laisva',
                     'išduota',
                     'prarasta',
-                    'sugadinta',
                     'tvarkoma'
                 ) NOT NULL DEFAULT 'laisva'
             ");

@@ -161,7 +161,14 @@
                                                         <input type="radio" name="target_status" value="{{ $targetStatus }}" class="sr-only peer" @checked(old('target_status') === $targetStatus)>
                                                         <div class="rounded-xl border border-transparent peer-checked:border-teal-500 peer-checked:bg-teal-50 p-1 dark:peer-checked:border-teal-400 dark:peer-checked:bg-teal-950/30">
                                                             <div class="text-sm font-semibold text-zinc-950 dark:text-white">{{ $lifecycleLabels[$targetStatus] ?? ($statusLabels[$targetStatus] ?? $targetStatus) }}</div>
-                                                            <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Būsena taps: {{ $statusLabels[$targetStatus] ?? $targetStatus }}</div>
+                                                            @if($targetStatus === \App\Models\BookCopy::LIFECYCLE_MARK_CONDITION_DAMAGED)
+                                                                <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Fizinė būklė taps: {{ \App\Models\BookCopy::conditionLabels()[\App\Models\BookCopy::CONDITION_DAMAGED] }}</div>
+                                                            @elseif($targetStatus === \App\Models\BookCopy::STATUS_MAINTENANCE)
+                                                                <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Fizinė būklė taps: {{ \App\Models\BookCopy::conditionLabels()[\App\Models\BookCopy::CONDITION_DAMAGED] }}</div>
+                                                                <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Gyvenimo ciklo būsena taps: {{ $statusLabels[$targetStatus] ?? $targetStatus }}</div>
+                                                            @else
+                                                                <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Gyvenimo ciklo būsena taps: {{ $statusLabels[$targetStatus] ?? $targetStatus }}</div>
+                                                            @endif
                                                         </div>
                                                     </label>
                                                 @endforeach

@@ -3,6 +3,7 @@
 namespace App\Queries\Books;
 
 use App\Models\Book;
+use App\Models\BookCopy;
 use App\Models\Library;
 use App\Models\Reservation;
 use App\Models\User;
@@ -75,7 +76,11 @@ class GetLibraryBookDetailsQuery
                     ->when(! empty($copyLifecycle), function ($copyQuery) use ($copyLifecycle) {
                         match ($copyLifecycle) {
                             'aktyvi' => $copyQuery->whereIn('status', ['laisva', 'išduota']),
-                            'issues' => $copyQuery->whereIn('status', ['prarasta', 'sugadinta', 'tvarkoma']),
+                            'issues' => $copyQuery->where(function ($issuesQuery) {
+                                $issuesQuery
+                                    ->whereIn('status', ['prarasta', 'tvarkoma'])
+                                    ->orWhere('condition_status', BookCopy::CONDITION_DAMAGED);
+                            }),
                             'removed' => $copyQuery->where('status', 'nurašyta'),
                             default => null,
                         };

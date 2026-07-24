@@ -796,7 +796,7 @@ class PresentationDemoDataSeeder extends Seeder
         return match (true) {
             $i % 50 === 0 => BookCopy::STATUS_LOST,
             $i % 33 === 0 => BookCopy::STATUS_MAINTENANCE,
-            $i % 25 === 0 => BookCopy::STATUS_DAMAGED,
+            $i % 25 === 0 => BookCopy::STATUS_AVAILABLE,
             $i % 20 === 0 => BookCopy::STATUS_WITHDRAWN,
             $i % 7 === 0 => BookCopy::STATUS_LOANED,
             default => BookCopy::STATUS_AVAILABLE,
@@ -819,7 +819,6 @@ class PresentationDemoDataSeeder extends Seeder
             BookCopy::STATUS_AVAILABLE => 'Kopija prieinama greitam isdavimui.',
             BookCopy::STATUS_LOANED => 'Kopija siuo metu naudojama skaitytojo.',
             BookCopy::STATUS_LOST => 'Pazymeta kaip prarasta inventorizacijos metu.',
-            BookCopy::STATUS_DAMAGED => 'Reikia ivertinti bukle pries isdavima.',
             BookCopy::STATUS_MAINTENANCE => 'Tvarkoma arba paruosiama grizimui i fonda.',
             BookCopy::STATUS_WITHDRAWN => 'Nenaudojama aktyviame fonde.',
             default => null,

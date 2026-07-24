@@ -6,7 +6,7 @@
         $visibleCopies = $book->bookCopies;
         $availableCopies = $visibleCopies->where('status', 'laisva')->count();
         $loanedCopies = $visibleCopies->where('status', 'išduota')->count();
-        $unavailableCopies = $visibleCopies->whereIn('status', ['prarasta', 'sugadinta', 'tvarkoma', 'nurašyta'])->count();
+        $unavailableCopies = $visibleCopies->whereIn('status', ['prarasta', 'tvarkoma', 'nurašyta'])->count();
         $hasActiveReservations = $book->reservations->contains(fn ($reservation) => $reservation->isActive());
         $activeReservationsCount = $book->reservations->filter(fn ($reservation) => $reservation->isActive())->count();
         $hasOnlyUnavailableCopies = $visibleCopies->isNotEmpty() && $unavailableCopies === $visibleCopies->count();

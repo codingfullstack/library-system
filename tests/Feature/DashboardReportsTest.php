@@ -55,7 +55,8 @@ it('shows extended dashboard reports scoped to the staff library', function () {
     $damagedCopy = BookCopy::factory()->create([
         'library_id' => $library->id,
         'book_id' => $otherBook->id,
-        'status' => BookCopy::STATUS_DAMAGED,
+        'status' => BookCopy::STATUS_AVAILABLE,
+        'condition_status' => BookCopy::CONDITION_DAMAGED,
     ]);
     $otherLibraryCopy = BookCopy::factory()->create([
         'library_id' => $otherLibrary->id,
@@ -151,7 +152,7 @@ it('shows extended dashboard reports scoped to the staff library', function () {
     $response->assertDontSee('Peržiūrėti visus');
     $response->assertDontSee('Ctrl + K');
     $response->assertDontSee('Atnaujinti būsenas');
-    $response->assertSee(route('manage.book-copies.index', ['status' => BookCopy::STATUS_DAMAGED]), false);
+    $response->assertSee(route('manage.book-copies.index', ['condition_status' => BookCopy::CONDITION_DAMAGED]), false);
     $response->assertSee('Populiari knyga');
     $response->assertSee('Rasa Autore');
     $response->assertSee('Aktyvus narys');
@@ -171,7 +172,8 @@ it('shows dashboard reports across libraries for super admin', function () {
 
     BookCopy::factory()->create([
         'library_id' => $otherLibrary->id,
-        'status' => BookCopy::STATUS_DAMAGED,
+        'status' => BookCopy::STATUS_AVAILABLE,
+        'condition_status' => BookCopy::CONDITION_DAMAGED,
     ]);
 
     $response = $this->actingAs($superAdmin)->get(route('dashboard'));
@@ -296,7 +298,6 @@ it('exports dashboard reports to excel format', function () {
     $response->assertSee('Bibliotekos ataskaita');
     $response->assertSee('Suvestinė');
 });
-
 
 
 

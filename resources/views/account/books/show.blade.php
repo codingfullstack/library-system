@@ -3,7 +3,7 @@
         $visibleCopies = $book->bookCopies;
         $availableCopies = $visibleCopies->where('status', 'laisva')->count();
         $loanedCopies = $visibleCopies->whereIn('status', ['išduota', 'vėluoja'])->count();
-        $unavailableCopies = $visibleCopies->whereIn('status', ['prarasta', 'sugadinta', 'tvarkoma', 'nurašyta'])->count();
+        $unavailableCopies = $visibleCopies->whereIn('status', ['prarasta', 'tvarkoma', 'nurašyta'])->count();
         $copyLibraries = $visibleCopies
             ->groupBy('library_id')
             ->map(function ($copies) {

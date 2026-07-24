@@ -36,10 +36,6 @@ class BorrowBookCopyForm extends Component
 
     public string $notes = '';
 
-    public bool $overrideReservation = false;
-
-    public string $overrideReason = '';
-
     public function mount(BookCopy $bookCopy, ?int $preferredReservationId = null, bool $compactPreferredActions = false): void
     {
         $this->bookCopy = $bookCopy->loadMissing(['book:id,slug,title', 'library:id,name']);
@@ -52,6 +48,10 @@ class BorrowBookCopyForm extends Component
     public function open(): void
     {
         if (! $this->canBorrow()) {
+            return;
+        }
+
+        if ($this->canIssuePreferred()) {
             return;
         }
 
@@ -107,17 +107,13 @@ class BorrowBookCopyForm extends Component
             'library_name' => $member->library?->name,
         ];
         $this->memberSearch = '';
-        $this->overrideReservation = false;
-        $this->overrideReason = '';
-        $this->resetErrorBag(['selectedMemberId', 'overrideReservation', 'overrideReason']);
+        $this->resetErrorBag(['selectedMemberId']);
     }
 
     public function clearMember(): void
     {
         $this->selectedMemberId = null;
         $this->selectedMember = null;
-        $this->overrideReservation = false;
-        $this->overrideReason = '';
     }
 
     public function issuePreferred()
@@ -165,14 +161,11 @@ class BorrowBookCopyForm extends Component
             'dueAt' => ['nullable', 'date_format:Y-m-d', 'after:today'],
             'noDueDate' => ['boolean'],
             'notes' => ['nullable', 'string', 'max:1000'],
-            'overrideReservation' => ['boolean'],
-            'overrideReason' => ['nullable', 'string', 'max:1000'],
         ], [
             'selectedMemberId.required' => 'Pasirinkite narį.',
             'dueAt.date_format' => 'Data turi būti formato YYYY-MM-DD.',
             'dueAt.after' => 'Grąžinimo data turi būti vėlesnė nei šiandien.',
             'notes.max' => 'Pastabos negali virsyti 1000 simboliu.',
-            'overrideReason.max' => 'Komentaras negali virsyti 1000 simboliu.',
         ]);
 
         if ($this->noDueDate && $this->dueAt) {
@@ -187,8 +180,6 @@ class BorrowBookCopyForm extends Component
                 'due_at' => $this->dueAt,
                 'no_due_date' => $this->noDueDate,
                 'notes' => $this->notes,
-                'override_reservation' => $this->overrideReservation,
-                'override_reason' => $this->overrideReason,
             ]);
         } catch (ValidationException $exception) {
             foreach ($exception->errors() as $field => $messages) {
@@ -207,6 +198,12 @@ class BorrowBookCopyForm extends Component
     {
         $actor = Auth::user();
         $members = collect();
+
+        if ($this->canIssuePreferred()) {
+            $this->isOpen = false;
+            $this->selectedMemberId = null;
+            $this->selectedMember = null;
+        }
 
         if ($actor && $this->isOpen && trim($this->memberSearch) !== '') {
             $members = $searchLibraryMembersQuery->handle($actor, $this->memberSearch);
@@ -255,7 +252,6 @@ class BorrowBookCopyForm extends Component
             return match ($this->bookCopy->status) {
                 BookCopy::STATUS_LOANED => 'Negalima išduoti: kopija šiuo metu jau išduota.',
                 BookCopy::STATUS_LOST => 'Negalima išduoti: kopija pažymėta kaip prarasta.',
-                BookCopy::STATUS_DAMAGED => 'Negalima išduoti: kopija pažymėta kaip sugadinta.',
                 BookCopy::STATUS_MAINTENANCE => 'Negalima išduoti: kopija šiuo metu tvarkoma.',
                 BookCopy::STATUS_WITHDRAWN => 'Negalima išduoti: kopija nurašyta iš fondo.',
                 default => 'Negalima išduoti: kopijos būsena neleidžia išdavimo.',
@@ -306,8 +302,6 @@ class BorrowBookCopyForm extends Component
             'due_at' => 'dueAt',
             'book_copy' => 'bookCopy',
             'reservation' => 'preferredReservation',
-            'reservation_override' => 'overrideReservation',
-            'override_reason' => 'overrideReason',
             default => $field,
         };
     }

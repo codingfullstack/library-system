@@ -241,6 +241,7 @@ it('filters book copies on the book page by lifecycle group', function () {
         'location_id' => $location->id,
         'inventory_code' => 'INV-ACTIVE-001',
         'status' => 'laisva',
+        'condition_status' => BookCopy::CONDITION_GOOD,
     ]);
 
     $issuesResponse = $this->actingAs($user)->get(route('books.show', [

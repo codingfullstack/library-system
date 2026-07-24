@@ -18,11 +18,13 @@ class BookCopy extends Model
 
     public const STATUS_LOST = 'prarasta';
 
-    public const STATUS_DAMAGED = 'sugadinta';
+    public const LEGACY_STATUS_DAMAGED = 'sugadinta';
 
     public const STATUS_MAINTENANCE = 'tvarkoma';
 
     public const STATUS_WITHDRAWN = 'nurašyta';
+
+    public const LIFECYCLE_MARK_CONDITION_DAMAGED = 'mark_condition_damaged';
 
     public const CONDITION_NEW = 'nauja';
 
@@ -118,7 +120,6 @@ class BookCopy extends Model
             self::STATUS_AVAILABLE => 'Laisva',
             self::STATUS_LOANED => 'Išduota',
             self::STATUS_LOST => 'Prarasta',
-            self::STATUS_DAMAGED => 'Sugadinta',
             self::STATUS_MAINTENANCE => 'Tvarkoma',
             self::STATUS_WITHDRAWN => 'Nurašytas fondas',
         ];
@@ -165,7 +166,7 @@ class BookCopy extends Model
     {
         return [
             self::STATUS_LOST => 'Pažymėti kaip prarastą',
-            self::STATUS_DAMAGED => 'Pažymėti kaip sugadintą',
+            self::LIFECYCLE_MARK_CONDITION_DAMAGED => 'Pažymėti fizinę būklę kaip sugadintą',
             self::STATUS_MAINTENANCE => 'Siųsti tvarkyti',
             self::STATUS_AVAILABLE => 'Grąžinti į aktyvų fondą',
             self::STATUS_WITHDRAWN => 'Nurašyti',
@@ -189,18 +190,13 @@ class BookCopy extends Model
         return match ($this->status) {
             self::STATUS_AVAILABLE => [
                 self::STATUS_LOST,
-                self::STATUS_DAMAGED,
+                self::LIFECYCLE_MARK_CONDITION_DAMAGED,
                 self::STATUS_MAINTENANCE,
-                self::STATUS_WITHDRAWN,
-            ],
-            self::STATUS_DAMAGED => [
-                self::STATUS_MAINTENANCE,
-                self::STATUS_AVAILABLE,
                 self::STATUS_WITHDRAWN,
             ],
             self::STATUS_MAINTENANCE => [
                 self::STATUS_AVAILABLE,
-                self::STATUS_DAMAGED,
+                self::LIFECYCLE_MARK_CONDITION_DAMAGED,
                 self::STATUS_WITHDRAWN,
             ],
             self::STATUS_LOST => [

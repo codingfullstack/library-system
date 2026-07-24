@@ -249,3 +249,80 @@ it('allows historical terminal reservations to retain lifecycle fields', functio
 
     expect($reservation->fresh()->status)->toBe(Reservation::STATUS_CANCELLED);
 });
+
+it('has the active reservation generated column and unique user book index', function () {
+    skipUnlessMySqlLike();
+
+    $generatedColumn = DB::selectOne("
+        SELECT generation_expression, extra
+        FROM information_schema.columns
+        WHERE table_schema = database()
+          AND table_name = 'reservations'
+          AND column_name = 'active_reservation_marker'
+    ");
+
+    $indexColumns = DB::table('information_schema.statistics')
+        ->whereRaw('table_schema = database()')
+        ->where('table_name', 'reservations')
+        ->where('index_name', 'reservations_active_user_book_unique')
+        ->where('non_unique', 0)
+        ->orderBy('seq_in_index')
+        ->pluck('column_name')
+        ->all();
+
+    expect($generatedColumn)->not->toBeNull()
+        ->and(strtolower((string) $generatedColumn->generation_expression))->toContain('status')
+        ->and($indexColumns)->toBe(['library_id', 'book_id', 'user_id', 'active_reservation_marker']);
+})->group('mariadb', 'database-invariants');
+
+it('rejects waiting and ready active reservations for the same user and book', function () {
+    skipUnlessMySqlLike();
+
+    $copy = BookCopy::factory()->create(['status' => BookCopy::STATUS_AVAILABLE]);
+    $member = User::factory()->member()->create(['library_id' => $copy->library_id]);
+
+    Reservation::factory()->create([
+        'library_id' => $copy->library_id,
+        'book_id' => $copy->book_id,
+        'user_id' => $member->id,
+        'status' => Reservation::STATUS_WAITING,
+    ]);
+
+    expect(fn () => Reservation::factory()->create([
+        'library_id' => $copy->library_id,
+        'book_id' => $copy->book_id,
+        'user_id' => $member->id,
+        'assigned_book_copy_id' => $copy->id,
+        'pickup_branch_id' => $copy->branch_id,
+        'status' => Reservation::STATUS_READY,
+        'ready_at' => now(),
+        'expires_at' => now()->addDay(),
+    ]))->toThrow(\Illuminate\Database\QueryException::class);
+})->group('mariadb', 'database-invariants');
+
+it('allows a new active reservation after terminal reservation statuses', function (string $status) {
+    skipUnlessMySqlLike();
+
+    $copy = BookCopy::factory()->create(['status' => BookCopy::STATUS_LOANED]);
+    $member = User::factory()->member()->create(['library_id' => $copy->library_id]);
+
+    Reservation::factory()->create([
+        'library_id' => $copy->library_id,
+        'book_id' => $copy->book_id,
+        'user_id' => $member->id,
+        'status' => $status,
+    ]);
+
+    $active = Reservation::factory()->create([
+        'library_id' => $copy->library_id,
+        'book_id' => $copy->book_id,
+        'user_id' => $member->id,
+        'status' => Reservation::STATUS_WAITING,
+    ]);
+
+    expect($active->fresh()->isActive())->toBeTrue();
+})->with([
+    Reservation::STATUS_CANCELLED,
+    Reservation::STATUS_EXPIRED,
+    Reservation::STATUS_FULFILLED,
+])->group('mariadb', 'database-invariants');

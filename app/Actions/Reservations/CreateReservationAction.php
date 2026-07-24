@@ -11,6 +11,7 @@ use App\Models\Reservation;
 use App\Models\User;
 use App\Services\ReservationNotificationService;
 use App\Services\ReservationQueueService;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -18,107 +19,120 @@ class CreateReservationAction
 {
     public function handle(User $actor, array $data): Reservation
     {
-        $member = $this->resolveMember($actor, $data);
-        $libraryId = $this->resolveLibraryId($actor, $member);
+        try {
+            return DB::transaction(function () use ($actor, $data): Reservation {
+                $member = $this->resolveMember($actor, $data);
+                $libraryId = $this->resolveLibraryId($actor, $member);
 
-        $book = Book::query()
-            ->whereKey($data['book_id'])
-            ->firstOrFail();
+                $book = Book::query()
+                    ->whereKey($data['book_id'])
+                    ->firstOrFail();
 
-        $belongsToLibrary = BookCopy::query()
-            ->where('library_id', $libraryId)
-            ->where('book_id', $book->id)
-            ->exists();
+                $queueService = app(ReservationQueueService::class);
+                $queueService->lockQueueContext($libraryId, (int) $book->id);
 
-        if (! $belongsToLibrary) {
+                $belongsToLibrary = BookCopy::query()
+                    ->where('library_id', $libraryId)
+                    ->where('book_id', $book->id)
+                    ->exists();
+
+                if (! $belongsToLibrary) {
+                    throw ValidationException::withMessages([
+                        'book_id' => 'Si knyga nepriklauso pasirinktai bibliotekai.',
+                    ]);
+                }
+
+                [$scope, $branchId] = $this->resolveScope($actor, $libraryId, $data);
+
+                $hasActiveLoan = Loan::query()
+                    ->where('library_id', $libraryId)
+                    ->where('user_id', $member->id)
+                    ->whereNull('returned_at')
+                    ->whereHas('bookCopy', fn ($query) => $query->where('book_id', $book->id))
+                    ->exists();
+
+                if ($hasActiveLoan) {
+                    throw ValidationException::withMessages([
+                        'book_id' => 'Sis narys jau turi aktyviai isduota sia knyga.',
+                    ]);
+                }
+
+                $hasActiveReservation = Reservation::query()
+                    ->where('library_id', $libraryId)
+                    ->where('book_id', $book->id)
+                    ->where('user_id', $member->id)
+                    ->active()
+                    ->lockForUpdate()
+                    ->exists();
+
+                if ($hasActiveReservation) {
+                    throw ValidationException::withMessages([
+                        'book_id' => 'Sis narys jau turi aktyvia sios knygos rezervacija.',
+                    ]);
+                }
+
+                $hasAvailableCopy = $queueService->hasAvailableCopies($libraryId, $book->id, $scope, $branchId);
+
+                if ($hasAvailableCopy) {
+                    throw ValidationException::withMessages([
+                        'book_id' => $scope === Reservation::SCOPE_BRANCH
+                            ? 'Knyga siuo metu prieinama pasirinktame filiale, rezervacija nereikalinga.'
+                            : 'Knyga siuo metu prieinama pasirinktoje bibliotekoje, rezervacija nereikalinga.',
+                    ]);
+                }
+
+                $reservation = Reservation::create([
+                    'library_id' => $libraryId,
+                    'book_id' => $book->id,
+                    'user_id' => $member->id,
+                    'scope' => $scope,
+                    'branch_id' => $branchId,
+                    'pickup_branch_id' => null,
+                    'status' => Reservation::STATUS_WAITING,
+                    'reserved_at' => now(),
+                    'ready_at' => null,
+                    'expires_at' => null,
+                    'fulfilled_at' => null,
+                    'cancelled_at' => null,
+                    'notes' => $data['notes'] ?? null,
+                ]);
+
+                app(SyncReservationQueueAction::class)->handle($libraryId, $book->id);
+                DB::afterCommit(fn () => app(ReservationNotificationService::class)->notifyCreated($reservation->fresh()));
+
+                app(RecordAuditLogAction::class)->handle(
+                    $actor,
+                    'reservation_created',
+                    $reservation,
+                    sprintf(
+                        'Sukurta rezervacija knygai "%s" nariui %s.',
+                        $book->title,
+                        $member->name
+                    ),
+                    [
+                        'reservation_id' => $reservation->id,
+                        'book_id' => $book->id,
+                        'book_title' => $book->title,
+                        'target_member_id' => $member->id,
+                        'target_member_name' => $member->name,
+                        'scope' => $scope,
+                        'branch_id' => $branchId,
+                        'expires_at' => $reservation->expires_at?->toDateTimeString(),
+                    ],
+                    $libraryId
+                );
+
+                return $reservation->fresh();
+            });
+        } catch (QueryException $exception) {
+            if (! $this->isActiveReservationUniqueConstraintViolation($exception)) {
+                throw $exception;
+            }
+
             throw ValidationException::withMessages([
-                'book_id' => 'Ši knyga nepriklauso pasirinktai bibliotekai.',
+                'book_id' => 'Jus jau turite aktyvia sios knygos rezervacija.',
             ]);
         }
-
-        [$scope, $branchId] = $this->resolveScope($actor, $libraryId, $data);
-
-        $hasActiveLoan = Loan::query()
-            ->where('library_id', $libraryId)
-            ->where('user_id', $member->id)
-            ->whereNull('returned_at')
-            ->whereHas('bookCopy', function ($query) use ($book) {
-                $query->where('book_id', $book->id);
-            })
-            ->exists();
-
-        if ($hasActiveLoan) {
-            throw ValidationException::withMessages([
-                'book_id' => 'Šis narys jau turi aktyviai išduota šia knyga.',
-            ]);
-        }
-
-        $hasPendingReservation = Reservation::query()
-            ->where('library_id', $libraryId)
-            ->where('book_id', $book->id)
-            ->where('user_id', $member->id)
-            ->pending()
-            ->exists();
-
-        if ($hasPendingReservation) {
-            throw ValidationException::withMessages([
-                'book_id' => 'Šis narys jau turi laukiancia šios knygos rezervacija.',
-            ]);
-        }
-
-        $queueService = app(ReservationQueueService::class);
-        $hasAvailableCopy = $queueService->hasAvailableCopies($libraryId, $book->id, $scope, $branchId);
-
-        if ($hasAvailableCopy) {
-            throw ValidationException::withMessages([
-                'book_id' => $scope === Reservation::SCOPE_BRANCH
-                    ? 'Knyga šiuo metu prieinama pasirinktame filiale, rezervacija nereikalinga.'
-                    : 'Knyga šiuo metu prieinama pasirinktoje bibliotekoje, rezervacija nereikalinga.',
-            ]);
-        }
-
-        $reservation = Reservation::create([
-            'library_id' => $libraryId,
-            'book_id' => $book->id,
-            'user_id' => $member->id,
-            'scope' => $scope,
-            'branch_id' => $branchId,
-            'pickup_branch_id' => null,
-            'status' => Reservation::STATUS_WAITING,
-            'reserved_at' => now(),
-            'ready_at' => null,
-            'expires_at' => null,
-            'fulfilled_at' => null,
-            'cancelled_at' => null,
-            'notes' => $data['notes'] ?? null,
-        ]);
-
-        app(SyncReservationQueueAction::class)->handle($libraryId, $book->id);
-        DB::afterCommit(fn () => app(ReservationNotificationService::class)->notifyCreated($reservation->fresh()));
-
-        app(RecordAuditLogAction::class)->handle(
-            $actor,
-            'reservation_created',
-            $reservation,
-            sprintf(
-                'Sukurta rezervacija knygai "%s" nariui %s.',
-                $book->title,
-                $member->name
-            ),
-            [
-                'reservation_id' => $reservation->id,
-                'book_id' => $book->id,
-                'book_title' => $book->title,
-                'target_member_id' => $member->id,
-                'target_member_name' => $member->name,
-                'scope' => $scope,
-                'branch_id' => $branchId,
-                'expires_at' => $reservation->expires_at?->toDateTimeString(),
-            ],
-            $libraryId
-        );
-
-        return $reservation->fresh();
     }
 
     private function resolveMember(User $actor, array $data): User
@@ -195,7 +209,7 @@ class CreateReservationAction
 
         if (! in_array($scope, [Reservation::SCOPE_BRANCH, Reservation::SCOPE_LIBRARY], true)) {
             throw ValidationException::withMessages([
-                'scope' => 'Pasirinkite galiojančią rezervacijos apimtį.',
+                'scope' => 'Pasirinkite galiojancia rezervacijos apimti.',
             ]);
         }
 
@@ -212,7 +226,7 @@ class CreateReservationAction
 
             if (! $staffBranchId) {
                 throw ValidationException::withMessages([
-                    'branch_id' => 'Darbuotojas turi būti priskirtas filialui.',
+                    'branch_id' => 'Darbuotojas turi buti priskirtas filialui.',
                 ]);
             }
 
@@ -227,7 +241,7 @@ class CreateReservationAction
 
         if (! $branchId) {
             throw ValidationException::withMessages([
-                'branch_id' => 'Pasirinkite filialą filialo apimties rezervacijai.',
+                'branch_id' => 'Pasirinkite filiala filialo apimties rezervacijai.',
             ]);
         }
 
@@ -243,5 +257,15 @@ class CreateReservationAction
         }
 
         return [Reservation::SCOPE_BRANCH, $branchId];
+    }
+
+    private function isActiveReservationUniqueConstraintViolation(QueryException $exception): bool
+    {
+        $errorInfo = $exception->errorInfo;
+        $message = $exception->getMessage();
+
+        return ($errorInfo[0] ?? null) === '23000'
+            && (str_contains($message, 'reservations_active_user_book_unique')
+                || str_contains($message, 'active_reservation_marker'));
     }
 }

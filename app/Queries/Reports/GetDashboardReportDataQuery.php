@@ -81,7 +81,7 @@ class GetDashboardReportDataQuery
                 })
                 ->count(),
             'lost_book_copies_count' => (clone $copiesQuery)->where('status', BookCopy::STATUS_LOST)->count(),
-            'damaged_book_copies_count' => (clone $copiesQuery)->where('status', BookCopy::STATUS_DAMAGED)->count(),
+            'damaged_book_copies_count' => (clone $copiesQuery)->where('condition_status', BookCopy::CONDITION_DAMAGED)->count(),
             'maintenance_book_copies_count' => (clone $copiesQuery)->where('status', BookCopy::STATUS_MAINTENANCE)->count(),
             'withdrawn_book_copies_count' => (clone $copiesQuery)->where('status', BookCopy::STATUS_WITHDRAWN)->count(),
             'active_members_count' => (clone $membersQuery)->count(),
@@ -146,7 +146,7 @@ class GetDashboardReportDataQuery
                     $dateTo
                 ),
                 'bookCopies as damaged_book_copies_count' => fn (Builder $query) => $this->applyBookCopyPeriod(
-                    $query->where('status', BookCopy::STATUS_DAMAGED),
+                    $query->where('condition_status', BookCopy::CONDITION_DAMAGED),
                     $dateFrom,
                     $dateTo
                 ),
@@ -477,7 +477,7 @@ class GetDashboardReportDataQuery
                     $dateTo
                 ),
                 'bookCopies as damaged_book_copies_count' => fn (Builder $query) => $this->applyBookCopyPeriod(
-                    $query->where('status', BookCopy::STATUS_DAMAGED),
+                    $query->where('condition_status', BookCopy::CONDITION_DAMAGED),
                     $dateFrom,
                     $dateTo
                 ),
