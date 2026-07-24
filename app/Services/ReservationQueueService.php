@@ -248,7 +248,23 @@ class ReservationQueueService
 
     private function isReservationQueueUniqueConstraintViolation(QueryException $exception): bool
     {
-        return ($exception->errorInfo[0] ?? null) === '23000'
-            && str_contains($exception->getMessage(), 'reservation_queues_library_book_unique');
+        if (($exception->errorInfo[0] ?? null) !== '23000') {
+            return false;
+        }
+
+        $driver = DB::connection()->getDriverName();
+        $message = $exception->getMessage();
+
+        if (in_array($driver, ['mysql', 'mariadb'], true)) {
+            return str_contains($message, 'reservation_queues_library_book_unique');
+        }
+
+        if ($driver !== 'sqlite') {
+            return false;
+        }
+
+        return (int) ($exception->errorInfo[1] ?? 0) === 19
+            && str_contains($message, 'reservation_queues.library_id')
+            && str_contains($message, 'reservation_queues.book_id');
     }
 }

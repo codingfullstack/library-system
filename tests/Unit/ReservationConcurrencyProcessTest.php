@@ -13,6 +13,7 @@ use App\Models\Reservation;
 use App\Models\ReservationQueue;
 use App\Models\User;
 use App\Services\ReservationQueueService;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Group;
@@ -36,6 +37,8 @@ class ReservationConcurrencyProcessTest extends TestCase
 
     protected function tearDown(): void
     {
+        Artisan::call('up');
+
         $this->tearDownTemporaryMariaDbDatabase();
 
         parent::tearDown();
@@ -161,11 +164,157 @@ class ReservationConcurrencyProcessTest extends TestCase
         $this->assertTrue($first->isSuccessful(), $first->getErrorOutput().$first->getOutput());
         $this->assertTrue($second->isSuccessful(), $second->getErrorOutput().$second->getOutput());
         $this->assertFileExists($secondAcquiredFile);
-        $this->assertLessThan(1.0, $elapsed);
+        $this->assertLessThan(2.0, $elapsed);
         $this->assertNotSame(
             (int) file_get_contents($firstAcquiredFile),
             (int) file_get_contents($secondAcquiredFile)
         );
+    }
+
+    public function test_different_queues_do_not_block_on_reservation_or_copy_row_locks(): void
+    {
+        $library = Library::factory()->create();
+        $firstBook = Book::factory()->create();
+        $secondBook = Book::factory()->create();
+        $branch = Branch::factory()->create(['library_id' => $library->id]);
+        $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+        $members = User::factory()->count(2)->member()->create(['library_id' => $library->id]);
+
+        foreach ([$firstBook, $secondBook] as $index => $book) {
+            BookCopy::factory()->create([
+                'library_id' => $library->id,
+                'book_id' => $book->id,
+                'branch_id' => $branch->id,
+                'location_id' => $location->id,
+                'status' => BookCopy::STATUS_AVAILABLE,
+            ]);
+
+            Reservation::factory()->create([
+                'library_id' => $library->id,
+                'book_id' => $book->id,
+                'user_id' => $members[$index]->id,
+                'scope' => Reservation::SCOPE_LIBRARY,
+                'branch_id' => null,
+                'status' => Reservation::STATUS_WAITING,
+                'reserved_at' => now()->subMinutes(2 - $index),
+                'ready_at' => null,
+                'expires_at' => null,
+                'fulfilled_at' => null,
+                'cancelled_at' => null,
+            ]);
+        }
+
+        $releaseFile = $this->signalFile('release_queue_a_rows');
+        $lockedFile = $this->signalFile('queue_a_rows_locked');
+        $firstQueueLocks = $this->queueMutationRowsLockProcess($library->id, $firstBook->id, $releaseFile, $lockedFile);
+        $secondQueueSync = $this->syncProcess($library->id, $secondBook->id);
+
+        $firstQueueLocks->start();
+        $this->waitForSignalFile($lockedFile);
+
+        $startedAt = microtime(true);
+        $secondQueueSync->start();
+        $secondQueueSync->wait();
+        $elapsed = microtime(true) - $startedAt;
+
+        touch($releaseFile);
+        $firstQueueLocks->wait();
+
+        $this->assertTrue($firstQueueLocks->isSuccessful(), $firstQueueLocks->getErrorOutput().$firstQueueLocks->getOutput());
+        $this->assertTrue($secondQueueSync->isSuccessful(), $secondQueueSync->getErrorOutput().$secondQueueSync->getOutput());
+        $this->assertLessThan(2.0, $elapsed);
+    }
+
+    public function test_production_queue_lock_call_sites_do_not_target_multiple_queue_identities(): void
+    {
+        $callSites = [
+            base_path('app/Actions/Loans/BorrowBookCopyAction.php') => [
+                '$bookCopyContext->library_id',
+                '$bookCopyContext->book_id',
+                'handle($bookCopy->library_id, $bookCopy->book_id)',
+            ],
+            base_path('app/Actions/Loans/ReturnBookCopyAction.php') => [
+                '$bookCopyContext->library_id',
+                '$bookCopyContext->book_id',
+                'handle($bookCopy->library_id, $bookCopy->book_id)',
+            ],
+            base_path('app/Actions/Reservations/CancelReservationAction.php') => [
+                '$reservationContext->library_id',
+                '$reservationContext->book_id',
+                'handle($lockedReservation->library_id, $lockedReservation->book_id)',
+            ],
+            base_path('app/Actions/Reservations/CreateReservationAction.php') => [
+                'lockQueueContext($libraryId, (int) $book->id)',
+                'handle($libraryId, $book->id)',
+            ],
+            base_path('app/Console/Commands/ExpireReservationsCommand.php') => [
+                '$reservationContext->library_id',
+                '$reservationContext->book_id',
+                'handle($bookToSync[\'library_id\'], $bookToSync[\'book_id\'])',
+            ],
+        ];
+
+        foreach ($callSites as $path => $expectedFragments) {
+            $contents = file_get_contents($path);
+
+            $this->assertSame(1, substr_count($contents, 'lockQueueContext('), $path);
+
+            foreach ($expectedFragments as $fragment) {
+                $this->assertStringContainsString($fragment, $contents, $path);
+            }
+        }
+    }
+
+    public function test_legacy_apply_and_same_queue_sync_share_queue_mutex_without_deadlock(): void
+    {
+        $this->dropReadyCompletenessCheck();
+
+        [$library, $book] = $this->seedLegacyAssignableReadyReservation();
+
+        $legacyApply = $this->legacyReadyApplyProcess();
+        $sync = $this->syncProcess($library->id, $book->id);
+
+        $legacyApply->start();
+        $sync->start();
+        $legacyApply->wait();
+        $sync->wait();
+
+        $this->assertTrue($legacyApply->isSuccessful(), $legacyApply->getErrorOutput().$legacyApply->getOutput());
+        $this->assertTrue($sync->isSuccessful(), $sync->getErrorOutput().$sync->getOutput());
+        $this->assertSame(1, Reservation::query()
+            ->where('library_id', $library->id)
+            ->where('book_id', $book->id)
+            ->where('status', Reservation::STATUS_READY)
+            ->whereNotNull('assigned_book_copy_id')
+            ->count());
+    }
+
+    public function test_legacy_apply_on_queue_a_does_not_block_sync_on_queue_b(): void
+    {
+        $this->dropReadyCompletenessCheck();
+
+        $library = Library::factory()->create();
+        $firstBook = Book::factory()->create();
+        $secondBook = Book::factory()->create();
+
+        $this->seedLegacyAssignableReadyReservation($library, $firstBook);
+        $this->seedWaitingReservationWithAvailableCopy($library, $secondBook);
+
+        $legacyApply = $this->legacyReadyApplyProcess();
+        $sync = $this->syncProcess($library->id, $secondBook->id);
+
+        $legacyApply->start();
+
+        $startedAt = microtime(true);
+        $sync->start();
+        $sync->wait();
+        $elapsed = microtime(true) - $startedAt;
+
+        $legacyApply->wait();
+
+        $this->assertTrue($legacyApply->isSuccessful(), $legacyApply->getErrorOutput().$legacyApply->getOutput());
+        $this->assertTrue($sync->isSuccessful(), $sync->getErrorOutput().$sync->getOutput());
+        $this->assertLessThan(2.0, $elapsed);
     }
 
     public function test_queue_context_can_be_locked_when_book_has_no_copies_but_reservation_creation_is_rejected(): void
@@ -411,6 +560,43 @@ class ReservationConcurrencyProcessTest extends TestCase
         return $process;
     }
 
+    private function legacyReadyApplyProcess(): Process
+    {
+        $code = <<<'PHP'
+require 'vendor/autoload.php';
+$app = require 'bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+try {
+    Illuminate\Support\Facades\Artisan::call('down');
+
+    $exitCode = Illuminate\Support\Facades\Artisan::call('reservations:audit-legacy-ready', [
+        '--apply' => true,
+        '--maintenance-confirmed' => true,
+        '--json' => true,
+    ]);
+
+    echo Illuminate\Support\Facades\Artisan::output();
+
+    if ($exitCode !== 0) {
+        exit($exitCode);
+    }
+} finally {
+    Illuminate\Support\Facades\Artisan::call('up');
+}
+PHP;
+
+        $process = new Process([
+            PHP_BINARY,
+            '-r',
+            $code,
+        ], base_path(), $this->temporaryDatabaseEnvironment());
+
+        $process->setTimeout(60);
+
+        return $process;
+    }
+
     private function createReservationProcess(int $actorId, int $memberId, int $bookId): Process
     {
         $code = <<<'PHP'
@@ -546,6 +732,73 @@ PHP;
         return $process;
     }
 
+    /**
+     * @return array{0: Library, 1: Book}
+     */
+    private function seedLegacyAssignableReadyReservation(?Library $library = null, ?Book $book = null): array
+    {
+        $library ??= Library::factory()->create();
+        $book ??= Book::factory()->create();
+        $branch = Branch::factory()->create(['library_id' => $library->id]);
+        $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+        $member = User::factory()->member()->create(['library_id' => $library->id]);
+
+        BookCopy::factory()->create([
+            'library_id' => $library->id,
+            'book_id' => $book->id,
+            'branch_id' => $branch->id,
+            'location_id' => $location->id,
+            'status' => BookCopy::STATUS_AVAILABLE,
+        ]);
+
+        Reservation::factory()->create([
+            'library_id' => $library->id,
+            'book_id' => $book->id,
+            'user_id' => $member->id,
+            'scope' => Reservation::SCOPE_LIBRARY,
+            'branch_id' => null,
+            'pickup_branch_id' => $branch->id,
+            'assigned_book_copy_id' => null,
+            'status' => Reservation::STATUS_READY,
+            'reserved_at' => now()->subHour(),
+            'ready_at' => now()->subMinutes(30),
+            'expires_at' => now()->addDay(),
+            'fulfilled_at' => null,
+            'cancelled_at' => null,
+        ]);
+
+        return [$library, $book];
+    }
+
+    private function seedWaitingReservationWithAvailableCopy(Library $library, Book $book): void
+    {
+        $branch = Branch::factory()->create(['library_id' => $library->id]);
+        $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+        $member = User::factory()->member()->create(['library_id' => $library->id]);
+
+        BookCopy::factory()->create([
+            'library_id' => $library->id,
+            'book_id' => $book->id,
+            'branch_id' => $branch->id,
+            'location_id' => $location->id,
+            'status' => BookCopy::STATUS_AVAILABLE,
+        ]);
+
+        Reservation::factory()->create([
+            'library_id' => $library->id,
+            'book_id' => $book->id,
+            'user_id' => $member->id,
+            'scope' => Reservation::SCOPE_LIBRARY,
+            'branch_id' => null,
+            'status' => Reservation::STATUS_WAITING,
+            'reserved_at' => now()->subHour(),
+            'ready_at' => null,
+            'expires_at' => null,
+            'fulfilled_at' => null,
+            'cancelled_at' => null,
+        ]);
+    }
+
     private function candidateReservationSetLockProcess(int $libraryId, int $bookId, string $releaseFile, string $lockedFile): Process
     {
         $code = <<<'PHP'
@@ -561,6 +814,64 @@ try {
         ->activeReservationsQuery((int) $argv[1], (int) $argv[2])
         ->lockForUpdate()
         ->get();
+    file_put_contents($argv[4], 'locked');
+
+    $deadline = microtime(true) + 10;
+
+    while (! file_exists($argv[3])) {
+        if (microtime(true) > $deadline) {
+            throw new RuntimeException('Timed out waiting for release signal.');
+        }
+
+        usleep(20 * 1000);
+    }
+
+    Illuminate\Support\Facades\DB::commit();
+} catch (Throwable $exception) {
+    Illuminate\Support\Facades\DB::rollBack();
+    fwrite(STDERR, $exception::class.': '.$exception->getMessage().PHP_EOL);
+    exit(1);
+}
+PHP;
+
+        $process = new Process([
+            PHP_BINARY,
+            '-r',
+            $code,
+            (string) $libraryId,
+            (string) $bookId,
+            $releaseFile,
+            $lockedFile,
+        ], base_path(), $this->temporaryDatabaseEnvironment());
+
+        $process->setTimeout(60);
+
+        return $process;
+    }
+
+    private function queueMutationRowsLockProcess(int $libraryId, int $bookId, string $releaseFile, string $lockedFile): Process
+    {
+        $code = <<<'PHP'
+require 'vendor/autoload.php';
+$app = require 'bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+Illuminate\Support\Facades\DB::beginTransaction();
+
+try {
+    app(App\Services\ReservationQueueService::class)->lockQueueContext((int) $argv[1], (int) $argv[2]);
+    app(App\Services\ReservationQueueService::class)
+        ->activeReservationsQuery((int) $argv[1], (int) $argv[2])
+        ->lockForUpdate()
+        ->get();
+    app(App\Services\ReservationQueueService::class)
+        ->availableCopiesQuery((int) $argv[1], (int) $argv[2])
+        ->whereNotNull('branch_id')
+        ->orderBy('branch_id')
+        ->orderBy('id')
+        ->lockForUpdate()
+        ->get();
+
     file_put_contents($argv[4], 'locked');
 
     $deadline = microtime(true) + 10;

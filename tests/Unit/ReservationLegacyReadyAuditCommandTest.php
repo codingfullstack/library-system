@@ -13,9 +13,12 @@ use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\UsesTemporaryMariaDbDatabase;
 use Tests\TestCase;
 
+#[Group('mariadb')]
+#[Group('database-invariants')]
 class ReservationLegacyReadyAuditCommandTest extends TestCase
 {
     use UsesTemporaryMariaDbDatabase;
@@ -30,6 +33,8 @@ class ReservationLegacyReadyAuditCommandTest extends TestCase
 
     protected function tearDown(): void
     {
+        Artisan::call('up');
+
         $this->tearDownTemporaryMariaDbDatabase();
 
         parent::tearDown();
@@ -77,11 +82,14 @@ class ReservationLegacyReadyAuditCommandTest extends TestCase
 
     public function test_apply_is_blocked_before_the_assigned_copy_column_exists(): void
     {
+        Artisan::call('down');
+
         $this->dropAssignedCopyMigrationColumns();
         $this->seedLegacyReadyDataset();
 
         $exitCode = Artisan::call('reservations:audit-legacy-ready', [
             '--apply' => true,
+            '--maintenance-confirmed' => true,
             '--json' => true,
         ]);
         $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
@@ -94,12 +102,47 @@ class ReservationLegacyReadyAuditCommandTest extends TestCase
         );
     }
 
+    public function test_apply_is_blocked_when_application_is_not_in_maintenance_mode(): void
+    {
+        $this->seedLegacyReadyDataset();
+
+        $exitCode = Artisan::call('reservations:audit-legacy-ready', [
+            '--apply' => true,
+            '--maintenance-confirmed' => true,
+            '--json' => true,
+        ]);
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertSame('BLOCK', $payload['status']);
+        $this->assertSame('Apply mode requires Laravel maintenance mode.', $payload['apply_error']);
+    }
+
+    public function test_apply_is_blocked_without_explicit_maintenance_confirmation(): void
+    {
+        Artisan::call('down');
+        $this->seedLegacyReadyDataset();
+
+        $exitCode = Artisan::call('reservations:audit-legacy-ready', [
+            '--apply' => true,
+            '--json' => true,
+        ]);
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertSame('BLOCK', $payload['status']);
+        $this->assertSame('Apply mode requires --maintenance-confirmed.', $payload['apply_error']);
+    }
+
     public function test_apply_assigns_only_deterministic_single_copy_rows(): void
     {
+        Artisan::call('down');
+
         $ids = $this->seedLegacyReadyDataset();
 
         $exitCode = Artisan::call('reservations:audit-legacy-ready', [
             '--apply' => true,
+            '--maintenance-confirmed' => true,
             '--json' => true,
         ]);
         $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
