@@ -7,11 +7,17 @@ use App\Models\BookCopy;
 use App\Models\Library;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Queries\BookCopies\AttachCurrentReservationForCopies;
 use App\Services\ReservationQueueService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class GetLibraryBookDetailsQuery
 {
+    public function __construct(
+        private readonly AttachCurrentReservationForCopies $attachCurrentReservationForCopies,
+        private readonly ReservationQueueService $queueService
+    ) {}
+
     public function handle(?User $user, Book $book, array $filters = []): Book
     {
         $libraryIds = $this->visibleLibraryIds($user);
@@ -22,7 +28,7 @@ class GetLibraryBookDetailsQuery
                 ->whereIn('library_id', $libraryIds))
             ->exists();
 
-        if (($user === null || $user->role === 'narys') && is_array($libraryIds) && ! $hasVisibleCopies) {
+        if (($user === null || $user->effectiveRole($user->activeLibraryId()) === 'narys') && is_array($libraryIds) && ! $hasVisibleCopies) {
             throw (new ModelNotFoundException)->setModel(Book::class, [$book->id]);
         }
 
@@ -38,7 +44,7 @@ class GetLibraryBookDetailsQuery
             'authors:id,name',
             'reservations' => function ($q) use ($libraryIds, $user) {
                 $q->when(is_array($libraryIds), fn ($reservationQuery) => $reservationQuery->whereIn('library_id', $libraryIds))
-                    ->when($user?->role === User::ROLE_STAFF, function ($reservationQuery) use ($user) {
+                    ->when($user?->effectiveRole($user->activeLibraryId()) === User::ROLE_STAFF, function ($reservationQuery) use ($user) {
                         $branchId = $user->assignedBranchId($user->activeLibraryId());
 
                         $reservationQuery->where(function ($scopeQuery) use ($branchId) {
@@ -118,7 +124,7 @@ class GetLibraryBookDetailsQuery
                                 'borrowed_at',
                                 'returned_at',
                             ])
-                            ->when($user?->role === User::ROLE_STAFF, function ($staffLoanQuery) use ($user) {
+                            ->when($user?->effectiveRole($user->activeLibraryId()) === User::ROLE_STAFF, function ($staffLoanQuery) use ($user) {
                                 $branchId = $user->assignedBranchId($user->activeLibraryId());
 
                                 $staffLoanQuery->whereHas('bookCopy', fn ($copyQuery) => $branchId
@@ -134,12 +140,10 @@ class GetLibraryBookDetailsQuery
             },
         ]);
 
-        $queueService = app(ReservationQueueService::class);
-
-        $book->reservations->each(function ($reservation) use ($queueService) {
+        $book->reservations->each(function ($reservation) {
             if ($reservation->isPending()) {
-                $reservation->setAttribute('queue_position', $queueService->positionFor($reservation));
-                $reservation->setAttribute('queue_size', $queueService->queueSize($reservation->library_id, $reservation->book_id));
+                $reservation->setAttribute('queue_position', $this->queueService->positionFor($reservation));
+                $reservation->setAttribute('queue_size', $this->queueService->queueSize($reservation->library_id, $reservation->book_id));
             }
         });
 
@@ -157,6 +161,10 @@ class GetLibraryBookDetailsQuery
                 $q->where('status', 'laisva');
             },
         ]);
+
+        $book->bookCopies->each(function (BookCopy $copy) use ($user) {
+            $this->attachCurrentReservationForCopies->handle([$copy], $user?->can('update', $copy) ?? false);
+        });
 
         return $book;
     }
@@ -179,7 +187,7 @@ class GetLibraryBookDetailsQuery
             return null;
         }
 
-        if ($user->role === 'narys') {
+        if ($user->effectiveRole($user->activeLibraryId()) === 'narys') {
             return $user->manageableLibraryIds();
         }
 

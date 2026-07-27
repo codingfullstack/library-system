@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class GetLibraryBookCopyDetailsQuery
 {
+    public function __construct(private readonly AttachCurrentReservationForCopies $attachCurrentReservationForCopies) {}
+
     public function handle(User $user, BookCopy $bookCopy): BookCopy
     {
         $libraryId = $user->activeLibraryId();
@@ -69,6 +71,8 @@ class GetLibraryBookCopyDetailsQuery
         if (! $copy) {
             throw (new ModelNotFoundException)->setModel(BookCopy::class, [$bookCopy->id]);
         }
+
+        $this->attachCurrentReservationForCopies->handle([$copy], $user->can('update', $copy));
 
         return $copy;
     }

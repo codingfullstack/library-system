@@ -43,9 +43,12 @@ it('returns canonical loan status fields from the api', function () {
         ->assertOk()
         ->assertJsonPath('data.0.id', $loan->id)
         ->assertJsonPath('data.0.status_label', 'Aktyvi')
+        ->assertJsonPath('data.0.display_status', 'Aktyvi')
         ->assertJsonPath('data.0.is_overdue', false)
         ->assertJsonPath('data.0.is_due_soon', true)
         ->assertJsonPath('data.0.overdue_days', 0)
+        ->assertJsonPath('data.0.can_return', true)
+        ->assertJsonPath('data.0.can_renew', false)
         ->assertJsonStructure([
             'data',
             'links' => ['first', 'last', 'prev', 'next'],

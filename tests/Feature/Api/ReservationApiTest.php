@@ -300,6 +300,8 @@ it('includes active reservations in the api book details response', function () 
         ->assertOk()
         ->assertJsonPath('reservations.0.id', $reservation->id)
         ->assertJsonPath('reservations.0.is_pending', true)
+        ->assertJsonPath('reservations.0.can_cancel', true)
+        ->assertJsonPath('reservations.0.display_status', 'Aktyvi')
         ->assertJsonPath('reservations.0.queue_position', 1)
         ->assertJsonPath('reservations.0.queue_size', 1);
 });
