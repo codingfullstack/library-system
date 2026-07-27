@@ -1666,7 +1666,7 @@ it('selects ready candidates from the locked reservation set instead of a late e
         ->and($reservation->fresh()->assigned_book_copy_id)->toBe($copy->id)
         ->and(Reservation::query()->where('status', Reservation::STATUS_READY)->where('assigned_book_copy_id', $copy->id)->count())->toBe(1)
         ->and($member->notifications()->where('type', 'reservation_ready')->count())->toBe(1);
-});
+})->group('mysql', 'mariadb', 'database-invariants', 'concurrency');
 
 it('sends one queue change when a reservation is cancelled', function () {
     $library = Library::factory()->create();

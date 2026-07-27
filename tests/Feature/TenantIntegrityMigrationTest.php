@@ -7,6 +7,9 @@ use App\Models\Library;
 use App\Models\Location;
 use App\Support\Tenancy\TenantIntegrityAuditor;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
+uses()->group('mysql', 'mariadb', 'database-invariants');
 
 it('migration preflight aborts instead of silently fixing bad tenant data', function () {
     $library = Library::factory()->create();
@@ -23,9 +26,15 @@ it('migration preflight aborts instead of silently fixing bad tenant data', func
         'status' => BookCopy::STATUS_AVAILABLE,
     ]);
 
-    DB::table('book_copies')
-        ->where('id', $copy->id)
-        ->update(['branch_id' => $otherBranch->id]);
+    Schema::disableForeignKeyConstraints();
+
+    try {
+        DB::table('book_copies')
+            ->where('id', $copy->id)
+            ->update(['branch_id' => $otherBranch->id]);
+    } finally {
+        Schema::enableForeignKeyConstraints();
+    }
 
     $migration = require base_path('database/migrations/2026_07_28_000000_enforce_tenant_ownership_invariants.php');
 

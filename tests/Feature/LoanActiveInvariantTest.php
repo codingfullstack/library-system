@@ -13,7 +13,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 
-uses(RefreshDatabase::class);
+uses(RefreshDatabase::class)->group('mysql', 'mariadb', 'database-invariants', 'concurrency');
 
 function loanInvariantFixture(): array
 {

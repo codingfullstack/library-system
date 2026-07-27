@@ -6,6 +6,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
+uses()->group('mysql', 'mariadb', 'database-invariants');
+
 function skipUnlessMySqlLike(): void
 {
     if (! in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
@@ -140,10 +142,13 @@ it('rejects two active ready reservations for the same assigned copy', function 
     skipUnlessMySqlLike();
 
     $copy = BookCopy::factory()->create(['status' => BookCopy::STATUS_AVAILABLE]);
+    $firstMember = User::factory()->member()->create(['library_id' => $copy->library_id]);
+    $secondMember = User::factory()->member()->create(['library_id' => $copy->library_id]);
 
     Reservation::factory()->create([
         'library_id' => $copy->library_id,
         'book_id' => $copy->book_id,
+        'user_id' => $firstMember->id,
         'assigned_book_copy_id' => $copy->id,
         'pickup_branch_id' => $copy->branch_id,
         'status' => Reservation::STATUS_READY,
@@ -157,6 +162,7 @@ it('rejects two active ready reservations for the same assigned copy', function 
         Reservation::factory()->create([
             'library_id' => $copy->library_id,
             'book_id' => $copy->book_id,
+            'user_id' => $secondMember->id,
             'assigned_book_copy_id' => $copy->id,
             'pickup_branch_id' => $copy->branch_id,
             'status' => Reservation::STATUS_READY,
@@ -176,10 +182,12 @@ it('rejects incomplete ready inserts and updates', function () {
     skipUnlessMySqlLike();
 
     $copy = BookCopy::factory()->create(['status' => BookCopy::STATUS_AVAILABLE]);
+    $member = User::factory()->member()->create(['library_id' => $copy->library_id]);
 
     $valid = Reservation::factory()->create([
         'library_id' => $copy->library_id,
         'book_id' => $copy->book_id,
+        'user_id' => $member->id,
         'assigned_book_copy_id' => $copy->id,
         'pickup_branch_id' => $copy->branch_id,
         'status' => Reservation::STATUS_READY,
@@ -215,6 +223,7 @@ it('rejects incomplete ready inserts and updates', function () {
     $waiting = Reservation::factory()->create([
         'library_id' => $copy->library_id,
         'book_id' => $copy->book_id,
+        'user_id' => User::factory()->member()->create(['library_id' => $copy->library_id])->id,
         'status' => Reservation::STATUS_WAITING,
     ]);
 
@@ -235,10 +244,12 @@ it('allows historical terminal reservations to retain lifecycle fields', functio
     skipUnlessMySqlLike();
 
     $copy = BookCopy::factory()->create(['status' => BookCopy::STATUS_AVAILABLE]);
+    $member = User::factory()->member()->create(['library_id' => $copy->library_id]);
 
     $reservation = Reservation::factory()->create([
         'library_id' => $copy->library_id,
         'book_id' => $copy->book_id,
+        'user_id' => $member->id,
         'assigned_book_copy_id' => $copy->id,
         'pickup_branch_id' => $copy->branch_id,
         'status' => Reservation::STATUS_CANCELLED,

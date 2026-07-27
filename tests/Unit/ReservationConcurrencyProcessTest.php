@@ -21,6 +21,7 @@ use Symfony\Component\Process\Process;
 use Tests\Support\UsesTemporaryMariaDbDatabase;
 use Tests\TestCase;
 
+#[Group('mysql')]
 #[Group('mariadb')]
 #[Group('concurrency')]
 #[Group('database-invariants')]

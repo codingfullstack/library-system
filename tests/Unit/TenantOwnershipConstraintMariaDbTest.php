@@ -12,9 +12,13 @@ use App\Models\Reservation;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\UsesTemporaryMariaDbDatabase;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('mariadb')]
+#[Group('database-invariants')]
 class TenantOwnershipConstraintMariaDbTest extends TestCase
 {
     use UsesTemporaryMariaDbDatabase;
