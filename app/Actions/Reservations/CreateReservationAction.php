@@ -137,7 +137,7 @@ class CreateReservationAction
 
     private function resolveMember(User $actor, array $data): User
     {
-        if ($actor->effectiveRole() === User::ROLE_MEMBER) {
+        if ($actor->effectiveRole($actor->activeLibraryId()) === User::ROLE_MEMBER) {
             if (! $actor->is_active) {
                 throw ValidationException::withMessages([
                     'user' => 'Jusu paskyra nera aktyvi.',

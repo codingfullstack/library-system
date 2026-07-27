@@ -20,6 +20,8 @@ class GetLibraryBookDetailsQuery
 
     public function handle(?User $user, Book $book, array $filters = []): Book
     {
+        $user?->loadMissing('libraryMemberships');
+
         $libraryIds = $this->visibleLibraryIds($user);
 
         $hasVisibleCopies = $book->bookCopies()
@@ -110,9 +112,11 @@ class GetLibraryBookDetailsQuery
                     ->when(! empty($branchId), fn ($copyQuery) => $copyQuery->where('branch_id', $branchId))
                     ->when(! empty($locationId), fn ($copyQuery) => $copyQuery->where('location_id', $locationId))
                     ->with([
+                        'book:id,slug,title,subtitle,isbn',
                         'branch:id,name',
                         'library:id,name,code,address,city',
                         'location:id,name,room,shelf',
+                        'statusHistories.user:id,name',
                         'activeLoan' => function ($loanQuery) use ($user) {
                             $loanQuery->select([
                                 'id',
@@ -124,16 +128,16 @@ class GetLibraryBookDetailsQuery
                                 'borrowed_at',
                                 'returned_at',
                             ])
-                            ->when($user?->effectiveRole($user->activeLibraryId()) === User::ROLE_STAFF, function ($staffLoanQuery) use ($user) {
-                                $branchId = $user->assignedBranchId($user->activeLibraryId());
+                                ->when($user?->effectiveRole($user->activeLibraryId()) === User::ROLE_STAFF, function ($staffLoanQuery) use ($user) {
+                                    $branchId = $user->assignedBranchId($user->activeLibraryId());
 
-                                $staffLoanQuery->whereHas('bookCopy', fn ($copyQuery) => $branchId
-                                    ? $copyQuery->where('branch_id', $branchId)
-                                    : $copyQuery->whereRaw('1 = 0'));
-                            })
-                            ->with([
-                                'user:id,name,email,membership_number',
-                            ]);
+                                    $staffLoanQuery->whereHas('bookCopy', fn ($copyQuery) => $branchId
+                                        ? $copyQuery->where('branch_id', $branchId)
+                                        : $copyQuery->whereRaw('1 = 0'));
+                                })
+                                ->with([
+                                    'user:id,name,email,membership_number',
+                                ]);
                         },
                     ])
                     ->orderBy('inventory_code');
@@ -162,9 +166,10 @@ class GetLibraryBookDetailsQuery
             },
         ]);
 
-        $book->bookCopies->each(function (BookCopy $copy) use ($user) {
-            $this->attachCurrentReservationForCopies->handle([$copy], $user?->can('update', $copy) ?? false);
-        });
+        $this->attachCurrentReservationForCopies->handle(
+            $book->bookCopies,
+            fn (BookCopy $copy): bool => $user?->can('update', $copy) ?? false
+        );
 
         return $book;
     }

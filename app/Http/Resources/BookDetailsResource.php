@@ -30,7 +30,8 @@ class BookDetailsResource extends JsonResource
             'available_copies_count' => $this->available_copies_count ?? null,
             'is_available' => ((int) ($this->available_copies_count ?? 0)) > 0,
             'can_reserve' => ($request->user()?->hasAnyEffectiveRole(['superadministratorius', 'administratorius', 'darbuotojas', 'narys']) ?? false)
-                && (int) ($this->copies_count ?? 0) > 0,
+                && (int) ($this->copies_count ?? 0) > 0
+                && (int) ($this->available_copies_count ?? 0) === 0,
             'display_status' => ((int) ($this->available_copies_count ?? 0)) > 0
                 ? 'Galima'
                 : (((int) ($this->copies_count ?? 0)) > 0 ? 'Šiuo metu neprieinama' : 'Nėra egzempliorių'),

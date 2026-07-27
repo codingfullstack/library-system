@@ -56,6 +56,34 @@ it('returns canonical loan status fields from the api', function () {
         ]);
 });
 
+it('matches can return with branch management authorization', function () {
+    $library = Library::factory()->create();
+    $admin = User::factory()->admin()->create(['library_id' => $library->id]);
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create();
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $copy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'status' => BookCopy::STATUS_AVAILABLE,
+    ]);
+    createLoanForApi($library, $member, [
+        'book_copy_id' => $copy->id,
+        'status' => Loan::STATUS_RETURNED,
+        'returned_at' => now(),
+    ], ['title' => $book->title]);
+
+    $this->actingAs($admin)
+        ->getJson('/api/auth/loans/active?status='.urlencode(Loan::STATUS_RETURNED))
+        ->assertOk()
+        ->assertJsonPath('data.0.can_return', false);
+
+    $this->actingAs($admin)
+        ->postJson('/api/auth/book-copies/'.$copy->id.'/return')
+        ->assertUnprocessable();
+});
+
 it('returns the first loans page with laravel paginator metadata and links', function () {
     $library = Library::factory()->create();
     $staff = User::factory()->admin()->create(['library_id' => $library->id]);

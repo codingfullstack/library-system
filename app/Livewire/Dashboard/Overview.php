@@ -82,7 +82,7 @@ class Overview extends Component
         $cards = $this->summaryCards($report, $previousReport);
         $snapshot = $this->snapshotItems($report, $filters);
         $alerts = $this->alertItems($report);
-        $quickActions = $this->quickActions($actor->effectiveRole());
+        $quickActions = $this->quickActions($actor->effectiveRole($actor->activeLibraryId()) ?? '');
         $copiesBreakdown = $this->copiesBreakdown($report);
 
         $this->chartPayload = [
@@ -385,7 +385,6 @@ class Overview extends Component
             ->count();
     }
 }
-
 
 
 

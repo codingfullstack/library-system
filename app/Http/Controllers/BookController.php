@@ -39,7 +39,7 @@ class BookController extends Controller
         ];
         $books = $getLibraryBooksQuery->handle($actor, $filters);
 
-        return view($actor->effectiveRole() === 'narys' ? 'account.books.index' : 'books.index', array_merge(
+        return view($actor->effectiveRole($actor->activeLibraryId()) === 'narys' ? 'account.books.index' : 'books.index', array_merge(
             ['books' => $books],
             $getBookIndexFiltersDataQuery->handle($actor, $filters)
         ));
@@ -63,7 +63,7 @@ class BookController extends Controller
             'location_id' => $request->query('location_id'),
         ]);
 
-        if ($actor->effectiveRole() === 'narys') {
+        if ($actor->effectiveRole($actor->activeLibraryId()) === 'narys') {
             $currentReservation = $book->reservations
                 ->filter(fn ($reservation) => $reservation->isActive())
                 ->sortBy([['created_at', 'asc'], ['id', 'asc']])

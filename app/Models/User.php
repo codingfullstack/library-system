@@ -7,9 +7,9 @@ use App\Support\UserManagement;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
@@ -19,8 +19,11 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     public const ROLE_SUPER_ADMIN = 'superadministratorius';
+
     public const ROLE_ADMIN = 'administratorius';
+
     public const ROLE_STAFF = 'darbuotojas';
+
     public const ROLE_MEMBER = 'narys';
 
     protected $fillable = [
@@ -72,7 +75,7 @@ class User extends Authenticatable
 
         $parts = preg_split('/\s+/', $name, -1, PREG_SPLIT_NO_EMPTY);
 
-        if (!$parts || count($parts) === 0) {
+        if (! $parts || count($parts) === 0) {
             return 'U';
         }
 
@@ -83,7 +86,7 @@ class User extends Authenticatable
         $first = mb_substr($parts[0], 0, 1);
         $last = mb_substr($parts[count($parts) - 1], 0, 1);
 
-        return strtoupper($first . $last);
+        return strtoupper($first.$last);
     }
 
     public function libraryMemberships(): HasMany
@@ -158,21 +161,25 @@ class User extends Authenticatable
         return in_array($this->effectiveRole($this->activeLibraryId()), [self::ROLE_ADMIN, self::ROLE_STAFF], true);
     }
 
-    public function effectiveRole(int|string|null $libraryId = null): string
+    public function effectiveRole(int|string|null $libraryId = null): ?string
     {
         if ($this->isSuperAdmin()) {
             return self::ROLE_SUPER_ADMIN;
         }
 
         if (empty($libraryId)) {
-            return $this->role;
+            return null;
         }
 
-        return $this->membershipForLibrary($libraryId)?->role ?: $this->role;
+        return $this->membershipForLibrary($libraryId)?->role;
     }
 
     public function hasAnyEffectiveRole(array $roles, int|string|null $libraryId = null): bool
     {
+        if (! $this->is_active) {
+            return false;
+        }
+
         $effectiveRole = $this->effectiveRole($libraryId ?: $this->activeLibraryId());
 
         if (! in_array($effectiveRole, $roles, true)) {
@@ -188,6 +195,10 @@ class User extends Authenticatable
 
     public function hasStaffAccess(): bool
     {
+        if (! $this->is_active) {
+            return false;
+        }
+
         return in_array($this->effectiveRole($this->activeLibraryId()), [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_STAFF], true);
     }
 
@@ -220,6 +231,18 @@ class User extends Authenticatable
 
     public function defaultLibraryId(): ?int
     {
+        if ($this->relationLoaded('libraryMemberships')) {
+            $membership = $this->libraryMemberships
+                ->where('is_active', true)
+                ->sortBy([
+                    ['joined_at', 'asc'],
+                    ['id', 'asc'],
+                ])
+                ->first();
+
+            return $membership?->library_id ? (int) $membership->library_id : null;
+        }
+
         return $this->activeLibraryMemberships()
             ->orderBy('joined_at')
             ->orderBy('id')
@@ -284,6 +307,10 @@ class User extends Authenticatable
 
     public function canManageBookCopy(BookCopy $bookCopy): bool
     {
+        if (! $this->is_active) {
+            return false;
+        }
+
         if ($this->isSuperAdmin()) {
             return true;
         }
@@ -307,6 +334,10 @@ class User extends Authenticatable
 
     public function canViewSensitiveLoanDetails(Loan $loan): bool
     {
+        if (! $this->is_active) {
+            return false;
+        }
+
         if ($this->isSuperAdmin()) {
             return true;
         }
@@ -342,6 +373,10 @@ class User extends Authenticatable
 
     public function canViewSensitiveReservationDetails(Reservation $reservation): bool
     {
+        if (! $this->is_active) {
+            return false;
+        }
+
         if ($this->isSuperAdmin()) {
             return true;
         }
@@ -375,6 +410,10 @@ class User extends Authenticatable
 
     public function canCancelReservation(Reservation $reservation): bool
     {
+        if (! $this->is_active) {
+            return false;
+        }
+
         if ($this->isSuperAdmin()) {
             return true;
         }
@@ -473,11 +512,3 @@ class User extends Authenticatable
             ->first();
     }
 }
-
-
-
-
-
-
-
-

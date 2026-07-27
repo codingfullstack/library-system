@@ -22,7 +22,7 @@ class ReservationController extends Controller
         GetLibraryReservationsQuery $getLibraryReservationsQuery,
         GetReservationIndexFiltersDataQuery $getReservationIndexFiltersDataQuery
     ): View {
-        if ($request->user()->effectiveRole() === 'narys') {
+        if ($request->user()->effectiveRole($request->user()->activeLibraryId()) === 'narys') {
             $filters = [
                 'search' => $request->query('search'),
                 'status' => $request->query('status'),
