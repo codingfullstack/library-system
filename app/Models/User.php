@@ -54,6 +54,12 @@ class User extends Authenticatable
                 $user->membership_number = UserManagement::generateMembershipNumber();
             }
         });
+
+        static::updated(function (User $user) {
+            if ($user->wasChanged(['password', 'role', 'is_active'])) {
+                $user->tokens()->delete();
+            }
+        });
     }
 
     public function initials(): string
@@ -144,22 +150,32 @@ class User extends Authenticatable
 
     public function isAdmin(): bool
     {
-        return $this->role === 'administratorius';
+        return $this->effectiveRole($this->activeLibraryId()) === self::ROLE_ADMIN;
     }
 
     public function isStaff(): bool
     {
-        return in_array($this->role, ['administratorius', 'darbuotojas'], true);
+        return in_array($this->effectiveRole($this->activeLibraryId()), [self::ROLE_ADMIN, self::ROLE_STAFF], true);
     }
 
     public function effectiveRole(int|string|null $libraryId = null): string
     {
-        return $this->role;
+        if ($this->isSuperAdmin()) {
+            return self::ROLE_SUPER_ADMIN;
+        }
+
+        if (empty($libraryId)) {
+            return $this->role;
+        }
+
+        return $this->membershipForLibrary($libraryId)?->role ?: $this->role;
     }
 
     public function hasAnyEffectiveRole(array $roles, int|string|null $libraryId = null): bool
     {
-        if (! in_array($this->role, $roles, true)) {
+        $effectiveRole = $this->effectiveRole($libraryId ?: $this->activeLibraryId());
+
+        if (! in_array($effectiveRole, $roles, true)) {
             return false;
         }
 
@@ -172,7 +188,7 @@ class User extends Authenticatable
 
     public function hasStaffAccess(): bool
     {
-        return in_array($this->role, ['superadministratorius', 'administratorius', 'darbuotojas'], true);
+        return in_array($this->effectiveRole($this->activeLibraryId()), [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_STAFF], true);
     }
 
     public function activeLibraryId(): ?int
@@ -251,23 +267,17 @@ class User extends Authenticatable
 
     public function assignedBranchId(int|string|null $libraryId = null): ?int
     {
-        if ($this->role !== self::ROLE_STAFF) {
-            return null;
-        }
-
         $libraryId = $libraryId ?: $this->activeLibraryId();
 
         if (empty($libraryId)) {
             return null;
         }
 
-        $membership = $this->relationLoaded('libraryMemberships')
-            ? $this->libraryMemberships
-                ->where('is_active', true)
-                ->firstWhere('library_id', (int) $libraryId)
-            : $this->activeLibraryMemberships()
-                ->where('library_id', $libraryId)
-                ->first();
+        if ($this->effectiveRole($libraryId) !== self::ROLE_STAFF) {
+            return null;
+        }
+
+        $membership = $this->membershipForLibrary($libraryId);
 
         return $membership?->branch_id ? (int) $membership->branch_id : null;
     }
@@ -286,7 +296,7 @@ class User extends Authenticatable
             return true;
         }
 
-        if ($this->role !== self::ROLE_STAFF) {
+        if ($this->effectiveRole($bookCopy->library_id) !== self::ROLE_STAFF) {
             return false;
         }
 
@@ -305,7 +315,7 @@ class User extends Authenticatable
             return false;
         }
 
-        if ($this->role === self::ROLE_MEMBER) {
+        if ($this->effectiveRole($loan->library_id) === self::ROLE_MEMBER) {
             return (int) $loan->user_id === (int) $this->id;
         }
 
@@ -313,7 +323,7 @@ class User extends Authenticatable
             return true;
         }
 
-        if ($this->role !== self::ROLE_STAFF) {
+        if ($this->effectiveRole($loan->library_id) !== self::ROLE_STAFF) {
             return false;
         }
 
@@ -348,7 +358,7 @@ class User extends Authenticatable
             return true;
         }
 
-        if ($this->role !== self::ROLE_STAFF) {
+        if ($this->effectiveRole($reservation->library_id) !== self::ROLE_STAFF) {
             return false;
         }
 
@@ -373,7 +383,7 @@ class User extends Authenticatable
             return false;
         }
 
-        if ($this->role === self::ROLE_MEMBER) {
+        if ($this->effectiveRole($reservation->library_id) === self::ROLE_MEMBER) {
             return (int) $reservation->user_id === (int) $this->id;
         }
 
@@ -381,7 +391,7 @@ class User extends Authenticatable
             return true;
         }
 
-        if ($this->role !== self::ROLE_STAFF) {
+        if ($this->effectiveRole($reservation->library_id) !== self::ROLE_STAFF) {
             return false;
         }
 
@@ -404,7 +414,7 @@ class User extends Authenticatable
             return self::ROLE_SUPER_ADMIN;
         }
 
-        return $this->belongsToLibrary($libraryId) ? $this->role : null;
+        return $this->belongsToLibrary($libraryId) ? $this->effectiveRole($libraryId) : null;
     }
 
     public function manageableLibraryIds(): array
@@ -444,6 +454,23 @@ class User extends Authenticatable
     public function getLibraryIdAttribute(?int $value): ?int
     {
         return $value ?: $this->defaultLibraryId();
+    }
+
+    public function membershipForLibrary(int|string|null $libraryId): ?LibraryMembership
+    {
+        if (empty($libraryId)) {
+            return null;
+        }
+
+        if ($this->relationLoaded('libraryMemberships')) {
+            return $this->libraryMemberships
+                ->where('is_active', true)
+                ->firstWhere('library_id', (int) $libraryId);
+        }
+
+        return $this->activeLibraryMemberships()
+            ->where('library_id', $libraryId)
+            ->first();
     }
 }
 

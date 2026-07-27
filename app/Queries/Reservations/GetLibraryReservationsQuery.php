@@ -83,7 +83,7 @@ class GetLibraryReservationsQuery
 
         return Reservation::query()
             ->when(! empty($libraryId), fn ($builder) => $builder->where('library_id', $libraryId))
-            ->when($user->role === User::ROLE_STAFF, function (Builder $builder) use ($user, $libraryId) {
+            ->when($user->effectiveRole($libraryId) === User::ROLE_STAFF, function (Builder $builder) use ($user, $libraryId) {
                 $branchId = $user->assignedBranchId($libraryId);
 
                 $builder->where(function (Builder $scopeQuery) use ($branchId) {

@@ -10,10 +10,15 @@ class LibraryMembership extends Model
 {
     use HasFactory;
 
+    public const ROLE_ADMIN = User::ROLE_ADMIN;
+    public const ROLE_STAFF = User::ROLE_STAFF;
+    public const ROLE_MEMBER = User::ROLE_MEMBER;
+
     protected $fillable = [
         'library_id',
         'branch_id',
         'user_id',
+        'role',
         'membership_number',
         'is_active',
         'joined_at',
@@ -25,6 +30,19 @@ class LibraryMembership extends Model
             'is_active' => 'boolean',
             'joined_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::updated(function (LibraryMembership $membership) {
+            if ($membership->wasChanged(['role', 'is_active', 'branch_id', 'library_id', 'user_id'])) {
+                $membership->user?->tokens()->delete();
+            }
+        });
+
+        static::deleted(function (LibraryMembership $membership) {
+            $membership->user?->tokens()->delete();
+        });
     }
 
     public function library(): BelongsTo

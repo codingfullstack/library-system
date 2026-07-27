@@ -50,11 +50,11 @@ class ReservationController extends Controller
             'per_page' => $validated['per_page'] ?? 25,
         ];
 
-        $reservations = $user?->role === 'narys'
+        $reservations = $user?->effectiveRole($user->activeLibraryId()) === 'narys'
             ? $getMemberReservationsQuery->handle($user, $filters)
             : $getLibraryReservationsQuery->handle($user, $filters);
 
-        $summary = $user?->role === 'narys'
+        $summary = $user?->effectiveRole($user->activeLibraryId()) === 'narys'
             ? $getMemberReservationsQuery->summary($user, $filters)
             : $getLibraryReservationsQuery->summary($user, $filters);
 
