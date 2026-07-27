@@ -5,7 +5,6 @@ namespace App\Http\Resources;
 use App\Models\BookCopy;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use App\Services\ReservationQueueService;
 
 class BookCopyDetailsResource extends JsonResource
 {
@@ -22,17 +21,9 @@ class BookCopyDetailsResource extends JsonResource
         $user = $request->user();
         $canViewOperationalDetails = $this->canManageCopy || $user?->isSuperAdmin();
         $canViewOwnLoan = $this->activeLoan && $this->activeLoan->user_id === $user?->id;
-        $currentReservation = null;
-
-        if ($canViewOperationalDetails && $this->book_id && $this->library_id) {
-            $currentReservation = app(ReservationQueueService::class)
-                ->getEligibleReservationForCopy($this->resource);
-
-            $currentReservation?->loadMissing([
-                'pickupBranch:id,name',
-                'user:id,name,email,membership_number',
-            ]);
-        }
+        $currentReservation = $canViewOperationalDetails
+            ? $this->resource->getAttribute('current_reservation')
+            : null;
 
         return [
             'id' => $this->id,

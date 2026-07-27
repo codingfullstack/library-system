@@ -17,6 +17,12 @@ class LoanResource extends JsonResource
         $safe = [
             'status' => $this->status,
             'status_label' => $this->statusLabel(),
+            'display_status' => $this->statusLabel(),
+            'is_overdue' => $this->is_overdue,
+            'is_due_soon' => $this->isDueSoon(),
+            'overdue_days' => $this->overdue_days,
+            'can_renew' => false,
+            'can_return' => $canViewSensitiveDetails && $this->returned_at === null,
             'book_copy' => $this->bookCopy ? [
                 'id' => $this->bookCopy->id,
                 'inventory_code' => $this->bookCopy->inventory_code,
@@ -56,9 +62,6 @@ class LoanResource extends JsonResource
             'returned_at' => $this->returned_at,
             'renewal_count' => $this->renewal_count,
             'notes' => $this->notes,
-            'is_overdue' => $this->is_overdue,
-            'is_due_soon' => $this->isDueSoon(),
-            'overdue_days' => $this->overdue_days,
             'user' => $this->user ? [
                 'id' => $this->user->id,
                 'name' => $this->user->name,

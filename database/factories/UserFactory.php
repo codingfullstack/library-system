@@ -48,6 +48,7 @@ class UserFactory extends Factory
                         'user_id' => $user->id,
                     ],
                     [
+                        'role' => $user->role,
                         'membership_number' => $user->membership_number,
                         'is_active' => $user->is_active,
                         'joined_at' => $user->created_at,

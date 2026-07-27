@@ -21,6 +21,8 @@ class ReservationResource extends JsonResource
             'is_pending' => $this->isPending(),
             'is_ready' => $this->isReady(),
             'is_current' => $this->isCurrent(),
+            'can_cancel' => ($request->user()?->canCancelReservation($this->resource) ?? false) && $this->isActive(),
+            'display_status' => $this->statusLabel(),
             'queue_position' => $this->isPending() ? ($this->queue_position ?? null) : null,
             'queue_size' => $this->isPending() ? ($this->queue_size ?? null) : null,
             'reservation_scope' => $this->scope,

@@ -16,18 +16,12 @@ class ResolvesHomeRoute
             return 'dashboard';
         }
 
-        if ($user->effectiveRole() === 'narys') {
+        $libraryId = $user->activeLibraryId();
+
+        if ($user->effectiveRole($libraryId) === User::ROLE_MEMBER || ($libraryId === null && $user->role === User::ROLE_MEMBER)) {
             return 'account.dashboard';
         }
 
         return 'books.index';
     }
 }
-
-
-
-
-
-
-
-

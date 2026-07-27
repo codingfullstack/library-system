@@ -25,7 +25,7 @@ class LoanController extends Controller
         GetActiveLibraryLoansQuery $getActiveLibraryLoansQuery,
         GetLoanIndexFiltersDataQuery $getLoanIndexFiltersDataQuery
     ): View {
-        if ($request->user()->effectiveRole() === 'narys') {
+        if ($request->user()->effectiveRole($request->user()->activeLibraryId()) === 'narys') {
             $filters = [
                 'search' => $request->query('search'),
                 'status' => $request->query('status'),

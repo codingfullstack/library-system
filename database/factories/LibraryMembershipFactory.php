@@ -15,6 +15,7 @@ class LibraryMembershipFactory extends Factory
             'library_id' => Library::factory(),
             'branch_id' => null,
             'user_id' => User::factory()->member(),
+            'role' => User::ROLE_MEMBER,
             'membership_number' => fn () => 'MEM:' . (string) Str::ulid(),
             'is_active' => true,
             'joined_at' => now(),
@@ -23,7 +24,17 @@ class LibraryMembershipFactory extends Factory
 
     public function member(): static
     {
-        return $this;
+        return $this->state(fn () => ['role' => User::ROLE_MEMBER]);
+    }
+
+    public function admin(): static
+    {
+        return $this->state(fn () => ['role' => User::ROLE_ADMIN]);
+    }
+
+    public function staff(): static
+    {
+        return $this->state(fn () => ['role' => User::ROLE_STAFF]);
     }
 }
 

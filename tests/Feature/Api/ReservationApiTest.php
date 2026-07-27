@@ -300,8 +300,32 @@ it('includes active reservations in the api book details response', function () 
         ->assertOk()
         ->assertJsonPath('reservations.0.id', $reservation->id)
         ->assertJsonPath('reservations.0.is_pending', true)
+        ->assertJsonPath('reservations.0.can_cancel', true)
+        ->assertJsonPath('reservations.0.display_status', 'Aktyvi')
         ->assertJsonPath('reservations.0.queue_position', 1)
         ->assertJsonPath('reservations.0.queue_size', 1);
+});
+
+it('matches can cancel with the cancellation action for inactive reservations', function () {
+    $library = Library::factory()->create();
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create();
+    $reservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $member->id,
+        'status' => Reservation::STATUS_FULFILLED,
+        'fulfilled_at' => now(),
+    ]);
+
+    $this->actingAs($member)
+        ->getJson('/api/auth/reservations')
+        ->assertOk()
+        ->assertJsonPath('data.0.can_cancel', false);
+
+    $this->actingAs($member)
+        ->patchJson('/api/auth/reservations/'.$reservation->id.'/cancel')
+        ->assertUnprocessable();
 });
 
 it('orders api reservations by creation date descending', function () {

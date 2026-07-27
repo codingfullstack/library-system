@@ -53,7 +53,7 @@ class LoanController extends Controller
             'per_page' => $validated['per_page'] ?? 25,
         ];
 
-        $loans = $user?->role === 'narys'
+        $loans = $user?->effectiveRole($user->activeLibraryId()) === 'narys'
             ? $getMemberLoansQuery->handle($user, $filters)
             : $getActiveLibraryLoansQuery->handle($user, $filters);
 
@@ -62,7 +62,7 @@ class LoanController extends Controller
 
     public function searchMembers(Request $request, SearchLibraryMembersQuery $searchLibraryMembersQuery): JsonResponse
     {
-        abort_if($request->user()?->role === 'narys', 403);
+        abort_if($request->user()?->effectiveRole($request->user()?->activeLibraryId()) === 'narys', 403);
         $validated = $request->validate([
             'q' => ['nullable', 'string', 'max:120'],
         ]);
@@ -102,7 +102,6 @@ class LoanController extends Controller
         return response()->json($result);
     }
 }
-
 
 
 

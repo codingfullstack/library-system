@@ -43,14 +43,45 @@ it('returns canonical loan status fields from the api', function () {
         ->assertOk()
         ->assertJsonPath('data.0.id', $loan->id)
         ->assertJsonPath('data.0.status_label', 'Aktyvi')
+        ->assertJsonPath('data.0.display_status', 'Aktyvi')
         ->assertJsonPath('data.0.is_overdue', false)
         ->assertJsonPath('data.0.is_due_soon', true)
         ->assertJsonPath('data.0.overdue_days', 0)
+        ->assertJsonPath('data.0.can_return', true)
+        ->assertJsonPath('data.0.can_renew', false)
         ->assertJsonStructure([
             'data',
             'links' => ['first', 'last', 'prev', 'next'],
             'meta' => ['current_page', 'last_page', 'per_page', 'total'],
         ]);
+});
+
+it('matches can return with branch management authorization', function () {
+    $library = Library::factory()->create();
+    $admin = User::factory()->admin()->create(['library_id' => $library->id]);
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create();
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $copy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'status' => BookCopy::STATUS_AVAILABLE,
+    ]);
+    createLoanForApi($library, $member, [
+        'book_copy_id' => $copy->id,
+        'status' => Loan::STATUS_RETURNED,
+        'returned_at' => now(),
+    ], ['title' => $book->title]);
+
+    $this->actingAs($admin)
+        ->getJson('/api/auth/loans/active?status='.urlencode(Loan::STATUS_RETURNED))
+        ->assertOk()
+        ->assertJsonPath('data.0.can_return', false);
+
+    $this->actingAs($admin)
+        ->postJson('/api/auth/book-copies/'.$copy->id.'/return')
+        ->assertUnprocessable();
 });
 
 it('returns the first loans page with laravel paginator metadata and links', function () {
