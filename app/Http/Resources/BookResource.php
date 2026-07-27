@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\Auth\BookReservationCapability;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -31,9 +32,9 @@ class BookResource extends JsonResource
             'unavailable_copies_count' => $this->unavailable_copies_count ?? null,
             'active_reservations_count' => $this->active_reservations_count ?? null,
             'is_available' => ((int) ($this->available_copies_count ?? 0)) > 0,
-            'can_reserve' => ($request->user()?->hasAnyEffectiveRole(['superadministratorius', 'administratorius', 'darbuotojas', 'narys']) ?? false)
-                && (int) ($this->copies_count ?? 0) > 0
-                && (int) ($this->available_copies_count ?? 0) === 0,
+            'can_reserve' => $request->user()
+                ? app(BookReservationCapability::class)->canReserve($request->user(), $this->resource)
+                : false,
             'display_status' => ((int) ($this->available_copies_count ?? 0)) > 0
                 ? 'Galima'
                 : (((int) ($this->copies_count ?? 0)) > 0 ? 'Šiuo metu neprieinama' : 'Nėra egzempliorių'),

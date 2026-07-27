@@ -37,6 +37,7 @@ Route::get('/pagalba', [PublicPageController::class, 'help'])->name('help');
 Route::middleware(['auth', 'overdue.notifications', 'verified', 'library.context', 'role:superadministratorius,administratorius,darbuotojas'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/dashboard/export/{format}', DashboardExportController::class)->name('dashboard.export');
+    Route::get('/exports/{resource}.csv', ListExportController::class)->name('exports.list');
 });
 
 Route::middleware(['auth', 'overdue.notifications'])->group(function () {
@@ -46,8 +47,6 @@ Route::middleware(['auth', 'overdue.notifications'])->group(function () {
     Route::get('/knygos/{book:slug}', [BookController::class, 'show'])->name('books.show');
 
     Route::post('/bibliotekos/{library:id}/prisijungti', [MemberLibraryController::class, 'join'])->middleware(['verified'])->name('libraries.join');
-
-    Route::get('/exports/{resource}.csv', ListExportController::class)->name('exports.list');
 
     Route::middleware(['verified', 'library.context', 'role:narys'])
         ->prefix('account')

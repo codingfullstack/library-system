@@ -16,10 +16,12 @@
                     </div>
 
                     <div class="flex flex-wrap items-center gap-3">
-                        <a href="{{ route('exports.list', array_merge(request()->query(), ['resource' => 'books'])) }}" class="inline-flex h-11 items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
-                            <flux:icon.arrow-down-tray class="size-4" />
-                            Eksportuoti
-                        </a>
+                        @if($canManageBooks)
+                            <a href="{{ route('exports.list', array_merge(request()->query(), ['resource' => 'books'])) }}" class="inline-flex h-11 items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                                <flux:icon.arrow-down-tray class="size-4" />
+                                Eksportuoti
+                            </a>
+                        @endif
 
                         @if($canManageBooks)
                             <a href="{{ route('manage.imports.show', 'books') }}" class="inline-flex h-11 items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">

@@ -6,6 +6,7 @@ use App\Models\Book;
 use App\Models\BookCopy;
 use App\Models\Branch;
 use App\Models\Library;
+use App\Models\Loan;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
@@ -115,6 +116,37 @@ class GetLibraryBooksQuery
                     }
 
                     $reservationQuery->active();
+                },
+                'reservations as current_user_active_reservations_count' => function ($reservationQuery) use ($user, $libraryIds) {
+                    if ($user?->effectiveRole($user->activeLibraryId()) !== User::ROLE_MEMBER) {
+                        $reservationQuery->whereRaw('1 = 0');
+
+                        return;
+                    }
+
+                    if (is_array($libraryIds)) {
+                        $reservationQuery->whereIn('library_id', $libraryIds);
+                    }
+
+                    $reservationQuery
+                        ->where('user_id', $user->id)
+                        ->active();
+                },
+                'loans as current_user_active_loans_count' => function ($loanQuery) use ($user, $libraryIds) {
+                    if ($user?->effectiveRole($user->activeLibraryId()) !== User::ROLE_MEMBER) {
+                        $loanQuery->whereRaw('1 = 0');
+
+                        return;
+                    }
+
+                    if (is_array($libraryIds)) {
+                        $loanQuery->whereIn('loans.library_id', $libraryIds);
+                    }
+
+                    $loanQuery
+                        ->where('loans.user_id', $user->id)
+                        ->whereNull('loans.returned_at')
+                        ->whereIn('loans.status', Loan::ACTIVE_STATUSES);
                 },
             ]);
 

@@ -19,7 +19,7 @@ class GetActiveLibraryLoansQuery
                 'user:id,name,email,membership_number',
                 'issuer:id,name',
                 'receiver:id,name',
-                'bookCopy:id,book_id,inventory_code,status,branch_id,location_id',
+                'bookCopy:id,library_id,book_id,inventory_code,status,branch_id,location_id',
                 'bookCopy.book:id,slug,title,subtitle,isbn',
                 'bookCopy.branch:id,name',
                 'bookCopy.location:id,name,room,shelf',
