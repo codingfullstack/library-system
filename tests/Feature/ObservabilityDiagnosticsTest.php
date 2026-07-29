@@ -1,7 +1,9 @@
 <?php
 
 use App\Services\FcmService;
+use App\Support\Observability\OperationDiagnostics;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 it('attaches a request id to api responses', function () {
     $this->getJson('/api/auth/me')
@@ -30,4 +32,22 @@ it('does not expose raw fcm tokens in failure responses', function () {
         ->and($result['responses'][0])->toHaveKey('token_hash')
         ->and($result['responses'][0])->not->toHaveKey('token')
         ->and($result['responses'][0]['token_hash'])->not->toBe('device-token-1');
+});
+
+it('does not let diagnostics logging failures interrupt domain code', function () {
+    Log::shouldReceive('error')->once()->andThrow(new RuntimeException('logger unavailable'));
+    Log::shouldReceive('warning')->once()->andThrow(new RuntimeException('logger unavailable'));
+
+    $diagnostics = new OperationDiagnostics();
+
+    $diagnostics->failure('reservation_cancel_failed', new RuntimeException('domain failure'), [
+        'operation' => 'reservation_cancel',
+        'reservation_id' => 10,
+    ]);
+    $diagnostics->warning('tenant_integrity_preflight_failed', [
+        'operation' => 'tenant_integrity_preflight',
+        'violation_count' => 1,
+    ]);
+
+    expect(true)->toBeTrue();
 });

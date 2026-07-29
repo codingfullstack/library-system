@@ -13,7 +13,11 @@ class OperationDiagnostics
      */
     public function failure(string $event, Throwable $exception, array $context = []): void
     {
-        Log::error($event, $this->failureContext($exception, $context));
+        try {
+            Log::error($event, $this->failureContext($exception, $context));
+        } catch (Throwable) {
+            // Diagnostics must never change domain transaction outcomes.
+        }
     }
 
     /**
@@ -21,7 +25,11 @@ class OperationDiagnostics
      */
     public function warning(string $event, array $context = []): void
     {
-        Log::warning($event, $this->sanitize($context));
+        try {
+            Log::warning($event, $this->sanitize($context));
+        } catch (Throwable) {
+            // Diagnostics must never change domain transaction outcomes.
+        }
     }
 
     public function tokenHash(string $token): string
