@@ -36,6 +36,8 @@ trait UsesTemporaryMariaDbDatabase
         DB::purge('mysql');
         DB::reconnect('mysql');
 
+        $this->assertSafeTemporaryDatabaseForFreshMigration();
+
         Artisan::call('migrate:fresh', ['--force' => true]);
     }
 
@@ -97,5 +99,14 @@ trait UsesTemporaryMariaDbDatabase
             $password,
             [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
         );
+    }
+
+    private function assertSafeTemporaryDatabaseForFreshMigration(): void
+    {
+        $database = (string) config('database.connections.mysql.database');
+
+        if (! str_starts_with($database, 'library_system_it_')) {
+            throw new \RuntimeException("Refusing to run migrate:fresh against non-temporary database [{$database}].");
+        }
     }
 }

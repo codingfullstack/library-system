@@ -50,6 +50,31 @@ class TenantOwnershipConstraintMariaDbTest extends TestCase
         $this->assertContains('scan_logs_book_copy_library_fk', $constraints);
     }
 
+    public function test_tenant_composite_constraints_preserve_historical_records(): void
+    {
+        $rules = DB::table('information_schema.REFERENTIAL_CONSTRAINTS')
+            ->where('CONSTRAINT_SCHEMA', DB::getDatabaseName())
+            ->whereIn('CONSTRAINT_NAME', [
+                'book_copies_branch_library_fk',
+                'book_copies_location_library_fk',
+                'memberships_branch_library_fk',
+                'loans_book_copy_library_fk',
+                'loans_user_membership_fk',
+                'reservations_user_membership_fk',
+                'reservations_branch_library_fk',
+                'reservations_pickup_branch_library_fk',
+                'reservations_assigned_copy_library_fk',
+                'scan_logs_book_copy_library_fk',
+            ])
+            ->get()
+            ->keyBy('CONSTRAINT_NAME');
+
+        foreach ($rules as $name => $constraint) {
+            $this->assertSame('RESTRICT', $constraint->DELETE_RULE, $name);
+            $this->assertSame('RESTRICT', $constraint->UPDATE_RULE, $name);
+        }
+    }
+
     public function test_valid_same_library_relationships_are_accepted(): void
     {
         $graph = $this->tenantGraph();
