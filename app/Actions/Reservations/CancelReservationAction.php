@@ -61,6 +61,12 @@ class CancelReservationAction
             $pickupBranchId = $lockedReservation->pickup_branch_id;
             $pickupBranchName = $lockedReservation->pickupBranch?->name;
 
+            if (! $lockedReservation->isActive()) {
+                throw ValidationException::withMessages([
+                    'reservation' => 'Galima atÅ¡aukti tik aktyviÄ… rezervacijÄ….',
+                ]);
+            }
+
             $queueService->activeReservationsQuery($lockedReservation->library_id, $lockedReservation->book_id)
                 ->lockForUpdate()
                 ->get(['id']);
