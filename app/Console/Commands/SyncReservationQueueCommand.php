@@ -3,7 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Actions\Reservations\SyncReservationQueueAction;
+use App\Support\Observability\OperationDiagnostics;
 use Illuminate\Console\Command;
+use Throwable;
 
 class SyncReservationQueueCommand extends Command
 {
@@ -22,7 +24,20 @@ class SyncReservationQueueCommand extends Command
             usleep($delayMs * 1000);
         }
 
-        $syncReservationQueue->handle((int) $this->argument('library_id'), (int) $this->argument('book_id'));
+        $libraryId = (int) $this->argument('library_id');
+        $bookId = (int) $this->argument('book_id');
+
+        try {
+            $syncReservationQueue->handle($libraryId, $bookId);
+        } catch (Throwable $exception) {
+            app(OperationDiagnostics::class)->failure('reservation_queue_command_failed', $exception, [
+                'operation' => 'reservation_queue_command',
+                'library_id' => $libraryId,
+                'book_id' => $bookId,
+            ]);
+
+            throw $exception;
+        }
 
         $this->info('Reservation queue synchronized.');
 

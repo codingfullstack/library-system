@@ -13,8 +13,10 @@ use App\Services\ReservationQueueService;
 use App\Support\Notifications\NotificationMessageBuilder;
 use App\Support\Notifications\NotificationMetadataBuilder;
 use App\Support\Notifications\NotificationType;
+use App\Support\Observability\OperationDiagnostics;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class ReturnBookCopyAction
 {
@@ -23,25 +25,36 @@ class ReturnBookCopyAction
      */
     public function handle(User $authUser, BookCopy $bookCopy): array
     {
-        return DB::transaction(function () use ($authUser, $bookCopy): array {
-            $bookCopyContext = BookCopy::query()
-                ->withoutGlobalScope('library')
-                ->whereKey($bookCopy->getKey())
-                ->firstOrFail();
+        try {
+            return DB::transaction(function () use ($authUser, $bookCopy): array {
+                $bookCopyContext = BookCopy::query()
+                    ->withoutGlobalScope('library')
+                    ->whereKey($bookCopy->getKey())
+                    ->firstOrFail();
 
-            app(ReservationQueueService::class)->lockQueueContext(
-                (int) $bookCopyContext->library_id,
-                (int) $bookCopyContext->book_id
-            );
+                app(ReservationQueueService::class)->lockQueueContext(
+                    (int) $bookCopyContext->library_id,
+                    (int) $bookCopyContext->book_id
+                );
 
-            $bookCopy = BookCopy::query()
-                ->whereKey($bookCopy->getKey())
-                ->lockForUpdate()
-                ->firstOrFail();
-            $bookCopy->loadMissing(['book:id,title', 'branch:id,name']);
+                $bookCopy = BookCopy::query()
+                    ->whereKey($bookCopy->getKey())
+                    ->lockForUpdate()
+                    ->firstOrFail();
+                $bookCopy->loadMissing(['book:id,title', 'branch:id,name']);
 
-            return $this->returnLocked($authUser, $bookCopy);
-        });
+                return $this->returnLocked($authUser, $bookCopy);
+            });
+        } catch (Throwable $exception) {
+            app(OperationDiagnostics::class)->failure('loan_return_failed', $exception, [
+                'operation' => 'loan_return',
+                'library_id' => $bookCopy->library_id,
+                'book_id' => $bookCopy->book_id,
+                'book_copy_id' => $bookCopy->id,
+            ]);
+
+            throw $exception;
+        }
     }
 
     /**
@@ -132,7 +145,6 @@ class ReturnBookCopyAction
         ];
     }
 }
-
 
 
 

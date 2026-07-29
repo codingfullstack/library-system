@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Support\Observability\OperationDiagnostics;
 use Google\Auth\Credentials\ServiceAccountCredentials;
 use Google\Auth\HttpHandler\HttpHandlerFactory;
 use GuzzleHttp\Client;
@@ -92,8 +93,12 @@ class FcmService
                 $responses[] = Arr::first($result['responses']);
             } catch (\Throwable $exception) {
                 $failed++;
+                app(OperationDiagnostics::class)->failure('fcm_delivery_failed', $exception, [
+                    'operation' => 'fcm_delivery',
+                    'token_hash' => app(OperationDiagnostics::class)->tokenHash($token),
+                ]);
                 $responses[] = [
-                    'token' => $token,
+                    'token_hash' => app(OperationDiagnostics::class)->tokenHash($token),
                     'error' => $exception->getMessage(),
                 ];
             }

@@ -13,7 +13,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-     $middleware->alias([
+        $middleware->append(\App\Http\Middleware\AttachRequestId::class);
+        $middleware->alias([
         'library.context' => \App\Http\Middleware\SetLibraryContext::class,
         'role' => \App\Http\Middleware\EnsureUserHasRole::class,
         'overdue.notifications' => \App\Http\Middleware\DispatchOverdueLoanNotifications::class,

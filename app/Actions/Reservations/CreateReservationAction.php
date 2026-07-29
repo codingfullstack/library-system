@@ -11,6 +11,7 @@ use App\Models\Reservation;
 use App\Models\User;
 use App\Services\ReservationNotificationService;
 use App\Services\ReservationQueueService;
+use App\Support\Observability\OperationDiagnostics;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -125,6 +126,11 @@ class CreateReservationAction
                 return $reservation->fresh();
             });
         } catch (QueryException $exception) {
+            app(OperationDiagnostics::class)->failure('reservation_create_failed', $exception, [
+                'operation' => 'reservation_create',
+                'book_id' => $data['book_id'] ?? null,
+            ]);
+
             if (! $this->isActiveReservationUniqueConstraintViolation($exception)) {
                 throw $exception;
             }

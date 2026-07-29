@@ -9,8 +9,10 @@ use App\Services\ReservationQueueService;
 use App\Support\Notifications\NotificationMessageBuilder;
 use App\Support\Notifications\NotificationMetadataBuilder;
 use App\Support\Notifications\NotificationType;
+use App\Support\Observability\OperationDiagnostics;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class ExpireReservationsCommand extends Command
 {
@@ -22,18 +24,19 @@ class ExpireReservationsCommand extends Command
     {
         $expiredCount = 0;
 
-        Reservation::query()
-            ->where('status', Reservation::STATUS_READY)
-            ->where('expires_at', '<=', now())
-            ->orderBy('expires_at')
-            ->orderBy('id')
-            ->select(['id'])
-            ->chunkById(100, function ($reservations) use (&$expiredCount): void {
-                foreach ($reservations as $reservationStub) {
-                    $bookToSync = DB::transaction(function () use ($reservationStub, &$expiredCount): ?array {
-                        $reservationContext = Reservation::query()
-                            ->whereKey($reservationStub->id)
-                            ->first();
+        try {
+            Reservation::query()
+                ->where('status', Reservation::STATUS_READY)
+                ->where('expires_at', '<=', now())
+                ->orderBy('expires_at')
+                ->orderBy('id')
+                ->select(['id'])
+                ->chunkById(100, function ($reservations) use (&$expiredCount): void {
+                    foreach ($reservations as $reservationStub) {
+                        $bookToSync = DB::transaction(function () use ($reservationStub, &$expiredCount): ?array {
+                            $reservationContext = Reservation::query()
+                                ->whereKey($reservationStub->id)
+                                ->first();
 
                         if (! $reservationContext) {
                             return null;
@@ -92,11 +95,18 @@ class ExpireReservationsCommand extends Command
                         ];
                     });
 
-                    if ($bookToSync !== null) {
-                        app(SyncReservationQueueAction::class)->handle($bookToSync['library_id'], $bookToSync['book_id']);
+                        if ($bookToSync !== null) {
+                            app(SyncReservationQueueAction::class)->handle($bookToSync['library_id'], $bookToSync['book_id']);
+                        }
                     }
-                }
-            });
+                });
+        } catch (Throwable $exception) {
+            app(OperationDiagnostics::class)->failure('reservation_expiration_failed', $exception, [
+                'operation' => 'reservation_expiration',
+            ]);
+
+            throw $exception;
+        }
 
         $this->info("Expired reservations: {$expiredCount}");
 

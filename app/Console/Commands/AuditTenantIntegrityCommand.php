@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Support\Tenancy\TenantIntegrityAuditor;
+use App\Support\Observability\OperationDiagnostics;
 use Illuminate\Console\Command;
 
 class AuditTenantIntegrityCommand extends Command
@@ -20,6 +21,12 @@ class AuditTenantIntegrityCommand extends Command
 
             return self::SUCCESS;
         }
+
+        app(OperationDiagnostics::class)->warning('tenant_integrity_preflight_failed', [
+            'operation' => 'tenant_integrity_preflight',
+            'violation_count' => $violations->count(),
+            'violation_types' => $violations->pluck('type')->unique()->values()->all(),
+        ]);
 
         $this->error('Tenant integrity violations found. No data was modified.');
         $violations->each(function ($violation): void {

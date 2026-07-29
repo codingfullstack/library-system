@@ -7,10 +7,12 @@ use App\Models\Reservation;
 use App\Services\ReservationNotificationService;
 use App\Services\ReservationQueueDebugService;
 use App\Services\ReservationQueueService;
+use App\Support\Observability\OperationDiagnostics;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class SyncReservationQueueAction
 {
@@ -23,30 +25,40 @@ class SyncReservationQueueAction
 
     public function handle(int $libraryId, int $bookId): void
     {
-        DB::transaction(function () use ($libraryId, $bookId): void {
-            $this->queueService->lockQueueContext($libraryId, $bookId);
+        try {
+            DB::transaction(function () use ($libraryId, $bookId): void {
+                $this->queueService->lockQueueContext($libraryId, $bookId);
 
-            $positionsBefore = $this->queueService->snapshotPositions($libraryId, $bookId);
+                $positionsBefore = $this->queueService->snapshotPositions($libraryId, $bookId);
 
-            app(ReservationQueueDebugService::class)->logSnapshot('before_queue_sync', $libraryId, $bookId, [
-                'old_positions' => $positionsBefore,
-            ]);
+                app(ReservationQueueDebugService::class)->logSnapshot('before_queue_sync', $libraryId, $bookId, [
+                    'old_positions' => $positionsBefore,
+                ]);
 
-            $this->syncQueue($libraryId, $bookId);
+                $this->syncQueue($libraryId, $bookId);
 
-            DB::afterCommit(function () use ($libraryId, $bookId, $positionsBefore): void {
-                $this->notificationService->notifyQueuePositionsChangedFromSnapshot(
-                    $libraryId,
-                    $bookId,
-                    $positionsBefore
-                );
+                DB::afterCommit(function () use ($libraryId, $bookId, $positionsBefore): void {
+                    $this->notificationService->notifyQueuePositionsChangedFromSnapshot(
+                        $libraryId,
+                        $bookId,
+                        $positionsBefore
+                    );
+                });
+
+                app(ReservationQueueDebugService::class)->logSnapshot('after_queue_sync', $libraryId, $bookId, [
+                    'old_positions' => $positionsBefore,
+                    'new_positions' => $this->queueService->getPositionsForBook($libraryId, $bookId),
+                ]);
             });
-
-            app(ReservationQueueDebugService::class)->logSnapshot('after_queue_sync', $libraryId, $bookId, [
-                'old_positions' => $positionsBefore,
-                'new_positions' => $this->queueService->getPositionsForBook($libraryId, $bookId),
+        } catch (Throwable $exception) {
+            app(OperationDiagnostics::class)->failure('reservation_queue_sync_failed', $exception, [
+                'operation' => 'reservation_queue_sync',
+                'library_id' => $libraryId,
+                'book_id' => $bookId,
             ]);
-        });
+
+            throw $exception;
+        }
     }
 
     private function syncQueue(int $libraryId, int $bookId): void
