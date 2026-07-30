@@ -88,7 +88,11 @@ class GetLibraryBookDetailsQuery
                             'issues' => $copyQuery->where(function ($issuesQuery) {
                                 $issuesQuery
                                     ->whereIn('status', ['prarasta', 'tvarkoma'])
-                                    ->orWhere('condition_status', BookCopy::CONDITION_DAMAGED);
+                                    ->orWhere(function ($damagedQuery) {
+                                        $damagedQuery
+                                            ->where('condition_status', BookCopy::CONDITION_DAMAGED)
+                                            ->where('status', '<>', BookCopy::STATUS_WITHDRAWN);
+                                    });
                             }),
                             'removed' => $copyQuery->where('status', 'nurašyta'),
                             default => null,

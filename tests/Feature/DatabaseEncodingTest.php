@@ -6,7 +6,7 @@ use App\Models\Reservation;
 use Illuminate\Support\Facades\File;
 
 it('keeps database seed and migration files in utf8 Lithuanian text', function () {
-    $badEncodingPattern = '/(?:Å|Ä|Â|â€)/u';
+    $badEncodingPattern = '/(?:Ã…|Ã„|Ã‚|Ã¢â‚¬)/u';
     $checkedFiles = 0;
 
     foreach (File::allFiles(database_path()) as $file) {
@@ -28,12 +28,14 @@ it('keeps database seed and migration files in utf8 Lithuanian text', function (
 it('stores canonical Lithuanian status values in database enum-backed columns', function () {
     $copy = BookCopy::factory()->create([
         'status' => BookCopy::STATUS_LOANED,
-        'condition_status' => 'padėvėta',
+        'condition_status' => BookCopy::CONDITION_WORN,
     ]);
+    $member = memberInLibrary($copy->library);
 
     $loan = Loan::factory()->create([
         'library_id' => $copy->library_id,
         'book_copy_id' => $copy->id,
+        'user_id' => $member->id,
         'status' => Loan::STATUS_RETURNED,
         'returned_at' => now(),
     ]);
@@ -41,12 +43,13 @@ it('stores canonical Lithuanian status values in database enum-backed columns', 
     $reservation = Reservation::factory()->create([
         'library_id' => $copy->library_id,
         'book_id' => $copy->book_id,
+        'user_id' => $member->id,
         'status' => Reservation::STATUS_FULFILLED,
         'fulfilled_at' => now(),
     ]);
 
-    expect($copy->refresh()->status)->toBe('išduota');
-    expect($copy->condition_status)->toBe('padėvėta');
-    expect($loan->refresh()->status)->toBe('grąžinta');
-    expect($reservation->refresh()->status)->toBe('įvykdyta');
+    expect($copy->refresh()->status)->toBe(BookCopy::STATUS_LOANED);
+    expect($copy->condition_status)->toBe(BookCopy::CONDITION_WORN);
+    expect($loan->refresh()->status)->toBe(Loan::STATUS_RETURNED);
+    expect($reservation->refresh()->status)->toBe(Reservation::STATUS_FULFILLED);
 });

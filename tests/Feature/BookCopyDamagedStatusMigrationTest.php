@@ -8,11 +8,7 @@ use App\Models\Library;
 use App\Models\Loan;
 use App\Models\Location;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-
-uses(RefreshDatabase::class);
 
 it('migrates legacy damaged lifecycle status into physical condition', function () {
     $library = Library::factory()->create();
@@ -21,24 +17,27 @@ it('migrates legacy damaged lifecycle status into physical condition', function 
     $book = Book::factory()->create();
     $member = User::factory()->member()->create(['library_id' => $library->id]);
 
-    Schema::disableForeignKeyConstraints();
-    Schema::drop('book_copies');
-    Schema::create('book_copies', function ($table) {
-        $table->id();
-        $table->unsignedBigInteger('library_id');
-        $table->unsignedBigInteger('book_id');
-        $table->unsignedBigInteger('branch_id');
-        $table->unsignedBigInteger('location_id')->nullable();
-        $table->string('inventory_code');
-        $table->string('qr_code');
-        $table->string('barcode')->nullable();
-        $table->string('status');
-        $table->string('condition_status')->default(BookCopy::CONDITION_GOOD);
-        $table->date('acquired_at')->nullable();
-        $table->text('notes')->nullable();
-        $table->timestamps();
-    });
-    Schema::enableForeignKeyConstraints();
+    if (DB::getDriverName() === 'mysql') {
+        while (DB::transactionLevel() > 0) {
+            DB::commit();
+        }
+
+        $enumValues = collect([
+            BookCopy::STATUS_AVAILABLE,
+            BookCopy::STATUS_LOANED,
+            BookCopy::STATUS_LOST,
+            BookCopy::STATUS_MAINTENANCE,
+            BookCopy::STATUS_WITHDRAWN,
+            BookCopy::LEGACY_STATUS_DAMAGED,
+        ])
+            ->map(fn (string $status) => DB::getPdo()->quote($status))
+            ->implode(', ');
+
+        DB::statement("
+            ALTER TABLE book_copies
+            MODIFY status ENUM({$enumValues}) NOT NULL DEFAULT ".DB::getPdo()->quote(BookCopy::STATUS_AVAILABLE)
+        );
+    }
 
     $availableLegacyId = DB::table('book_copies')->insertGetId([
         'library_id' => $library->id,
@@ -111,4 +110,9 @@ it('migrates legacy damaged lifecycle status into physical condition', function 
         'to_status' => BookCopy::STATUS_AVAILABLE,
         'reason_code' => 'marked_damaged',
     ]);
+
+    if (DB::getDriverName() === 'mysql' && DB::transactionLevel() === 0) {
+        $this->artisan('migrate:fresh', ['--force' => true])->assertExitCode(0);
+        DB::beginTransaction();
+    }
 });

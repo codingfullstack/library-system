@@ -25,9 +25,9 @@ it('passes when tenant references are internally consistent', function () {
 it('returns non-zero and does not mutate data when violations exist', function () {
     $graph = tenantIntegrityGraph();
 
-    DB::table('book_copies')
+    withTestForeignKeysDisabled(fn () => DB::table('book_copies')
         ->where('id', $graph['copy']->id)
-        ->update(['branch_id' => $graph['otherBranch']->id]);
+        ->update(['branch_id' => $graph['otherBranch']->id]));
 
     $this->artisan('tenants:audit-integrity')->assertExitCode(1);
 
@@ -43,7 +43,7 @@ it('returns non-zero and does not mutate data when violations exist', function (
 it('detects every tenant integrity violation type', function (string $expectedTable, string $expectedType, Closure $mutate) {
     $graph = tenantIntegrityGraph();
 
-    $id = $mutate($graph);
+    $id = withTestForeignKeysDisabled(fn () => $mutate($graph));
     $violations = app(TenantIntegrityAuditor::class)->violations();
 
     expect($violations)->toHaveCount(1);
