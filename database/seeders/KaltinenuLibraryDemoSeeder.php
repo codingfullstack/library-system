@@ -9,7 +9,6 @@ use App\Models\BookCopyStatusHistory;
 use App\Models\Branch;
 use App\Models\Category;
 use App\Models\Library;
-use App\Models\LibraryMembership;
 use App\Models\Loan;
 use App\Models\Location;
 use App\Models\Publisher;
@@ -17,64 +16,62 @@ use App\Models\Reservation;
 use App\Models\ScanLog;
 use App\Models\User;
 use App\Support\GeneratesSlugs;
-use App\Support\UserManagement;
 use Carbon\CarbonImmutable;
+use Database\Seeders\Support\DemoAccessActorSynchronizer;
+use Database\Seeders\Support\GuardsDemoSeeding;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 
 class KaltinenuLibraryDemoSeeder extends Seeder
 {
+    use GuardsDemoSeeding;
+
     public function run(): void
     {
+        $this->guardDemoSeedingIsAllowed();
+
         DB::transaction(function () {
             $now = now()->toImmutable();
 
-            User::query()
-                ->whereIn('email', [
-                    'admin@kaltinenubiblioteka.lt',
-                    'ieva@kaltinenubiblioteka.lt',
-                    'tomas@kaltinenubiblioteka.lt',
-                    'lukas.skaitytojas@example.com',
-                    'emilija.skaitytoja@example.com',
-                    'matas.skaitytojas@example.com',
-                    'gabija.skaitytoja@example.com',
-                    'saule.skaitytoja@example.com',
-                    'karolina.skaitytoja@example.com',
-                    'tadas.skaitytojas@example.com',
-                    'aiste.skaitytoja@example.com',
-                    'pijus.skaitytojas@example.com',
-                    'greta.skaitytoja@example.com',
-                ])->delete();
+            $library = Library::query()->updateOrCreate(
+                ['code' => 'KALT-ASTU-001'],
+                [
+                    'name' => 'Kaltinenu A. Stulginskio biblioteka',
+                    'email' => 'info@kaltinenubiblioteka.lt',
+                    'phone' => '+37060000123',
+                    'address' => 'Varniu g. 12',
+                    'city' => 'Kaltinenai',
+                    'is_active' => true,
+                    'is_public' => true,
+                ]
+            );
 
-            Library::query()->where('code', 'KALT-ASTU-001')->get()->each->delete();
+            $mainBranch = Branch::query()->updateOrCreate(
+                ['library_id' => $library->id, 'code' => 'MAIN'],
+                [
+                    'name' => 'Pagrindinis skyrius',
+                    'address' => 'Varniu g. 12',
+                    'city' => 'Kaltinenai',
+                ]
+            );
 
-            $library = Library::create([
-                'name' => 'Kaltinenu A. Stulginskio biblioteka',
-                'code' => 'KALT-ASTU-001',
-                'email' => 'info@kaltinenubiblioteka.lt',
-                'phone' => '+37060000123',
-                'address' => 'Varniu g. 12',
-                'city' => 'Kaltinenai',
-                'is_active' => true,
-                'is_public' => true,
-            ]);
+            $childrenBranch = Branch::query()->updateOrCreate(
+                ['library_id' => $library->id, 'code' => 'KIDS'],
+                [
+                    'name' => 'Vaiku ir jaunimo skyrius',
+                    'address' => 'Varniu g. 12',
+                    'city' => 'Kaltinenai',
+                ]
+            );
 
-            $mainBranch = Branch::create([
-                'library_id' => $library->id,
-                'name' => 'Pagrindinis skyrius',
-                'code' => 'MAIN',
-                'address' => 'Varniu g. 12',
-                'city' => 'Kaltinenai',
-            ]);
+            $actors = (new DemoAccessActorSynchronizer())->syncLibrary($library);
 
-            $childrenBranch = Branch::create([
-                'library_id' => $library->id,
-                'name' => 'Vaiku ir jaunimo skyrius',
-                'code' => 'KIDS',
-                'address' => 'Varniu g. 12',
-                'city' => 'Kaltinenai',
-            ]);
+            if (
+                Loan::query()->where('library_id', $library->id)->exists()
+                || Reservation::query()->where('library_id', $library->id)->exists()
+            ) {
+                return;
+            }
 
             $fantasyLocation = Location::create([
                 'library_id' => $library->id,
@@ -134,72 +131,22 @@ class KaltinenuLibraryDemoSeeder extends Seeder
             $sruoga = Author::query()->firstOrCreate(['name' => 'Balys Sruoga'], ['bio' => 'Lietuvių rašytojas, dramaturgas ir literatūros kritikas.']);
             $green = Author::query()->firstOrCreate(['name' => 'John Green'], ['bio' => 'Amerikiečių jaunimo literatūros autorius.']);
 
-            $admin = User::query()->updateOrCreate(
-                ['email' => 'admin@kaltinenubiblioteka.lt'],
-                [
-                    'name' => 'Kaltinenu bibliotekos administratorius',
-                    'email_verified_at' => now(),
-                    'password' => Hash::make('password'),
-                    'role' => 'administratorius',
-                    'phone' => '+37061111111',
-                    'membership_number' => null,
-                    'is_active' => true,
-                ]
-            );
-            $this->attachLibraryMembership($admin, $library);
+            $admin = $actors['admins']->first();
+            $staffA = $actors['staff']->firstWhere('email', 'ieva@kaltinenubiblioteka.lt');
+            $staffB = $actors['staff']->firstWhere('email', 'tomas@kaltinenubiblioteka.lt');
+            $member1 = $actors['members']->firstWhere('email', 'lukas.skaitytojas@example.com');
+            $member3 = $actors['members']->firstWhere('email', 'matas.skaitytojas@example.com');
+            $member4 = $actors['members']->firstWhere('email', 'gabija.skaitytoja@example.com');
+            $member5 = $actors['members']->firstWhere('email', 'saule.skaitytoja@example.com');
+            $allMembers = $actors['members']->values();
+            $employees = $actors['admins']->merge($actors['staff'])->values();
 
-            $staffA = User::query()->updateOrCreate(
-                ['email' => 'ieva@kaltinenubiblioteka.lt'],
-                [
-                    'name' => 'Ieva Jonaite',
-                    'email_verified_at' => now(),
-                    'password' => Hash::make('password'),
-                    'role' => 'darbuotojas',
-                    'phone' => '+37062222222',
-                    'membership_number' => null,
-                    'is_active' => true,
-                ]
-            );
-            $this->attachLibraryMembership($staffA, $library, $mainBranch);
-
-            $staffB = User::query()->updateOrCreate(
-                ['email' => 'tomas@kaltinenubiblioteka.lt'],
-                [
-                    'name' => 'Tomas Petrauskas',
-                    'email_verified_at' => now(),
-                    'password' => Hash::make('password'),
-                    'role' => 'darbuotojas',
-                    'phone' => '+37063333333',
-                    'membership_number' => null,
-                    'is_active' => true,
-                ]
-            );
-            $this->attachLibraryMembership($staffB, $library, $childrenBranch);
-
-            $member1 = $this->createMember($library, 'Lukas Petrauskas', 'lukas.skaitytojas@example.com', '+37064444444');
-            $member2 = $this->createMember($library, 'Emilija Jankauskaitė', 'emilija.skaitytoja@example.com', '+37065555555');
-            $member3 = $this->createMember($library, 'Matas Vaitkus', 'matas.skaitytojas@example.com', '+37066666666');
-            $member4 = $this->createMember($library, 'Gabija Rimkutė', 'gabija.skaitytoja@example.com', '+37067777777');
-            $member5 = $this->createMember($library, 'Saule Girdžiūtė', 'saule.skaitytoja@example.com', '+37068888888');
-            $member6 = $this->createMember($library, 'Karolina Butkevičiūtė', 'karolina.skaitytoja@example.com', '+37069900001');
-            $member7 = $this->createMember($library, 'Tadas Veverskis', 'tadas.skaitytojas@example.com', '+37069900002');
-            $member8 = $this->createMember($library, 'Aistė Maciulytė', 'aiste.skaitytoja@example.com', '+37069900003');
-            $member9 = $this->createMember($library, 'Pijus Zabiela', 'pijus.skaitytojas@example.com', '+37069900004');
-            $member10 = $this->createMember($library, 'Greta Šimkutė', 'greta.skaitytoja@example.com', '+37069900005');
-
-            $allMembers = collect([
-                $member1,
-                $member2,
-                $member3,
-                $member4,
-                $member5,
-                $member6,
-                $member7,
-                $member8,
-                $member9,
-                $member10,
-            ]);
-            $employees = collect([$admin, $staffA, $staffB]);
+            if (
+                Loan::query()->where('library_id', $library->id)->exists()
+                || Reservation::query()->where('library_id', $library->id)->exists()
+            ) {
+                return;
+            }
 
             $hp1 = Book::query()->where('isbn', '9786090141601')->firstOrFail();
             $witcher = Book::query()->where('isbn', '9786090404256')->firstOrFail();
@@ -282,6 +229,7 @@ class KaltinenuLibraryDemoSeeder extends Seeder
                 'user_id' => $member4->id,
                 'status' => Reservation::STATUS_READY,
                 'pickup_branch_id' => $childrenBranch->id,
+                'assigned_book_copy_id' => $copies[8]->id,
                 'reserved_at' => $now->subHours(3),
                 'ready_at' => $now->subHours(2),
                 'expires_at' => $now->addDays(3),
@@ -366,48 +314,6 @@ class KaltinenuLibraryDemoSeeder extends Seeder
         });
     }
 
-    private function createMember(Library $library, string $name, string $email, string $phone): User
-    {
-        $existingMembershipNumber = User::query()
-            ->where('email', $email)
-            ->value('membership_number');
-
-        $user = User::query()->updateOrCreate(
-            ['email' => $email],
-            [
-                'name' => $name,
-                'email_verified_at' => now(),
-                'password' => Hash::make('password'),
-                'role' => 'narys',
-                'phone' => $phone,
-                'membership_number' => str_starts_with((string) $existingMembershipNumber, 'MEM:')
-                    ? $existingMembershipNumber
-                    : UserManagement::generateMembershipNumber(),
-                'is_active' => true,
-            ]
-        );
-
-        $this->attachLibraryMembership($user, $library);
-
-        return $user;
-    }
-
-    private function attachLibraryMembership(User $user, Library $library, ?Branch $branch = null): void
-    {
-        LibraryMembership::query()->updateOrCreate(
-            [
-                'library_id' => $library->id,
-                'user_id' => $user->id,
-            ],
-            [
-                'branch_id' => $user->role === User::ROLE_STAFF ? $branch?->id : null,
-                'membership_number' => $user->membership_number,
-                'is_active' => $user->is_active,
-                'joined_at' => $user->created_at,
-            ]
-        );
-    }
-
     private function createCopy(
         Library $library,
         Book $book,
@@ -460,7 +366,7 @@ class KaltinenuLibraryDemoSeeder extends Seeder
             'to_status' => $toStatus,
             'reason_code' => $reasonCode,
             'reason_notes' => $reasonNotes,
-            'changed_at' => $changedAt ?? now()->subDays(rand(1, 90)),
+            'changed_at' => $changedAt ?? now()->subDays(7),
         ]);
 
         if ($changedAt && $changedAt->gt($copy->updated_at?->toImmutable() ?? CarbonImmutable::parse($copy->created_at))) {

@@ -85,14 +85,12 @@ class AuthController extends Controller
             'email' => $user->email,
             'role' => $user->effectiveRole($libraryId),
             'global_role' => $user->isSuperAdmin() ? User::ROLE_SUPER_ADMIN : null,
-            'membership_role' => $libraryId ? $user->effectiveRole($libraryId) : null,
             'phone' => $user->phone,
             'membership_number' => $user->membership_number,
             'is_active' => (bool) $user->is_active,
         ];
     }
 }
-
 
 
 

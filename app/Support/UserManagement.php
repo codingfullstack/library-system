@@ -115,6 +115,21 @@ class UserManagement
             throw new \InvalidArgumentException('Superadministratoriui bibliotekos narystė nepriskiriama.');
         }
 
+        if ($user->role === User::ROLE_STAFF) {
+            if ($branchId === null) {
+                throw new \InvalidArgumentException('Darbuotojo narystei privalomas filialas.');
+            }
+
+            $branchBelongsToLibrary = \App\Models\Branch::query()
+                ->whereKey($branchId)
+                ->where('library_id', $libraryId)
+                ->exists();
+
+            if (! $branchBelongsToLibrary) {
+                throw new \InvalidArgumentException('Darbuotojo filialas turi priklausyti tai pačiai bibliotekai.');
+            }
+        }
+
         return LibraryMembership::query()->updateOrCreate(
             [
                 'library_id' => $libraryId,

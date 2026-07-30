@@ -64,14 +64,19 @@ Route::middleware(['auth', 'overdue.notifications'])->group(function () {
     Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.mark-read');
     Route::get('/book-copies/{id}', [BookCopyController::class, 'showPage'])->name('book-copies.show');
     Route::get('/book-copies/{id}/qr', [BookCopyQrController::class, 'show'])->name('book-copies.qr');
-    // LOANS
-    Route::get('/loans', [LoanController::class, 'index'])->name('loans.index');
-    Route::get('/loans/search-members', [LoanController::class, 'searchMembers'])->name('loans.search-members');
-    Route::post('/book-copies/{bookCopy}/return', [LoanController::class, 'returnBook'])->name('loans.return');
-    // RESERVATIONS
-    Route::get('/reservations', [ReservationController::class, 'index'])->name('reservations.index');
-    Route::post('/reservations', [ReservationController::class, 'store'])->name('reservations.store');
-    Route::patch('/reservations/{reservation}/cancel', [ReservationController::class, 'cancel'])->name('reservations.cancel');
+    Route::middleware(['verified', 'library.context', 'role:superadministratorius,administratorius,darbuotojas,narys'])->group(function () {
+        // LOANS
+        Route::get('/loans', [LoanController::class, 'index'])->name('loans.index');
+        Route::post('/book-copies/{bookCopy}/return', [LoanController::class, 'returnBook'])->name('loans.return');
+        // RESERVATIONS
+        Route::get('/reservations', [ReservationController::class, 'index'])->name('reservations.index');
+        Route::post('/reservations', [ReservationController::class, 'store'])->name('reservations.store');
+        Route::patch('/reservations/{reservation}/cancel', [ReservationController::class, 'cancel'])->name('reservations.cancel');
+    });
+
+    Route::middleware(['verified', 'library.context', 'role:superadministratorius,administratorius,darbuotojas'])->group(function () {
+        Route::get('/loans/search-members', [LoanController::class, 'searchMembers'])->name('loans.search-members');
+    });
 
 });
 

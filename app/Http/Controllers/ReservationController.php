@@ -13,6 +13,7 @@ use App\Queries\Reservations\GetReservationIndexFiltersDataQuery;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class ReservationController extends Controller
 {
@@ -22,26 +23,50 @@ class ReservationController extends Controller
         GetLibraryReservationsQuery $getLibraryReservationsQuery,
         GetReservationIndexFiltersDataQuery $getReservationIndexFiltersDataQuery
     ): View {
-        if ($request->user()->effectiveRole($request->user()->activeLibraryId()) === 'narys') {
-            $filters = [
-                'search' => $request->query('search'),
-                'status' => $request->query('status'),
-                'branch_id' => $request->query('branch_id'),
-                'reservation_date' => $request->query('reservation_date'),
-                'per_page' => $request->query('per_page', 15),
-            ];
+        $user = $request->user();
+        $libraryId = $user->activeLibraryId();
+        $effectiveRole = $user->effectiveRole($libraryId);
 
-            return view('account.reservations.index', [
-                'reservations' => $getMemberReservationsQuery->handle($request->user(), $filters),
-                'summary' => $getMemberReservationsQuery->summary($request->user(), $filters),
-            ]);
-        }
+        return match ($effectiveRole) {
+            'narys' => $this->memberIndex($request, $getMemberReservationsQuery),
+            'darbuotojas', 'administratorius', 'superadministratorius' => $this->staffIndex(
+                $request,
+                $getLibraryReservationsQuery,
+                $getReservationIndexFiltersDataQuery
+            ),
+            default => throw new HttpException(403),
+        };
+    }
+
+    private function memberIndex(Request $request, GetMemberReservationsQuery $getMemberReservationsQuery): View
+    {
+        $filters = [
+            'search' => $request->query('search'),
+            'status' => $request->query('status'),
+            'branch_id' => $request->query('branch_id'),
+            'reservation_date' => $request->query('reservation_date'),
+            'per_page' => $request->query('per_page', 15),
+        ];
+
+        return view('account.reservations.index', [
+            'reservations' => $getMemberReservationsQuery->handle($request->user(), $filters),
+            'summary' => $getMemberReservationsQuery->summary($request->user(), $filters),
+        ]);
+    }
+
+    private function staffIndex(
+        Request $request,
+        GetLibraryReservationsQuery $getLibraryReservationsQuery,
+        GetReservationIndexFiltersDataQuery $getReservationIndexFiltersDataQuery
+    ): View {
+        $scope = $request->user()->isSuperAdmin() && blank($request->query('library_id')) ? 'global' : 'library';
 
         $reservations = $getLibraryReservationsQuery->handle($request->user(), [
             'search' => $request->query('search'),
             'status' => $request->query('status'),
             'queue' => $request->query('queue'),
             'library_id' => $request->query('library_id'),
+            'scope' => $scope,
             'branch_id' => $request->query('branch_id'),
             'reservation_date' => $request->query('reservation_date'),
             'per_page' => $request->query('per_page', 20),
@@ -52,6 +77,7 @@ class ReservationController extends Controller
                 'reservations' => $reservations,
                 'summary' => $getLibraryReservationsQuery->summary($request->user(), [
                     'library_id' => $request->query('library_id'),
+                    'scope' => $scope,
                     'branch_id' => $request->query('branch_id'),
                 ]),
             ],

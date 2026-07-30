@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Models\Library;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Fortify\Features;
 
@@ -28,7 +29,8 @@ test('users can authenticate using the login screen', function () {
 });
 
 test('member users are redirected to their account dashboard after login', function () {
-    $user = User::factory()->member()->create();
+    $library = Library::factory()->create();
+    $user = memberInLibrary($library);
 
     $response = $this->post(route('login.store'), [
         'email' => $user->email,

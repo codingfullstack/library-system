@@ -21,6 +21,8 @@ use App\Support\GeneratesSlugs;
 use App\Support\Notifications\NotificationType;
 use App\Support\Notifications\NotificationUiConfig;
 use App\Support\UserManagement;
+use Database\Seeders\Support\DemoAccessActorSynchronizer;
+use Database\Seeders\Support\GuardsDemoSeeding;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
@@ -31,48 +33,42 @@ use Illuminate\Support\Str;
 
 class DemoLibrarySeeder extends Seeder
 {
+    use GuardsDemoSeeding;
+
     public function run(): void
     {
+        $this->guardDemoSeedingIsAllowed();
+
         DB::transaction(function () {
-            $this->clearDemoUsers();
-            $this->clearDemoLibraries();
-            $this->clearRetiredDemoBooks();
-            $this->clearDemoSuperAdmin();
+            $libraryX = Library::query()->updateOrCreate(
+                ['code' => 'LIB-X'],
+                [
+                    'name' => 'Vilniaus miesto centrine biblioteka',
+                    'email' => 'centras@library.test',
+                    'phone' => '+37060000001',
+                    'address' => 'Gedimino pr. 12',
+                    'city' => 'Vilnius',
+                    'is_active' => true,
+                    'is_public' => true,
+                ]
+            );
 
-            $libraryX = Library::create([
-                'name' => 'Vilniaus miesto centrine biblioteka',
-                'code' => 'LIB-X',
-                'email' => 'centras@library.test',
-                'phone' => '+37060000001',
-                'address' => 'Gedimino pr. 12',
-                'city' => 'Vilnius',
-                'is_active' => true,
-            ]);
+            $libraryY = Library::query()->updateOrCreate(
+                ['code' => 'LIB-Y'],
+                [
+                    'name' => 'Kauno rajono viesoji biblioteka',
+                    'email' => 'kaunas@library.test',
+                    'phone' => '+37060000002',
+                    'address' => 'Laisves al. 48',
+                    'city' => 'Kaunas',
+                    'is_active' => true,
+                    'is_public' => true,
+                ]
+            );
 
-            $libraryY = Library::create([
-                'name' => 'Kauno rajono viesoji biblioteka',
-                'code' => 'LIB-Y',
-                'email' => 'kaunas@library.test',
-                'phone' => '+37060000002',
-                'address' => 'Laisves al. 48',
-                'city' => 'Kaunas',
-                'is_active' => true,
-            ]);
+            (new DemoAccessActorSynchronizer())->syncSuperadmins();
 
-            User::create([
-                'name' => 'Superadministratorius',
-                'email' => 'superadmin@test.com',
-                'password' => Hash::make('password'),
-                'role' => 'superadministratorius',
-                'phone' => '+37060000000',
-                'membership_number' => null,
-                'is_active' => true,
-                'email_verified_at' => now(),
-            ]);
-
-            [$adminX, $staffX, $membersX] = $this->seedLibraryUsers($libraryX, [
-                'administratorius' => ['name' => 'Rasa Klimienė', 'email' => 'adminx@test.com', 'phone' => '+37061110001'],
-                'darbuotojas' => ['name' => 'Paulius Mockus', 'email' => 'staffx@test.com', 'phone' => '+37062220001'],
+            $memberProfilesX = [
                 'members' => [
                     ['name' => 'Austeja Kazlauskaite', 'email' => 'austeja.kazlauskaite@example.com', 'phone' => '+37061234001'],
                     ['name' => 'Mantas Balsevicius', 'email' => 'mantas.balsevicius@example.com', 'phone' => '+37061234002'],
@@ -95,11 +91,9 @@ class DemoLibrarySeeder extends Seeder
                     ['name' => 'Milda Gerdvilaite', 'email' => 'milda.gerdvilaite@example.com', 'phone' => '+37061234019'],
                     ['name' => 'Povilas Morkunas', 'email' => 'povilas.morkunas@example.com', 'phone' => '+37061234020'],
                 ],
-            ]);
+            ];
 
-            [$adminY, $staffY, $membersY] = $this->seedLibraryUsers($libraryY, [
-                'administratorius' => ['name' => 'Dalia Varnienė', 'email' => 'adminy@test.com', 'phone' => '+37061110002'],
-                'darbuotojas' => ['name' => 'Mantas Jasiūnas', 'email' => 'staffy@test.com', 'phone' => '+37062220002'],
+            $memberProfilesY = [
                 'members' => [
                     ['name' => 'Ieva Noreikaite', 'email' => 'ieva.noreikaite@example.com', 'phone' => '+37061235001'],
                     ['name' => 'Domas Vasiliauskas', 'email' => 'domas.vasiliauskas@example.com', 'phone' => '+37061235002'],
@@ -122,7 +116,7 @@ class DemoLibrarySeeder extends Seeder
                     ['name' => 'Neringa Kuodyte', 'email' => 'neringa.kuodyte@example.com', 'phone' => '+37061235019'],
                     ['name' => 'Marius Giedraitis', 'email' => 'marius.giedraitis@example.com', 'phone' => '+37061235020'],
                 ],
-            ]);
+            ];
 
             $categories = $this->seedCategories()->keyBy('slug');
             $publishers = $this->seedPublishers()->keyBy('name');
@@ -143,14 +137,26 @@ class DemoLibrarySeeder extends Seeder
                 'Kalniečiai',
             ]);
 
-            $this->assignStaffBranch($staffX, $libraryX, $branchesX->first());
-            $this->assignStaffBranch($staffY, $libraryY, $branchesY->first());
+            $access = new DemoAccessActorSynchronizer();
+            $actorsX = $access->syncLibrary($libraryX);
+            $actorsY = $access->syncLibrary($libraryY);
 
-            $employeesX = collect([$adminX, $staffX]);
-            $employeesY = collect([$adminY, $staffY]);
+            $membersX = $this->seedLibraryMembers($libraryX, $memberProfilesX)
+                ->merge($actorsX['members'])
+                ->unique('id')
+                ->values();
+            $membersY = $this->seedLibraryMembers($libraryY, $memberProfilesY)
+                ->merge($actorsY['members'])
+                ->unique('id')
+                ->values();
 
-            $copiesX = $this->seedCopiesForLibrary($libraryX, $books->shuffle()->take(min(20, $books->count())), $branchesX, $locationsX, 'X', $employeesX, $membersX);
-            $copiesY = $this->seedCopiesForLibrary($libraryY, $books->shuffle()->take(min(20, $books->count())), $branchesY, $locationsY, 'Y', $employeesY, $membersY);
+            $employeesX = $actorsX['admins']->merge($actorsX['staff'])->values();
+            $employeesY = $actorsY['admins']->merge($actorsY['staff'])->values();
+            $staffX = $actorsX['staff']->first();
+
+            $bookSample = $books->sortBy(fn (Book $book) => $book->isbn ?: $book->title)->values();
+            $copiesX = $this->seedCopiesForLibrary($libraryX, $bookSample->take(min(20, $bookSample->count())), $branchesX, $locationsX, 'X', $employeesX, $membersX);
+            $copiesY = $this->seedCopiesForLibrary($libraryY, $bookSample->skip(5)->take(min(20, $bookSample->count())), $branchesY, $locationsY, 'Y', $employeesY, $membersY);
 
             $this->seedReservationsForLibrary($libraryX, $copiesX, $membersX);
             $this->seedReservationsForLibrary($libraryY, $copiesY, $membersY);
@@ -169,157 +175,38 @@ class DemoLibrarySeeder extends Seeder
         });
     }
 
-    private function clearDemoLibraries(): void
-    {
-        Library::query()
-            ->whereIn('code', ['LIB-X', 'LIB-Y'])
-            ->get()
-            ->each(function (Library $library) {
-                $library->delete();
-            });
-    }
-
-    private function clearDemoUsers(): void
-    {
-        $demoEmails = [
-            'adminx@test.com',
-            'staffx@test.com',
-            'adminy@test.com',
-            'staffy@test.com',
-            'austeja.kazlauskaite@example.com',
-            'mantas.balsevicius@example.com',
-            'egle.petrauskaite@example.com',
-            'lukas.vaitiekunas@example.com',
-            'saule.grigaityte@example.com',
-            'rokas.jankauskas@example.com',
-            'gabija.rimkute@example.com',
-            'emilija.varnyte@example.com',
-            'nojus.pocius@example.com',
-            'milda.janusauskaite@example.com',
-            'tadas.veverskis@example.com',
-            'karolina.butkeviciute@example.com',
-            'simona.petratyte@example.com',
-            'giedre.valentiene@example.com',
-            'tomas.vaiktus@example.com',
-            'aiste.jakaite@example.com',
-            'urte.zukaite@example.com',
-            'dovile.kairiene@example.com',
-            'milda.gerdvilaite@example.com',
-            'povilas.morkunas@example.com',
-            'ieva.noreikaite@example.com',
-            'domas.vasiliauskas@example.com',
-            'goda.lukoceviciute@example.com',
-            'ugnius.narbutas@example.com',
-            'vakare.simonaityte@example.com',
-            'jonas.petraitis@example.com',
-            'aiste.maciulyte@example.com',
-            'pijus.zabiela@example.com',
-            'greta.simkute@example.com',
-            'nedas.petrauskas@example.com',
-            'paulina.stankute@example.com',
-            'rugile.plioplyte@example.com',
-            'lina.bertaityte@example.com',
-            'viltaras.kvedaras@example.com',
-            'monika.vaiciulyte@example.com',
-            'elze.mockute@example.com',
-            'liepa.rimiene@example.com',
-            'darius.venslovas@example.com',
-            'neringa.kuodyte@example.com',
-            'marius.giedraitis@example.com',
-        ];
-
-        User::query()->whereIn('email', $demoEmails)->delete();
-    }
-
-    private function clearDemoSuperAdmin(): void
-    {
-        User::query()->where('email', 'superadmin@test.com')->delete();
-    }
-
-    private function clearRetiredDemoBooks(): void
-    {
-        Book::query()
-            ->whereIn('isbn', [
-                '9786090135003',
-                '9786090142324',
-                '9786090142331',
-                '9786090143901',
-                '9786090145110',
-                '9786090145455',
-                '9786094273126',
-                '9785415011237',
-                '9786094661550',
-                '9786094793664',
-                '9786090151904',
-                '9786090155605',
-                '9786094272709',
-                '9786090155339',
-                '9786094665800',
-                '9786094272211',
-                '9786090139889',
-                '9786090158996',
-                '9786098142379',
-                '9786094797631',
-                '9786090145100',
-                '9786094270538',
-            ])
-            ->delete();
-    }
-
     /**
-     * @param array{
-     *   admin: array{name: string, email: string, phone: string},
-     *   staff: array{name: string, email: string, phone: string},
-     *   members: list<array{name: string, email: string, phone: string}>
-     * } $profiles
-     * @return array{0: User, 1: User, 2: Collection<int, User>}
+     * @param array{members: list<array{name: string, email: string, phone: string}>} $profiles
+     * @return Collection<int, User>
      */
-    private function seedLibraryUsers(Library $library, array $profiles): array
+    private function seedLibraryMembers(Library $library, array $profiles): Collection
     {
-        $admin = User::create([
-            'name' => $profiles['administratorius']['name'],
-            'email' => $profiles['administratorius']['email'],
-            'password' => Hash::make('password'),
-            'role' => 'administratorius',
-            'phone' => $profiles['administratorius']['phone'],
-            'membership_number' => null,
-            'is_active' => true,
-            'email_verified_at' => now(),
-        ]);
-        $this->attachLibraryMembership($admin, $library);
-
-        $staff = User::create([
-            'name' => $profiles['darbuotojas']['name'],
-            'email' => $profiles['darbuotojas']['email'],
-            'password' => Hash::make('password'),
-            'role' => 'darbuotojas',
-            'phone' => $profiles['darbuotojas']['phone'],
-            'membership_number' => null,
-            'is_active' => true,
-            'email_verified_at' => now(),
-        ]);
-        $this->attachLibraryMembership($staff, $library);
-
-        $members = collect($profiles['members'])
+        return collect($profiles['members'])
             ->values()
             ->map(function (array $member, int $index) use ($library) {
-                $user = User::create([
-                    'name' => $member['name'],
-                    'email' => $member['email'],
-                    'password' => Hash::make('password'),
-                    'role' => 'narys',
-                    'phone' => $member['phone'],
-                    'membership_number' => UserManagement::generateMembershipNumber(),
-                    'is_active' => true,
-                    'email_verified_at' => now(),
-                ]);
+                $existingMembershipNumber = User::query()
+                    ->where('email', $member['email'])
+                    ->value('membership_number');
+
+                $user = User::query()->updateOrCreate(
+                    ['email' => $member['email']],
+                    [
+                        'name' => $member['name'],
+                        'password' => Hash::make('password'),
+                        'role' => 'narys',
+                        'phone' => $member['phone'],
+                        'membership_number' => str_starts_with((string) $existingMembershipNumber, 'MEM:')
+                            ? $existingMembershipNumber
+                            : UserManagement::generateMembershipNumber(),
+                        'is_active' => true,
+                        'email_verified_at' => now(),
+                    ]
+                );
 
                 $this->attachLibraryMembership($user, $library);
 
                 return $user;
             });
-
-        return [$admin, $staff, $members];
     }
 
     private function attachLibraryMembership(User $user, Library $library): void
@@ -335,18 +222,6 @@ class DemoLibrarySeeder extends Seeder
                 'joined_at' => $user->created_at,
             ]
         );
-    }
-
-    private function assignStaffBranch(User $user, Library $library, ?Branch $branch): void
-    {
-        if (! $branch || $user->role !== User::ROLE_STAFF) {
-            return;
-        }
-
-        LibraryMembership::query()
-            ->where('library_id', $library->id)
-            ->where('user_id', $user->id)
-            ->update(['branch_id' => $branch->id]);
     }
 
     /**
@@ -694,13 +569,17 @@ class DemoLibrarySeeder extends Seeder
     private function seedBranchesAndLocations(Library $library, array $branchNames): array
     {
         $branches = collect($branchNames)->map(function (string $branchName, int $index) use ($library) {
-            return Branch::create([
-                'library_id' => $library->id,
-                'name' => $branchName,
-                'code' => $library->code.'-BR-'.str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT),
-                'address' => $library->address,
-                'city' => $library->city,
-            ]);
+            return Branch::query()->updateOrCreate(
+                [
+                    'library_id' => $library->id,
+                    'code' => $library->code.'-BR-'.str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT),
+                ],
+                [
+                    'name' => $branchName,
+                    'address' => $library->address,
+                    'city' => $library->city,
+                ]
+            );
         });
 
         $locations = collect();
@@ -715,14 +594,18 @@ class DemoLibrarySeeder extends Seeder
                     ['name' => 'Krastotyros fondas', 'room' => '3', 'shelf' => 'E-2'],
                     ['name' => 'Sandelis', 'room' => '0', 'shelf' => 'ST-1'],
                 ])->map(function (array $location, int $index) use ($library, $branch) {
-                    return Location::create([
-                        'library_id' => $library->id,
-                        'branch_id' => $branch->id,
-                        'name' => $location['name'],
-                        'code' => $branch->code.'-LOC-'.str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT),
-                        'room' => $location['room'],
-                        'shelf' => $location['shelf'],
-                    ]);
+                    return Location::query()->updateOrCreate(
+                        [
+                            'library_id' => $library->id,
+                            'code' => $branch->code.'-LOC-'.str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT),
+                        ],
+                        [
+                            'branch_id' => $branch->id,
+                            'name' => $location['name'],
+                            'room' => $location['room'],
+                            'shelf' => $location['shelf'],
+                        ]
+                    );
                 })
             );
         }
@@ -747,16 +630,27 @@ class DemoLibrarySeeder extends Seeder
         Collection $employees,
         Collection $members
     ): Collection {
+        $existingCopies = BookCopy::query()
+            ->where('library_id', $library->id)
+            ->where('inventory_code', 'like', sprintf('%s-%s-%%', $library->code, $prefix))
+            ->get();
+
+        if ($existingCopies->isNotEmpty()) {
+            return $existingCopies->values();
+        }
+
         $copies = collect();
         $inventoryCounter = 1;
 
         foreach ($books as $book) {
-            $count = rand(3, 6);
+            $count = 3 + (($book->id + $inventoryCounter) % 4);
 
             for ($i = 0; $i < $count; $i++) {
-                $branch = $branches->random();
-                $location = $locations->where('branch_id', $branch->id)->random();
-                $targetStatus = collect([
+                $sequence = $inventoryCounter + $i;
+                $branch = $branches[($sequence - 1) % $branches->count()];
+                $branchLocations = $locations->where('branch_id', $branch->id)->values();
+                $location = $branchLocations[($sequence - 1) % max(1, $branchLocations->count())];
+                $statuses = [
                     BookCopy::STATUS_AVAILABLE,
                     BookCopy::STATUS_AVAILABLE,
                     BookCopy::STATUS_AVAILABLE,
@@ -766,25 +660,27 @@ class DemoLibrarySeeder extends Seeder
                     BookCopy::STATUS_MAINTENANCE,
                     BookCopy::STATUS_LOST,
                     BookCopy::STATUS_WITHDRAWN,
-                ])->random();
+                ];
+                $targetStatus = $statuses[($sequence - 1) % count($statuses)];
 
                 $condition = match ($targetStatus) {
-                    BookCopy::STATUS_MAINTENANCE => collect([BookCopy::CONDITION_WORN, BookCopy::CONDITION_DAMAGED])->random(),
-                    BookCopy::STATUS_LOST => collect([BookCopy::CONDITION_GOOD, BookCopy::CONDITION_WORN])->random(),
-                    default => collect([BookCopy::CONDITION_NEW, BookCopy::CONDITION_GOOD, BookCopy::CONDITION_GOOD, BookCopy::CONDITION_WORN])->random(),
+                    BookCopy::STATUS_MAINTENANCE => [BookCopy::CONDITION_WORN, BookCopy::CONDITION_DAMAGED][$sequence % 2],
+                    BookCopy::STATUS_LOST => [BookCopy::CONDITION_GOOD, BookCopy::CONDITION_WORN][$sequence % 2],
+                    default => [BookCopy::CONDITION_NEW, BookCopy::CONDITION_GOOD, BookCopy::CONDITION_GOOD, BookCopy::CONDITION_WORN][$sequence % 4],
                 };
+                $currentInventory = $inventoryCounter++;
 
                 $copy = BookCopy::create([
                     'library_id' => $library->id,
                     'book_id' => $book->id,
                     'branch_id' => $branch->id,
                     'location_id' => $location->id,
-                    'inventory_code' => sprintf('%s-%s-%03d', $library->code, $prefix, $inventoryCounter++),
-                    'qr_code' => sprintf('QR-%s-%04d', $library->code, $inventoryCounter + 500),
-                    'barcode' => '978'.str_pad((string) rand(1000000000, 9999999999), 10, '0', STR_PAD_LEFT),
+                    'inventory_code' => sprintf('%s-%s-%03d', $library->code, $prefix, $currentInventory),
+                    'qr_code' => sprintf('QR-%s-%04d', $library->code, $currentInventory + 500),
+                    'barcode' => '978'.str_pad((string) (1000000000 + $library->id * 10000 + $currentInventory), 10, '0', STR_PAD_LEFT),
                     'status' => BookCopy::STATUS_AVAILABLE,
                     'condition_status' => $condition,
-                    'acquired_at' => now()->subMonths(rand(6, 48))->format('Y-m-d'),
+                    'acquired_at' => Carbon::parse('2024-01-01')->subDays($currentInventory * 3)->format('Y-m-d'),
                     'notes' => $this->copyNotesForStatus($targetStatus),
                 ]);
 
@@ -792,7 +688,7 @@ class DemoLibrarySeeder extends Seeder
                 $this->recordCopyHistory($copy, $employees->first(), 'created', BookCopy::STATUS_AVAILABLE, 'Kopija įtrauktas į bibliotekos fondą.');
 
                 if ($targetStatus === BookCopy::STATUS_LOANED) {
-                    $this->seedLoanForCopy($copy, $members->random(), $employees->random(), false);
+                    $this->seedLoanForCopy($copy, $members[($currentInventory - 1) % $members->count()], $employees[($currentInventory - 1) % $employees->count()], false, $currentInventory);
 
                     continue;
                 }
@@ -810,24 +706,24 @@ class DemoLibrarySeeder extends Seeder
                     default => ['status_adjusted', 'Statusas atnaujintas demo duomenims.'],
                 };
 
-                $this->recordCopyHistory($copy, $employees->random(), $reasonCode, $targetStatus, $notes);
+                $this->recordCopyHistory($copy, $employees[($currentInventory - 1) % $employees->count()], $reasonCode, $targetStatus, $notes);
             }
         }
 
         $availableCopies = $copies->filter(fn (BookCopy $copy) => $copy->status === BookCopy::STATUS_AVAILABLE)->values();
 
-        foreach ($availableCopies->shuffle()->take(min(20, $availableCopies->count())) as $copy) {
-            $this->seedLoanForCopy($copy, $members->random(), $employees->random(), true);
+        foreach ($availableCopies->sortBy('inventory_code')->take(min(20, $availableCopies->count())) as $index => $copy) {
+            $this->seedLoanForCopy($copy, $members[$index % $members->count()], $employees[$index % $employees->count()], true, $index + 100);
         }
 
         return $copies->values();
     }
 
-    private function seedLoanForCopy(BookCopy $copy, User $member, User $employee, bool $returned): void
+    private function seedLoanForCopy(BookCopy $copy, User $member, User $employee, bool $returned, int $seedIndex): void
     {
-        $borrowedAt = $this->safeTimestamp(now()->subDays(rand(3, 40))->subHours(rand(1, 8)));
+        $borrowedAt = $this->safeTimestamp(now()->subDays(3 + ($seedIndex % 38))->subHours(1 + ($seedIndex % 8)));
         $dueAt = $this->safeTimestamp((clone $borrowedAt)->addDays(14));
-        $returnedAt = $returned ? $this->safeTimestamp((clone $borrowedAt)->addDays(rand(4, 16))) : null;
+        $returnedAt = $returned ? $this->safeTimestamp((clone $borrowedAt)->addDays(4 + ($seedIndex % 13))) : null;
         $status = $returned
             ? 'grąžinta'
             : (now()->gt($dueAt) ? 'vėluoja' : 'aktyvi');
@@ -842,7 +738,7 @@ class DemoLibrarySeeder extends Seeder
             'due_at' => $dueAt,
             'returned_at' => $returnedAt,
             'status' => $status,
-            'renewal_count' => $returned ? rand(0, 1) : rand(0, 2),
+            'renewal_count' => $returned ? $seedIndex % 2 : $seedIndex % 3,
             'notes' => $returned
                 ? 'Demonstracinis grąžinimo įrašas.'
                 : 'Skaitytojas šiuo metu naudojasi šia kopija.',
@@ -863,11 +759,15 @@ class DemoLibrarySeeder extends Seeder
      */
     private function seedReservationsForLibrary(Library $library, Collection $copies, Collection $members): void
     {
+        if (Reservation::query()->where('library_id', $library->id)->exists()) {
+            return;
+        }
+
         $books = $copies->pluck('book')->filter()->unique('id')->values();
 
-        foreach ($books->shuffle()->take(min(16, $books->count())) as $book) {
-            $queuedMembers = $members->shuffle()->take(rand(2, 4))->values();
-            $reservedAt = $this->safeTimestamp(now()->subDays(rand(1, 10))->subHours(rand(1, 10)));
+        foreach ($books->sortBy(fn (Book $book) => $book->isbn ?: $book->title)->take(min(16, $books->count())) as $bookIndex => $book) {
+            $queuedMembers = $members->slice($bookIndex % $members->count(), 2 + ($bookIndex % 3))->values();
+            $reservedAt = $this->safeTimestamp(now()->subDays(1 + ($bookIndex % 10))->subHours(1 + ($bookIndex % 10)));
 
             foreach ($queuedMembers as $position => $member) {
                 $this->seedReservationForBook(
@@ -881,14 +781,15 @@ class DemoLibrarySeeder extends Seeder
                 );
             }
 
-            foreach ($members->whereNotIn('id', $queuedMembers->pluck('id'))->shuffle()->take(rand(2, 4)) as $historicalMember) {
-                $historicalStatus = collect([
+            foreach ($members->whereNotIn('id', $queuedMembers->pluck('id'))->values()->take(2 + (($bookIndex + 1) % 3)) as $historicalIndex => $historicalMember) {
+                $historicalStatuses = [
                     Reservation::STATUS_FULFILLED,
                     Reservation::STATUS_CANCELLED,
                     Reservation::STATUS_EXPIRED,
-                ])->random();
+                ];
+                $historicalStatus = $historicalStatuses[($bookIndex + $historicalIndex) % count($historicalStatuses)];
 
-                $historicalReservedAt = $this->safeTimestamp(now()->subDays(rand(12, 25))->subHours(rand(1, 12)));
+                $historicalReservedAt = $this->safeTimestamp(now()->subDays(12 + (($bookIndex + $historicalIndex) % 14))->subHours(1 + (($bookIndex + $historicalIndex) % 12)));
 
                 $this->seedReservationForBook(
                     $library,
@@ -896,7 +797,7 @@ class DemoLibrarySeeder extends Seeder
                     $historicalMember,
                     $historicalStatus,
                     $historicalReservedAt,
-                    $historicalStatus === Reservation::STATUS_EXPIRED ? now()->subDays(rand(1, 4)) : null,
+                    $historicalStatus === Reservation::STATUS_EXPIRED ? now()->subDays(1 + (($bookIndex + $historicalIndex) % 4)) : null,
                     match ($historicalStatus) {
                         Reservation::STATUS_FULFILLED => 'Rezervacija buvo sėkmingai įvykdyta ir knyga atsiimta.',
                         Reservation::STATUS_CANCELLED => 'Narys atšaukė rezervaciją telefonu.',
@@ -934,8 +835,8 @@ class DemoLibrarySeeder extends Seeder
             'expires_at' => in_array($status, [Reservation::STATUS_READY, Reservation::STATUS_EXPIRED], true)
                 ? ($expiresAt ?? now()->addDays(4))
                 : null,
-            'fulfilled_at' => $status === Reservation::STATUS_FULFILLED ? now()->subDays(rand(1, 5)) : null,
-            'cancelled_at' => $status === Reservation::STATUS_CANCELLED ? now()->subDays(rand(1, 4)) : null,
+            'fulfilled_at' => $status === Reservation::STATUS_FULFILLED ? Carbon::parse($reservedAt)->addDays(2) : null,
+            'cancelled_at' => $status === Reservation::STATUS_CANCELLED ? Carbon::parse($reservedAt)->addDay() : null,
             'notes' => $notes,
         ]);
     }
@@ -946,15 +847,23 @@ class DemoLibrarySeeder extends Seeder
      */
     private function seedScanLogs(Library $library, Collection $copies, Collection $employees): void
     {
-        foreach ($copies->shuffle()->take(min(40, $copies->count())) as $copy) {
+        if (ScanLog::query()->where('library_id', $library->id)->exists()) {
+            return;
+        }
+
+        $scanTypes = ['info', 'loan', 'return', 'inventory'];
+        $scanResults = ['success', 'success', 'success', 'error'];
+        $devices = ['Samsung A54', 'Samsung Tab A9', 'Web scanner', 'Chrome Windows'];
+
+        foreach ($copies->sortBy('inventory_code')->take(min(40, $copies->count())) as $index => $copy) {
             ScanLog::create([
                 'library_id' => $library->id,
                 'book_copy_id' => $copy->id,
-                'user_id' => $employees->random()->id,
+                'user_id' => $employees[$index % $employees->count()]->id,
                 'scan_value' => $copy->qr_code,
-                'scan_type' => collect(['info', 'loan', 'return', 'inventory'])->random(),
-                'result' => collect(['success', 'success', 'success', 'error'])->random(),
-                'device_info' => collect(['Samsung A54', 'Samsung Tab A9', 'Web scanner', 'Chrome Windows'])->random(),
+                'scan_type' => $scanTypes[$index % count($scanTypes)],
+                'result' => $scanResults[$index % count($scanResults)],
+                'device_info' => $devices[$index % count($devices)],
             ]);
         }
     }
@@ -972,11 +881,18 @@ class DemoLibrarySeeder extends Seeder
         Collection $employees,
         Collection $members
     ): void {
+        if (AuditLog::query()
+            ->where('library_id', $library->id)
+            ->whereIn('action', ['book_updated', 'reservation_created', 'book_copy_status_changed', 'book_copy_updated', 'user_updated', 'loan_issued'])
+            ->exists()) {
+            return;
+        }
+
         $bookSamples = $books->take(3)->values();
 
         foreach ($bookSamples as $bookIndex => $book) {
             foreach (range(1, 12) as $step) {
-                $actor = $employees->random();
+                $actor = $employees[($bookIndex + $step) % $employees->count()];
                 $createdAt = $this->safeTimestamp(now()->subDays(40 - ($bookIndex * 8))->addHours($step));
 
                 $this->createAuditLog([
@@ -991,7 +907,7 @@ class DemoLibrarySeeder extends Seeder
                     'metadata' => [
                         'book_id' => $book->id,
                         'book_title' => $book->title,
-                        'target_member_id' => $members->random()->id,
+                        'target_member_id' => $members[($bookIndex + $step) % $members->count()]->id,
                     ],
                 ], $createdAt);
             }
@@ -999,7 +915,7 @@ class DemoLibrarySeeder extends Seeder
 
         foreach ($copies->take(5)->values() as $copyIndex => $copy) {
             foreach (range(1, 10) as $step) {
-                $actor = $employees->random();
+                $actor = $employees[($copyIndex + $step) % $employees->count()];
                 $createdAt = $this->safeTimestamp(now()->subDays(18 - $copyIndex)->addMinutes($step * 35));
 
                 $this->createAuditLog([
@@ -1021,7 +937,7 @@ class DemoLibrarySeeder extends Seeder
 
         foreach ($members->take(4)->values() as $memberIndex => $member) {
             foreach (range(1, 6) as $step) {
-                $actor = $employees->random();
+                $actor = $employees[($memberIndex + $step) % $employees->count()];
                 $createdAt = $this->safeTimestamp(now()->subDays(12 - $memberIndex)->addMinutes($step * 50));
 
                 $this->createAuditLog([
@@ -1184,11 +1100,11 @@ class DemoLibrarySeeder extends Seeder
     private function copyNotesForStatus(string $status): ?string
     {
         return match ($status) {
-            BookCopy::STATUS_AVAILABLE => collect([
+            BookCopy::STATUS_AVAILABLE => [
                 null,
                 'Kopija tvarkinga ir prieinama skaitytojams.',
                 'Pastaruoju metu dažnai ieškoma prie informacijos stalo.',
-            ])->random(),
+            ][strlen($status) % 3],
             BookCopy::STATUS_LOANED => 'Kopija šiuo metu išduota skaitytojui.',
             BookCopy::STATUS_MAINTENANCE => 'Laukiama smulkaus taisymo arba perklijavimo.',
             BookCopy::STATUS_LOST => 'Nepavyko rasti per paskutinę inventorizaciją.',
@@ -1209,10 +1125,10 @@ class DemoLibrarySeeder extends Seeder
             ->max('changed_at');
 
         $changedAt = $lastChangedAt
-            ? Carbon::parse($lastChangedAt)->addHours(rand(6, 48))
+            ? Carbon::parse($lastChangedAt)->addHours(12)
             : ($copy->acquired_at
-                ? Carbon::parse($copy->acquired_at)->startOfDay()->addDays(rand(1, 20))->addHours(rand(8, 17))
-                : now()->subMonths(6)->addDays(rand(1, 15))->addHours(rand(8, 17)));
+                ? Carbon::parse($copy->acquired_at)->startOfDay()->addDays(2)->addHours(10)
+                : now()->subMonths(6)->addDays(2)->addHours(10));
 
         $changedAt = $this->safeTimestamp($changedAt);
 

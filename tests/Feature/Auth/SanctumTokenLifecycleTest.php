@@ -23,24 +23,24 @@ it('revokes sanctum tokens when password role or active state changes', function
     ['is_active', false],
 ]);
 
-it('revokes sanctum tokens when a membership authorization context changes', function () {
+it('revokes sanctum tokens when membership activity changes', function () {
     $library = Library::factory()->create();
     $user = User::factory()->member()->create(['library_id' => $library->id]);
     $membership = $user->activeLibraryMemberships()->firstOrFail();
     $user->createToken('android-app');
 
-    $membership->update(['role' => User::ROLE_STAFF]);
+    $membership->update(['is_active' => false]);
 
     expect(PersonalAccessToken::query()->count())->toBe(0);
 });
 
-it('uses membership role as the library authorization authority', function () {
+it('uses account role as the library authorization authority', function () {
     $library = Library::factory()->create();
     $user = User::factory()->member()->create(['library_id' => $library->id]);
 
     expect($user->fresh()->effectiveRole($library->id))->toBe(User::ROLE_MEMBER);
 
-    $user->activeLibraryMemberships()->firstOrFail()->update(['role' => User::ROLE_ADMIN]);
+    $user->forceFill(['role' => User::ROLE_ADMIN])->save();
 
     expect($user->fresh()->effectiveRole($library->id))->toBe(User::ROLE_ADMIN);
 });

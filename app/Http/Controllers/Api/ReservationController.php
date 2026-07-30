@@ -46,17 +46,25 @@ class ReservationController extends Controller
             'status' => $validated['status'] ?? null,
             'queue' => $validated['queue'] ?? null,
             'library_id' => $validated['library_id'] ?? null,
+            'scope' => $user->isSuperAdmin() && empty($validated['library_id'] ?? null) ? 'global' : 'library',
             'branch_id' => $validated['branch_id'] ?? null,
             'per_page' => $validated['per_page'] ?? 25,
         ];
 
-        $reservations = $user?->effectiveRole($user->activeLibraryId()) === 'narys'
-            ? $getMemberReservationsQuery->handle($user, $filters)
-            : $getLibraryReservationsQuery->handle($user, $filters);
+        $libraryId = $user->activeLibraryId();
+        $effectiveRole = $user->effectiveRole($libraryId);
 
-        $summary = $user?->effectiveRole($user->activeLibraryId()) === 'narys'
-            ? $getMemberReservationsQuery->summary($user, $filters)
-            : $getLibraryReservationsQuery->summary($user, $filters);
+        [$reservations, $summary] = match ($effectiveRole) {
+            'narys' => [
+                $getMemberReservationsQuery->handle($user, $filters),
+                $getMemberReservationsQuery->summary($user, $filters),
+            ],
+            'darbuotojas', 'administratorius', 'superadministratorius' => [
+                $getLibraryReservationsQuery->handle($user, $filters),
+                $getLibraryReservationsQuery->summary($user, $filters),
+            ],
+            default => abort(403),
+        };
 
         return ReservationResource::collection($reservations)
             ->additional(['summary' => $summary]);

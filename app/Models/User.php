@@ -163,6 +163,10 @@ class User extends Authenticatable
 
     public function effectiveRole(int|string|null $libraryId = null): ?string
     {
+        if (! $this->is_active) {
+            return null;
+        }
+
         if ($this->isSuperAdmin()) {
             return self::ROLE_SUPER_ADMIN;
         }
@@ -171,7 +175,7 @@ class User extends Authenticatable
             return null;
         }
 
-        return $this->membershipForLibrary($libraryId)?->role;
+        return $this->membershipForLibrary($libraryId) ? $this->role : null;
     }
 
     public function hasAnyEffectiveRole(array $roles, int|string|null $libraryId = null): bool
@@ -180,17 +184,18 @@ class User extends Authenticatable
             return false;
         }
 
-        $effectiveRole = $this->effectiveRole($libraryId ?: $this->activeLibraryId());
+        $resolvedLibraryId = $libraryId ?: $this->activeLibraryId();
+        $effectiveRole = $this->effectiveRole($resolvedLibraryId);
 
         if (! in_array($effectiveRole, $roles, true)) {
             return false;
         }
 
-        if ($this->isSuperAdmin() || empty($libraryId)) {
+        if ($this->isSuperAdmin()) {
             return true;
         }
 
-        return $this->belongsToLibrary($libraryId);
+        return ! empty($resolvedLibraryId) && $this->belongsToLibrary($resolvedLibraryId);
     }
 
     public function hasStaffAccess(): bool

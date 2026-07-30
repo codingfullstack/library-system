@@ -10,9 +10,13 @@
     >
         @php
             $user = auth()->user();
-            $canSeeDashboard = $user?->hasStaffAccess() ?? false;
+            $activeLibraryId = $user?->activeLibraryId();
+            $effectiveRole = $user?->effectiveRole($activeLibraryId);
+            $canSeeDashboard = in_array($effectiveRole, ['superadministratorius', 'administratorius', 'darbuotojas'], true);
             $canManageLibrary = $canSeeDashboard;
-            $isMember = $user?->effectiveRole() === 'narys';
+            $isMember = $effectiveRole === 'narys';
+            $isAdmin = in_array($effectiveRole, ['superadministratorius', 'administratorius'], true);
+            $isSuperAdmin = $effectiveRole === 'superadministratorius';
             $homeRoute = $canSeeDashboard ? route('dashboard') : ($isMember ? route('account.dashboard') : route('books.index'));
             $unreadNotificationsCount = $user ? $user->unreadNotifications()->count() : 0;
             $desktopSearchRoute = $canManageLibrary ? route('manage.search.index') : route('books.index');
@@ -203,7 +207,7 @@
                                 <span>{{ __('Kopijos') }}</span>
                             </a>
 
-                            @if($user?->isSuperAdmin() || $user?->isAdmin())
+                            @if($isAdmin)
                                 <a href="{{ route('manage.branches.index') }}" wire:navigate @click="mobileNavOpen = false" @class([
                                     'flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition',
                                     'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20' => request()->routeIs('manage.branches.*'),
@@ -223,7 +227,7 @@
                                 <span>{{ __('Vietos') }}</span>
                             </a>
 
-                            @if($user?->isSuperAdmin())
+                            @if($isSuperAdmin)
                                 <a href="{{ route('manage.libraries.index') }}" wire:navigate @click="mobileNavOpen = false" @class([
                                     'flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition',
                                     'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20' => request()->routeIs('manage.libraries.*'),
@@ -375,7 +379,7 @@
                             {{ __('Kopijos') }}
                         </flux:sidebar.item>
 
-                        @if($user?->isSuperAdmin())
+                        @if($isSuperAdmin)
                             <flux:sidebar.item icon="building-library" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('manage.libraries.index')" :current="request()->routeIs('manage.libraries.*')" wire:navigate>
                                 {{ __('Bibliotekos') }}
                             </flux:sidebar.item>
@@ -389,7 +393,7 @@
                             </flux:sidebar.item>
                         @endif
 
-                        @if($user?->isSuperAdmin() || $user?->isAdmin())
+                        @if($isAdmin)
                             <flux:sidebar.item icon="building-library" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('manage.branches.index')" :current="request()->routeIs('manage.branches.*')" wire:navigate>
                                 {{ __('Filialai') }}
                             </flux:sidebar.item>
@@ -402,10 +406,10 @@
 
                     <flux:sidebar.group :heading="__('Nustatymai')" class="mt-6 grid gap-1">
                         <flux:sidebar.item icon="cog-6-tooth" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('profile.edit')" :current="request()->routeIs('profile.edit')" wire:navigate>
-                            {{ __('Sistemos nustatymai') }}
+                            {{ __('Paskyros nustatymai') }}
                         </flux:sidebar.item>
 
-                        @if($user?->isSuperAdmin())
+                        @if($isSuperAdmin)
                             <flux:sidebar.item icon="clipboard-document" class="h-11 rounded-xl px-3 text-sm font-medium" :href="route('manage.audit-logs.index')" :current="request()->routeIs('manage.audit-logs.*')" wire:navigate>
                                 {{ __('Auditų žurnalas') }}
                             </flux:sidebar.item>

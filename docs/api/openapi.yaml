@@ -275,7 +275,7 @@ components:
         total: { type: integer }
     AuthUser:
       type: object
-      required: [id, library_id, library_name, branch_id, branch_name, name, email, role, global_role, membership_role, phone, membership_number, is_active]
+      required: [id, library_id, library_name, branch_id, branch_name, name, email, role, global_role, phone, membership_number, is_active]
       properties:
         id: { type: integer }
         library_id: { type: integer, nullable: true }
@@ -286,7 +286,6 @@ components:
         email: { type: string, format: email }
         role: { type: string, enum: [superadministratorius, administratorius, darbuotojas, narys], nullable: true }
         global_role: { type: string, enum: [superadministratorius], nullable: true }
-        membership_role: { type: string, enum: [administratorius, darbuotojas, narys], nullable: true }
         phone: { type: string, nullable: true }
         membership_number: { type: string, nullable: true }
         is_active: { type: boolean }

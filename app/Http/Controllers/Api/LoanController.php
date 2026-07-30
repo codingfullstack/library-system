@@ -50,19 +50,26 @@ class LoanController extends Controller
             'employee_id' => $validated['employee_id'] ?? null,
             'overdue' => $validated['overdue'] ?? null,
             'library_id' => $validated['library_id'] ?? null,
+            'scope' => $user->isSuperAdmin() && empty($validated['library_id'] ?? null) ? 'global' : 'library',
             'per_page' => $validated['per_page'] ?? 25,
         ];
 
-        $loans = $user?->effectiveRole($user->activeLibraryId()) === 'narys'
-            ? $getMemberLoansQuery->handle($user, $filters)
-            : $getActiveLibraryLoansQuery->handle($user, $filters);
+        $libraryId = $user->activeLibraryId();
+        $effectiveRole = $user->effectiveRole($libraryId);
+
+        $loans = match ($effectiveRole) {
+            'narys' => $getMemberLoansQuery->handle($user, $filters),
+            'darbuotojas', 'administratorius', 'superadministratorius' => $getActiveLibraryLoansQuery->handle($user, $filters),
+            default => abort(403),
+        };
 
         return LoanResource::collection($loans);
     }
 
     public function searchMembers(Request $request, SearchLibraryMembersQuery $searchLibraryMembersQuery): JsonResponse
     {
-        abort_if($request->user()?->effectiveRole($request->user()?->activeLibraryId()) === 'narys', 403);
+        $effectiveRole = $request->user()?->effectiveRole($request->user()?->activeLibraryId());
+        abort_unless(in_array($effectiveRole, ['superadministratorius', 'administratorius', 'darbuotojas'], true), 403);
         $validated = $request->validate([
             'q' => ['nullable', 'string', 'max:120'],
         ]);
@@ -102,7 +109,5 @@ class LoanController extends Controller
         return response()->json($result);
     }
 }
-
-
 
 

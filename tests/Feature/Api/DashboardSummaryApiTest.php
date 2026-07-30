@@ -2,6 +2,7 @@
 
 use App\Models\Book;
 use App\Models\BookCopy;
+use App\Models\Branch;
 use App\Models\Library;
 use App\Models\Loan;
 use App\Models\Reservation;
@@ -12,7 +13,8 @@ uses(RefreshDatabase::class);
 
 it('returns dashboard summary counts for the active library', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $readyMember = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create();
@@ -20,6 +22,7 @@ it('returns dashboard summary counts for the active library', function () {
     $copies = BookCopy::factory()->count(3)->create([
         'library_id' => $library->id,
         'book_id' => $book->id,
+        'branch_id' => $branch->id,
     ]);
 
     Loan::factory()->create([

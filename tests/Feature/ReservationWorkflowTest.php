@@ -401,10 +401,10 @@ it('does not duplicate the same overdue notification on later requests', functio
 
 it('creates a reservation ready notification for the first waiting member', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create(['title' => 'Paruošta knyga']);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
 
     $bookCopy = BookCopy::factory()->create([
@@ -463,10 +463,10 @@ it('creates a reservation ready notification for the first waiting member', func
 
 it('does not duplicate return side effects when the same copy is returned twice', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create(['title' => 'Single return book']);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $bookCopy = BookCopy::factory()->create([
         'library_id' => $library->id,
@@ -519,10 +519,10 @@ it('does not duplicate return side effects when the same copy is returned twice'
 
 it('creates a reservation fulfilled notification when reserved book is issued to the same member', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create(['title' => 'Įvykdyta rezervacija']);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $bookCopy = BookCopy::factory()->create([
         'library_id' => $library->id,
@@ -568,10 +568,10 @@ it('creates a reservation fulfilled notification when reserved book is issued to
 
 it('rolls back issued loan and reservation fulfillment if copy status update fails', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create(['title' => 'Rollback rezervacija']);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $bookCopy = BookCopy::factory()->create([
         'library_id' => $library->id,
@@ -633,10 +633,10 @@ it('rolls back issued loan and reservation fulfillment if copy status update fai
 
 it('allows issuing an available copy to the member who is first in reservation queue', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create(['title' => 'Rezervuota kopija']);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $bookCopy = BookCopy::factory()->create([
         'library_id' => $library->id,
@@ -876,11 +876,11 @@ it('does not move reservation queue notifications across library boundaries', fu
 
 it('does not create a second active loan when the same copy is borrowed twice', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $firstMember = User::factory()->member()->create(['library_id' => $library->id]);
     $secondMember = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create(['title' => 'Single borrow book']);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $bookCopy = BookCopy::factory()->create([
         'library_id' => $library->id,
@@ -913,10 +913,10 @@ it('does not create a second active loan when the same copy is borrowed twice', 
 
 it('uses the same global queue position in query api and queue change notifications', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $members = User::factory()->count(4)->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create(['title' => 'Consistent queue book']);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
 
     BookCopy::factory()->create([
@@ -1336,10 +1336,10 @@ it('does not move other reservations when a returned copy only makes the first r
 
 it('moves following reservations only after the ready reservation is issued', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $members = User::factory()->count(3)->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create(['title' => 'Issue moves queue book']);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $copy = BookCopy::factory()->create([
         'library_id' => $library->id,
@@ -1472,11 +1472,11 @@ it('keeps a future ready reservation in the active queue', function () {
 
 it('sends one queue change only when each previous reservation is actually fulfilled', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $loanMember = User::factory()->member()->create(['library_id' => $library->id]);
     $members = User::factory()->count(3)->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create(['title' => 'No duplicate queue changes']);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $copy = BookCopy::factory()->create([
         'library_id' => $library->id,
@@ -1864,7 +1864,8 @@ it('moves waiting positions when expiring ready reservations frees assigned copi
 
 it('keeps notification payload in sync with web list book details api and queue service', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $members = User::factory()->count(5)->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create(['title' => 'Consistent payload book']);
 
@@ -1905,11 +1906,11 @@ it('keeps notification payload in sync with web list book details api and queue 
 
 it('does not change reservation identity or creation date when marking it ready', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $loanMember = User::factory()->member()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create();
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $copy = BookCopy::factory()->create([
         'library_id' => $library->id,
@@ -2022,9 +2023,10 @@ it('does not let updated_at affect queue order', function () {
 
 it('uses created_at as displayed reservation date on the library reservation list', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create(['title' => 'Stable reservation date']);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $createdAt = now()->setDate(2026, 7, 15)->setTime(10, 24);
 
     Reservation::factory()->create([

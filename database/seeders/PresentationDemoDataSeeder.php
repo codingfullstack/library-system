@@ -21,6 +21,9 @@ use App\Models\UserNotification;
 use App\Support\GeneratesSlugs;
 use App\Support\Notifications\NotificationType;
 use App\Support\Notifications\NotificationUiConfig;
+use Database\Seeders\Support\DemoAccessActorSynchronizer;
+use Database\Seeders\Support\DemoDatasetMarker;
+use Database\Seeders\Support\GuardsDemoSeeding;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
@@ -30,7 +33,7 @@ use Illuminate\Support\Str;
 
 class PresentationDemoDataSeeder extends Seeder
 {
-    private const ADMIN_EMAIL = 'adminx@test.com';
+    use GuardsDemoSeeding;
 
     private const PREFIX = 'PRES';
 
@@ -66,39 +69,41 @@ class PresentationDemoDataSeeder extends Seeder
 
     private const TARGET_NOTIFICATIONS = 5500;
 
+    private const DATASET_VERSION = '1';
+
     public function run(): void
     {
-        $admin = User::query()->where('email', self::ADMIN_EMAIL)->first();
+        $this->guardDemoSeedingIsAllowed();
 
-        if (! $admin) {
-            $this->command?->error('User adminx@test.com was not found. Run the base demo seed first or create the target administrator.');
-
-            return;
-        }
-
-        $library = $admin->library;
+        $libraryCode = config('demo_libraries.presentation.library_code', 'LIB-X');
+        $library = Library::query()->where('code', $libraryCode)->first();
 
         if (! $library) {
-            $this->command?->error('User adminx@test.com does not have an active library membership.');
+            $this->command?->error('Presentation demo library "'.$libraryCode.'" was not found. Run the base demo seed first or create the target library.');
 
             return;
         }
 
         $branches = $this->ensureBranches($library);
+        (new DemoAccessActorSynchronizer())->syncLibrary($library);
+
         $locations = $this->ensureLocations($library, $branches);
         $categories = $this->ensureCategories();
         $publishers = $this->ensurePublishers();
         $authors = $this->ensureAuthors();
         $books = $this->ensureBooks($categories, $publishers, $authors);
-        $staff = $this->ensureStaff($library, $branches, $admin);
+        $staff = $this->ensureStaff($library, $branches);
         $members = $this->ensureMembers($library);
         $copies = $this->ensureCopies($library, $books, $branches, $locations, $staff);
 
-        $this->ensureLoans($library, $copies, $members, $staff);
-        $this->ensureReservations($library, $books, $branches, $members);
-        $this->ensureScanLogs($library, $copies, $staff);
-        $this->ensureAuditLogs($library, $books, $copies, $members, $staff);
-        $this->ensureNotifications($library, $books, $members, $staff);
+        if (! $this->datasetCompleted($library)) {
+            $this->ensureLoans($library, $copies, $members, $staff);
+            $this->ensureReservations($library, $books, $branches, $members);
+            $this->ensureScanLogs($library, $copies, $staff);
+            $this->ensureAuditLogs($library, $books, $copies, $members, $staff);
+            $this->ensureNotifications($library, $books, $members, $staff);
+            $this->markDatasetCompleted($library);
+        }
 
         $this->printReport($library->refresh());
     }
@@ -301,9 +306,9 @@ class PresentationDemoDataSeeder extends Seeder
      * @param  Collection<int, Branch>  $branches
      * @return Collection<int, User>
      */
-    private function ensureStaff(Library $library, Collection $branches, User $admin): Collection
+    private function ensureStaff(Library $library, Collection $branches): Collection
     {
-        $staff = collect([$admin]);
+        $staff = collect();
 
         for ($i = 1; $i <= self::TARGET_STAFF; $i++) {
             $branch = $branches[($i - 1) % $branches->count()];
@@ -327,6 +332,27 @@ class PresentationDemoDataSeeder extends Seeder
         }
 
         return $staff->values();
+    }
+
+    private function datasetCompleted(Library $library): bool
+    {
+        return (new DemoDatasetMarker())->completed($library, $this->datasetKey(), self::DATASET_VERSION);
+    }
+
+    private function markDatasetCompleted(Library $library): void
+    {
+        (new DemoDatasetMarker())->markCompleted($library, $this->datasetKey(), self::DATASET_VERSION, [
+            'target_loans' => self::TARGET_LOANS,
+            'target_reservations' => self::TARGET_RESERVATIONS,
+            'target_scan_logs' => self::TARGET_SCAN_LOGS,
+            'target_audit_logs' => self::TARGET_AUDIT_LOGS,
+            'target_notifications' => self::TARGET_NOTIFICATIONS,
+        ]);
+    }
+
+    private function datasetKey(): string
+    {
+        return config('demo_libraries.presentation.dataset_key', 'presentation-demo-v2');
     }
 
     /**

@@ -3,6 +3,7 @@
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\BookCopy;
+use App\Models\Branch;
 use App\Models\Category;
 use App\Models\Library;
 use App\Models\Loan;
@@ -16,7 +17,8 @@ uses(RefreshDatabase::class);
 it('shows extended dashboard reports scoped to the staff library', function () {
     $library = Library::factory()->create(['name' => 'Kalno biblioteka']);
     $otherLibrary = Library::factory()->create(['name' => 'Slenio biblioteka']);
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $member = User::factory()->member()->create([
         'library_id' => $library->id,
         'name' => 'Aktyvus narys',
@@ -44,17 +46,20 @@ it('shows extended dashboard reports scoped to the staff library', function () {
     $activeCopy = BookCopy::factory()->create([
         'library_id' => $library->id,
         'book_id' => $popularBook->id,
+        'branch_id' => $branch->id,
         'status' => BookCopy::STATUS_AVAILABLE,
         'inventory_code' => 'INV-POPULAR-001',
     ]);
     $lostCopy = BookCopy::factory()->create([
         'library_id' => $library->id,
         'book_id' => $popularBook->id,
+        'branch_id' => $branch->id,
         'status' => BookCopy::STATUS_LOST,
     ]);
     $damagedCopy = BookCopy::factory()->create([
         'library_id' => $library->id,
         'book_id' => $otherBook->id,
+        'branch_id' => $branch->id,
         'status' => BookCopy::STATUS_AVAILABLE,
         'condition_status' => BookCopy::CONDITION_DAMAGED,
     ]);
@@ -298,7 +303,6 @@ it('exports dashboard reports to excel format', function () {
     $response->assertSee('Bibliotekos ataskaita');
     $response->assertSee('Suvestinė');
 });
-
 
 
 

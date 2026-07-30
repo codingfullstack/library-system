@@ -16,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class LoanController extends Controller
 {
@@ -25,23 +26,45 @@ class LoanController extends Controller
         GetActiveLibraryLoansQuery $getActiveLibraryLoansQuery,
         GetLoanIndexFiltersDataQuery $getLoanIndexFiltersDataQuery
     ): View {
-        if ($request->user()->effectiveRole($request->user()->activeLibraryId()) === 'narys') {
-            $filters = [
-                'search' => $request->query('search'),
-                'status' => $request->query('status'),
-                'branch_id' => $request->query('branch_id'),
-                'per_page' => $request->query('per_page', 15),
-            ];
+        $user = $request->user();
+        $libraryId = $user->activeLibraryId();
+        $effectiveRole = $user->effectiveRole($libraryId);
 
-            return view('account.loans.index', [
-                'loans' => $getMemberLoansQuery->handle($request->user(), $filters),
-                'summary' => $getMemberLoansQuery->summary($request->user(), $filters),
-            ]);
-        }
+        return match ($effectiveRole) {
+            'narys' => $this->memberIndex($request, $getMemberLoansQuery),
+            'darbuotojas', 'administratorius', 'superadministratorius' => $this->staffIndex(
+                $request,
+                $getActiveLibraryLoansQuery,
+                $getLoanIndexFiltersDataQuery
+            ),
+            default => throw new HttpException(403),
+        };
+    }
 
+    private function memberIndex(Request $request, GetMemberLoansQuery $getMemberLoansQuery): View
+    {
+        $filters = [
+            'search' => $request->query('search'),
+            'status' => $request->query('status'),
+            'branch_id' => $request->query('branch_id'),
+            'per_page' => $request->query('per_page', 15),
+        ];
+
+        return view('account.loans.index', [
+            'loans' => $getMemberLoansQuery->handle($request->user(), $filters),
+            'summary' => $getMemberLoansQuery->summary($request->user(), $filters),
+        ]);
+    }
+
+    private function staffIndex(
+        Request $request,
+        GetActiveLibraryLoansQuery $getActiveLibraryLoansQuery,
+        GetLoanIndexFiltersDataQuery $getLoanIndexFiltersDataQuery
+    ): View {
         $selectedLibraryId = $request->user()->isSuperAdmin()
             ? (int) $request->query('library_id')
             : $request->user()->activeLibraryId();
+        $scope = $request->user()->isSuperAdmin() && empty($selectedLibraryId) ? 'global' : 'library';
 
         $loans = $getActiveLibraryLoansQuery->handle($request->user(), [
             'search' => $request->query('search'),
@@ -51,6 +74,7 @@ class LoanController extends Controller
             'overdue' => $request->query('overdue'),
             'due_date' => $request->query('due_date'),
             'library_id' => $request->query('library_id'),
+            'scope' => $scope,
             'branch_id' => $request->query('branch_id'),
             'per_page' => $request->query('per_page', 10),
         ]);
@@ -63,6 +87,7 @@ class LoanController extends Controller
             'overdue' => $request->query('overdue'),
             'due_date' => $request->query('due_date'),
             'library_id' => $request->query('library_id'),
+            'scope' => $scope,
             'branch_id' => $request->query('branch_id'),
         ]);
 

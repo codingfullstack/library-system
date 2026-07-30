@@ -396,6 +396,7 @@ class ReservationConcurrencyProcessTest extends TestCase
         $branch = Branch::factory()->create(['library_id' => $library->id]);
         $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
         $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+        $staff->libraryMemberships()->where('library_id', $library->id)->update(['branch_id' => $branch->id]);
         $borrower = User::factory()->member()->create(['library_id' => $library->id]);
         $reservationMember = User::factory()->member()->create(['library_id' => $library->id]);
 
@@ -562,6 +563,7 @@ class ReservationConcurrencyProcessTest extends TestCase
         $branch = Branch::factory()->create(['library_id' => $library->id]);
         $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
         $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+        $staff->libraryMemberships()->where('library_id', $library->id)->update(['branch_id' => $branch->id]);
         $members = User::factory()->count(4)->member()->create(['library_id' => $library->id])->values();
 
         $copies = collect([1, 2])->map(fn (int $index) => BookCopy::factory()->create([
