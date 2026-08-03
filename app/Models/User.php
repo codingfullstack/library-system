@@ -61,6 +61,10 @@ class User extends Authenticatable
         static::updated(function (User $user) {
             if ($user->wasChanged(['password', 'role', 'is_active'])) {
                 $user->tokens()->delete();
+
+                if ($user->wasChanged('is_active') && ! $user->is_active) {
+                    UserManagement::revokeWebSessions($user);
+                }
             }
         });
     }
@@ -245,7 +249,9 @@ class User extends Authenticatable
                 ])
                 ->first();
 
-            return $membership?->library_id ? (int) $membership->library_id : null;
+            if ($membership?->library_id) {
+                return (int) $membership->library_id;
+            }
         }
 
         return $this->activeLibraryMemberships()
@@ -283,12 +289,31 @@ class User extends Authenticatable
         }
 
         if ($this->relationLoaded('libraryMemberships')) {
-            return $this->libraryMemberships
+            if ($this->libraryMemberships
                 ->where('is_active', true)
-                ->contains('library_id', (int) $libraryId);
+                ->contains('library_id', (int) $libraryId)) {
+                return true;
+            }
         }
 
         return $this->activeLibraryMemberships()
+            ->where('library_id', $libraryId)
+            ->exists();
+    }
+
+    public function hasMembershipInLibrary(int|string|null $libraryId): bool
+    {
+        if (empty($libraryId)) {
+            return false;
+        }
+
+        if ($this->relationLoaded('libraryMemberships')) {
+            if ($this->libraryMemberships->contains('library_id', (int) $libraryId)) {
+                return true;
+            }
+        }
+
+        return $this->libraryMemberships()
             ->where('library_id', $libraryId)
             ->exists();
     }
@@ -507,9 +532,13 @@ class User extends Authenticatable
         }
 
         if ($this->relationLoaded('libraryMemberships')) {
-            return $this->libraryMemberships
+            $membership = $this->libraryMemberships
                 ->where('is_active', true)
                 ->firstWhere('library_id', (int) $libraryId);
+
+            if ($membership) {
+                return $membership;
+            }
         }
 
         return $this->activeLibraryMemberships()

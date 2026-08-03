@@ -7,8 +7,14 @@
             'narys' => 'Skaitytojas',
         ];
         $visibleUsers = $users->getCollection();
-        $activeUsers = $visibleUsers->where('is_active', true)->count();
-        $inactiveUsers = $visibleUsers->where('is_active', false)->count();
+        $actor = auth()->user();
+        $currentLibraryId = $actor?->activeLibraryId();
+        $isSuperAdmin = (bool) $actor?->isSuperAdmin();
+        $statusFor = fn ($user) => $isSuperAdmin
+            ? (bool) $user->is_active
+            : (bool) $user->libraryMemberships->firstWhere('library_id', $currentLibraryId)?->is_active;
+        $activeUsers = $visibleUsers->filter($statusFor)->count();
+        $inactiveUsers = $visibleUsers->reject($statusFor)->count();
         $memberUsers = $visibleUsers->where('role', 'narys')->count();
     @endphp
 
@@ -111,9 +117,9 @@
                             </div>
                             <div class="xl:min-w-0">
                                 <select name="aktyvi" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
-                                    <option value="">Statusas</option>
-                                    <option value="1" @selected(request('aktyvi') === '1')>Tik aktyvūs</option>
-                                    <option value="0" @selected(request('aktyvi') === '0')>Tik neaktyvūs</option>
+                                    <option value="">Visi</option>
+                                    <option value="1" @selected(request('aktyvi') === '1')>Aktyvūs</option>
+                                    <option value="0" @selected(request('aktyvi') === '0')>Neaktyvūs</option>
                                 </select>
                             </div>
                             <button type="submit" class="app-button-secondary h-11 rounded-2xl px-4">
@@ -144,6 +150,18 @@
                                 </thead>
                                 <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
                                     @foreach($users as $managedUser)
+                                        @php
+                                            $membership = $currentLibraryId
+                                                ? $managedUser->libraryMemberships->firstWhere('library_id', $currentLibraryId)
+                                                : null;
+                                            $displayActive = $isSuperAdmin ? (bool) $managedUser->is_active : (bool) $membership?->is_active;
+                                            $toggleRoute = $isSuperAdmin
+                                                ? route('manage.users.toggle-global-active', $managedUser)
+                                                : route('manage.users.toggle-membership', $managedUser);
+                                            $toggleLabel = $isSuperAdmin
+                                                ? ($managedUser->is_active ? 'Blokuoti paskyrą visoje sistemoje' : 'Atkurti paskyrą')
+                                                : ($displayActive ? 'Deaktyvuoti narystę' : 'Atkurti narystę');
+                                        @endphp
                                         <tr class="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40">
                                             <td class="px-4 py-4 align-middle"><input type="checkbox" class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"></td>
                                             <td class="px-4 py-4 align-middle">
@@ -160,10 +178,10 @@
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">{{ $managedUser->email }}</td>
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">{{ $managedUser->phone ?: '-' }}</td>
                                             <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">{{ $roleLabels[$managedUser->role] ?? $managedUser->role }}</td>
-                                            <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">{{ $managedUser->library?->name ?: '-' }}</td>
+                                            <td class="px-4 py-4 align-middle text-sm text-zinc-700 dark:text-zinc-300">{{ $isSuperAdmin ? ($managedUser->library?->name ?: '-') : ($membership?->library?->name ?: '-') }}</td>
                                             <td class="px-4 py-4 align-middle">
-                                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $managedUser->is_active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300' }}">
-                                                    {{ $managedUser->is_active ? 'Aktyvus' : 'Neaktyvūs' }}
+                                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $displayActive ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300' }}">
+                                                    {{ $displayActive ? 'Aktyvus' : 'Neaktyvus' }}
                                                 </span>
                                             </td>
                                             <td class="px-4 py-4 align-middle">
@@ -172,11 +190,11 @@
                                                         <flux:icon.pencil-square class="size-4" />
                                                     </a>
                                                     @if(auth()->id() !== $managedUser->id)
-                                                        <form method="POST" action="{{ route('manage.users.toggle-active', $managedUser) }}">
+                                                        <form method="POST" action="{{ $toggleRoute }}">
                                                             @csrf
                                                             @method('PATCH')
                                                             <button type="submit" class="inline-flex h-9 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-600 transition hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:text-white">
-                                                                {{ $managedUser->is_active ? 'Stop' : 'Start' }}
+                                                                {{ $toggleLabel }}
                                                             </button>
                                                         </form>
                                                     @endif

@@ -10,6 +10,7 @@ use App\Models\Location;
 use App\Models\Reservation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\PersonalAccessToken;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -73,12 +74,13 @@ test('admin can toggle member active status from index', function () {
     $response = $this
         ->actingAs($admin)
         ->from(route('manage.users.index'))
-        ->patch(route('manage.users.toggle-active', $member));
+        ->patch(route('manage.users.toggle-membership', $member));
 
     $response->assertRedirect(route('manage.users.index'));
     $response->assertSessionHas('success');
 
-    expect($member->fresh()->is_active)->toBeFalse();
+    expect($member->fresh()->is_active)->toBeTrue()
+        ->and($member->libraryMemberships()->where('library_id', $library->id)->value('is_active'))->toBe(false);
 });
 
 test('super admin can not deactivate the last active super admin', function () {
@@ -90,12 +92,133 @@ test('super admin can not deactivate the last active super admin', function () {
     $response = $this
         ->actingAs($superAdmin)
         ->from(route('manage.users.index'))
-        ->patch(route('manage.users.toggle-active', $superAdmin));
+        ->patch(route('manage.users.toggle-global-active', $superAdmin));
 
     $response->assertRedirect(route('manage.users.index'));
     $response->assertSessionHas('error');
 
     expect($superAdmin->fresh()->is_active)->toBeTrue();
+});
+
+test('admin membership deactivation does not affect global account or other libraries', function () {
+    $libraryA = Library::factory()->create(['name' => 'Library A']);
+    $libraryB = Library::factory()->create(['name' => 'Library B']);
+    $admin = User::factory()->for($libraryA)->admin()->create();
+    $member = User::factory()->for($libraryA)->member()->create(['is_active' => true]);
+
+    $member->libraryMemberships()->create([
+        'library_id' => $libraryB->id,
+        'membership_number' => $member->membership_number,
+        'is_active' => true,
+        'joined_at' => now(),
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->withSession(['active_library_id' => $libraryA->id])
+        ->patch(route('manage.users.toggle-membership', $member))
+        ->assertRedirect();
+
+    expect($member->fresh()->is_active)->toBeTrue()
+        ->and($member->libraryMemberships()->where('library_id', $libraryA->id)->value('is_active'))->toBe(false)
+        ->and($member->libraryMemberships()->where('library_id', $libraryB->id)->value('is_active'))->toBe(true);
+});
+
+test('admin cannot globally block a user account', function () {
+    $library = Library::factory()->create();
+    $admin = User::factory()->for($library)->admin()->create();
+    $member = User::factory()->for($library)->member()->create(['is_active' => true]);
+
+    $this
+        ->actingAs($admin)
+        ->patch(route('manage.users.toggle-global-active', $member))
+        ->assertForbidden();
+
+    expect($member->fresh()->is_active)->toBeTrue();
+});
+
+test('inactive membership remains visible and can be restored', function () {
+    $library = Library::factory()->create(['name' => 'Visible Library']);
+    $admin = User::factory()->for($library)->admin()->create();
+    $member = User::factory()->for($library)->member()->create([
+        'email' => 'inactive-visible@example.test',
+    ]);
+
+    $member->libraryMemberships()
+        ->where('library_id', $library->id)
+        ->update(['is_active' => false]);
+
+    $this
+        ->actingAs($admin)
+        ->withSession(['active_library_id' => $library->id])
+        ->get(route('manage.users.index'))
+        ->assertOk()
+        ->assertSee('inactive-visible@example.test')
+        ->assertSee('Neaktyvus')
+        ->assertSee('Atkurti narystę');
+
+    $this
+        ->actingAs($admin)
+        ->withSession(['active_library_id' => $library->id])
+        ->patch(route('manage.users.toggle-membership', $member))
+        ->assertRedirect();
+
+    expect($member->libraryMemberships()->where('library_id', $library->id)->value('is_active'))->toBe(true);
+});
+
+test('super admin can globally block account and revoke api tokens without changing memberships', function () {
+    $library = Library::factory()->create();
+    $superAdmin = User::factory()->superAdmin()->create();
+    $member = User::factory()->for($library)->member()->create(['is_active' => true]);
+    $member->createToken('android-app');
+
+    $this
+        ->actingAs($superAdmin)
+        ->patch(route('manage.users.toggle-global-active', $member))
+        ->assertRedirect();
+
+    expect($member->fresh()->is_active)->toBeFalse()
+        ->and($member->libraryMemberships()->where('library_id', $library->id)->value('is_active'))->toBe(true)
+        ->and(PersonalAccessToken::query()->where('tokenable_id', $member->id)->count())->toBe(0);
+
+    $this
+        ->actingAs($member->fresh())
+        ->get(route('account.dashboard'))
+        ->assertForbidden();
+});
+
+test('membership deactivation preserves loans and reservations', function () {
+    $library = Library::factory()->create();
+    $admin = User::factory()->for($library)->admin()->create();
+    $member = User::factory()->for($library)->member()->create();
+    $branch = Branch::factory()->for($library)->create();
+    $location = Location::factory()->for($library)->for($branch)->create();
+    $book = Book::factory()->create();
+    $copy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+    ]);
+    $loan = Loan::factory()->create([
+        'library_id' => $library->id,
+        'book_copy_id' => $copy->id,
+        'user_id' => $member->id,
+    ]);
+    $reservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $member->id,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->patch(route('manage.users.toggle-membership', $member))
+        ->assertRedirect();
+
+    expect(Loan::query()->whereKey($loan->id)->exists())->toBeTrue()
+        ->and(Reservation::query()->whereKey($reservation->id)->exists())->toBeTrue()
+        ->and($member->fresh()->is_active)->toBeTrue();
 });
 
 test('super admin can create member with generated membership number through livewire form', function () {
@@ -143,6 +266,20 @@ test('admin cannot assign super admin role through livewire form', function () {
         ->assertHasErrors(['role']);
 
     expect(User::query()->where('email', 'bad-role@example.test')->exists())->toBeFalse();
+});
+
+test('admin cannot change an existing users global role through livewire form', function () {
+    $library = Library::factory()->create();
+    $admin = User::factory()->for($library)->admin()->create();
+    $member = User::factory()->for($library)->member()->create();
+
+    Livewire::actingAs($admin)
+        ->test(UserForm::class, ['managedUser' => $member])
+        ->set('role', User::ROLE_STAFF)
+        ->call('save')
+        ->assertHasErrors(['role']);
+
+    expect($member->fresh()->role)->toBe(User::ROLE_MEMBER);
 });
 
 test('super admin can open manageable user show page with summary', function () {
@@ -302,8 +439,8 @@ test('admin sees only active library member loans and reservations on user show 
     $libraryA = Library::factory()->create(['name' => 'Library A']);
     $libraryB = Library::factory()->create(['name' => 'Library B']);
 
-    $admin = User::factory()->for($libraryA)->admin()->create();
-    $member = User::factory()->for($libraryA)->member()->create([
+    $admin = adminInLibrary($libraryA);
+    $member = memberInLibrary($libraryA, [
         'membership_number' => 'MULTI-MEM-001',
     ]);
 
@@ -378,9 +515,3 @@ test('admin sees only active library member loans and reservations on user show 
     $response->assertSee('Laukiančios rezervacijos');
     $response->assertDontSee('Library B');
 });
-
-
-
-
-
-

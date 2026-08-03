@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Management;
 
 use App\Actions\AuditLogs\RecordAuditLogAction;
 use App\Http\Controllers\Controller;
+use App\Models\LibraryMembership;
 use App\Models\User;
 use App\Queries\Management\AuditLogs\GetRecentAuditLogsForUserQuery;
 use App\Queries\Users\GetManagedUserDetailsQuery;
@@ -45,6 +46,7 @@ class UserController extends Controller
     ): View {
         $actor = $request->user();
         $this->ensureVisible($actor, $user);
+
         $user = $getManagedUserDetailsQuery->handle($user, $actor);
 
         return view('manage.users.show', [
@@ -145,13 +147,59 @@ class UserController extends Controller
             ->with('success', 'Vartotojas ištrintas.');
     }
 
-    public function toggleActive(
+    public function toggleMembership(Request $request, User $user): RedirectResponse
+    {
+        $actor = $request->user();
+        $this->ensureVisible($actor, $user);
+
+        if ($actor->isSuperAdmin()) {
+            return back()->with('error', 'Superadministratorius narystes valdo per bibliotekos kontekstą.');
+        }
+
+        if ($actor->id === $user->id) {
+            return back()->with('error', 'Negalite aktyvuoti arba deaktyvuoti savo narystės iš sąrašo.');
+        }
+
+        $membership = UserManagement::membershipForActor($actor, $user);
+
+        abort_unless($membership instanceof LibraryMembership, 404);
+
+        $membership->update([
+            'is_active' => ! $membership->is_active,
+        ]);
+
+        app(RecordAuditLogAction::class)->handle(
+            $actor,
+            'membership_toggled_active',
+            $user,
+            sprintf(
+                'Vartotojo "%s" narystė %s.',
+                $user->name,
+                $membership->is_active ? 'atkurta' : 'deaktyvuota'
+            ),
+            [
+                'target_user_id' => $user->id,
+                'target_user_name' => $user->name,
+                'target_user_role' => $user->role,
+                'library_id' => $membership->library_id,
+                'membership_active' => $membership->is_active,
+                'global_user_active' => $user->is_active,
+            ],
+            $membership->library_id
+        );
+
+        return back()->with('success', $membership->is_active ? 'Narystė atkurta.' : 'Narystė deaktyvuota.');
+    }
+
+    public function toggleGlobalActive(
         Request $request,
         User $user,
         HasAnotherActiveSuperAdminQuery $hasAnotherActiveSuperAdminQuery
     ): RedirectResponse {
         $actor = $request->user();
         $this->ensureVisible($actor, $user);
+
+        abort_unless($actor->isSuperAdmin(), 403);
 
         if ($actor->id === $user->id) {
             return back()->with('error', 'Negalite aktyvuoti arba deaktyvuoti savo paskyros iš sąrašo.');
@@ -164,11 +212,14 @@ class UserController extends Controller
         $user->update([
             'is_active' => ! $user->is_active,
         ]);
-        UserManagement::syncUserMembershipActivity($user);
+
+        if (! $user->is_active) {
+            UserManagement::revokeAllAccess($user);
+        }
 
         app(RecordAuditLogAction::class)->handle(
             $actor,
-            'user_toggled_active',
+            'user_toggled_global_active',
             $user,
             sprintf(
                 'Vartotojas "%s" %s.',

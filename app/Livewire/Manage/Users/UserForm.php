@@ -74,6 +74,7 @@ class UserForm extends Component
         if (! UserManagement::requiresLibrary($value)) {
             $this->libraryId = null;
             $this->branchId = null;
+
             return;
         }
 
@@ -98,6 +99,12 @@ class UserForm extends Component
 
         if ($actor->id === $this->managedUser?->id) {
             $this->guardSelfMutation($actor);
+        }
+
+        if (! $actor->isSuperAdmin() && $this->managedUser && $this->role !== $this->managedUser->role) {
+            throw ValidationException::withMessages([
+                'role' => 'Bibliotekos administratorius negali keisti globalios vartotojo rolės.',
+            ]);
         }
 
         $this->validate($this->rules(), [], [
@@ -134,7 +141,7 @@ class UserForm extends Component
             $this->ensureAnotherSuperAdminExists($this->managedUser);
         }
 
-        if ($this->managedUser?->isSuperAdmin() && ! $this->isActive) {
+        if ($actor->isSuperAdmin() && $this->managedUser?->isSuperAdmin() && ! $this->isActive) {
             $this->ensureAnotherSuperAdminExists($this->managedUser);
         }
 
@@ -143,7 +150,9 @@ class UserForm extends Component
             'email' => $this->email,
             'role' => $this->role,
             'phone' => $this->phone ?: null,
-            'is_active' => $this->isActive,
+            'is_active' => $actor->isSuperAdmin()
+                ? $this->isActive
+                : (bool) ($this->managedUser?->is_active ?? true),
             'membership_number' => $this->resolveMembershipNumber(),
         ];
 
@@ -331,12 +340,3 @@ class UserForm extends Component
         }
     }
 }
-
-
-
-
-
-
-
-
-

@@ -23,15 +23,32 @@ it('revokes sanctum tokens when password role or active state changes', function
     ['is_active', false],
 ]);
 
-it('revokes sanctum tokens when membership activity changes', function () {
-    $library = Library::factory()->create();
-    $user = User::factory()->member()->create(['library_id' => $library->id]);
+it('keeps sanctum tokens when membership activity changes but denies that library context', function () {
+    $libraryA = Library::factory()->create();
+    $libraryB = Library::factory()->create();
+    $user = User::factory()->member()->create(['library_id' => $libraryA->id]);
     $membership = $user->activeLibraryMemberships()->firstOrFail();
+    $user->libraryMemberships()->create([
+        'library_id' => $libraryB->id,
+        'membership_number' => $user->membership_number,
+        'is_active' => true,
+        'joined_at' => now(),
+    ]);
     $user->createToken('android-app');
 
     $membership->update(['is_active' => false]);
 
-    expect(PersonalAccessToken::query()->count())->toBe(0);
+    expect(PersonalAccessToken::query()->count())->toBe(1);
+
+    $this->actingAs($user)
+        ->withHeader('X-Library-Id', (string) $libraryA->id)
+        ->getJson('/api/auth/me')
+        ->assertForbidden();
+
+    $this->actingAs($user)
+        ->withHeader('X-Library-Id', (string) $libraryB->id)
+        ->getJson('/api/auth/me')
+        ->assertOk();
 });
 
 it('uses account role as the library authorization authority', function () {

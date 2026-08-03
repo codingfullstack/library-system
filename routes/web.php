@@ -97,7 +97,8 @@ Route::middleware(['auth', 'overdue.notifications', 'verified', 'library.context
         Route::resource('authors', ManageAuthorController::class)->except('show');
         Route::resource('locations', ManageLocationController::class)->except('show');
         Route::resource('users', ManageUserController::class)->except(['store', 'update']);
-        Route::patch('users/{user}/toggle-active', [ManageUserController::class, 'toggleActive'])->name('users.toggle-active');
+        Route::patch('users/{user}/toggle-membership', [ManageUserController::class, 'toggleMembership'])->name('users.toggle-membership');
+        Route::patch('users/{user}/toggle-global-active', [ManageUserController::class, 'toggleGlobalActive'])->name('users.toggle-global-active');
         Route::post('users/{user}/memberships', [ManageUserMembershipController::class, 'store'])->name('users.memberships.store');
         Route::patch('users/{user}/memberships/{membership}/toggle', [ManageUserMembershipController::class, 'toggle'])->name('users.memberships.toggle');
         Route::delete('users/{user}/memberships/{membership}', [ManageUserMembershipController::class, 'destroy'])->name('users.memberships.destroy');

@@ -30,7 +30,13 @@ class AuthController extends Controller
 
         if (! $user->is_active) {
             return response()->json([
-                'message' => 'Paskyra neaktyvi.',
+                'message' => trans('auth.inactive'),
+            ], 403);
+        }
+
+        if (! $user->isSuperAdmin() && ! $user->activeLibraryMemberships()->exists()) {
+            return response()->json([
+                'message' => trans('auth.no_active_membership'),
             ], 403);
         }
 
@@ -91,10 +97,3 @@ class AuthController extends Controller
         ];
     }
 }
-
-
-
-
-
-
-

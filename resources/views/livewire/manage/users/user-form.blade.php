@@ -100,17 +100,19 @@
             @error('passwordConfirmation') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
         </div>
 
-        <div class="lg:col-span-2">
-            <label class="flex items-center gap-3 text-sm text-zinc-700 dark:text-zinc-300">
-                <input
-                    type="checkbox"
-                    wire:model="isActive"
-                    class="rounded border-zinc-300 text-teal-700 focus:ring-teal-600 dark:border-zinc-700 dark:bg-zinc-900"
-                >
-                Aktyvus vartotojas
-            </label>
-            @error('isActive') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
-        </div>
+        @if($actor?->isSuperAdmin())
+            <div class="lg:col-span-2">
+                <label class="flex items-center gap-3 text-sm text-zinc-700 dark:text-zinc-300">
+                    <input
+                        type="checkbox"
+                        wire:model="isActive"
+                        class="rounded border-zinc-300 text-teal-700 focus:ring-teal-600 dark:border-zinc-700 dark:bg-zinc-900"
+                    >
+                    Aktyvi paskyra visoje sistemoje
+                </label>
+                @error('isActive') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+            </div>
+        @endif
     </div>
 
     <div class="flex flex-col gap-3 sm:flex-row">

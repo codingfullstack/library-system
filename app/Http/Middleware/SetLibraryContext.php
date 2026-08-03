@@ -2,9 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\LibraryContext;
 use Closure;
 use Illuminate\Http\Request;
-use App\Support\LibraryContext;
 use Symfony\Component\HttpFoundation\Response;
 
 class SetLibraryContext
@@ -22,12 +22,21 @@ class SetLibraryContext
 
         if ($user) {
             $requestedLibraryId = $request->integer('library_id') ?: (int) $request->header('X-Library-Id');
-            $activeLibraryId = $requestedLibraryId && ($user->isSuperAdmin() || $user->belongsToLibrary($requestedLibraryId))
+
+            if ($requestedLibraryId && ! $user->isSuperAdmin() && ! $user->belongsToLibrary($requestedLibraryId)) {
+                abort(403, 'Neturite aktyvios narystės pasirinktoje bibliotekoje.');
+            }
+
+            $activeLibraryId = $requestedLibraryId
                 ? $requestedLibraryId
                 : $user->activeLibraryId();
 
             if ($activeLibraryId && $request->hasSession() && (int) $request->session()->get('active_library_id') !== (int) $activeLibraryId) {
                 $request->session()->put('active_library_id', $activeLibraryId);
+            }
+
+            if (! $activeLibraryId && $request->hasSession()) {
+                $request->session()->forget('active_library_id');
             }
 
             app(LibraryContext::class)->set($activeLibraryId, $user->isSuperAdmin());
@@ -38,11 +47,3 @@ class SetLibraryContext
         return $next($request);
     }
 }
-
-
-
-
-
-
-
-
