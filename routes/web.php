@@ -89,6 +89,7 @@ Route::middleware(['auth', 'overdue.notifications', 'verified', 'library.context
         Route::post('imports/{resource}', [ManageImportController::class, 'store'])->name('imports.store');
         Route::get('imports/{resource}/template', [ManageImportController::class, 'template'])->name('imports.template');
         Route::get('books', fn () => redirect()->route('books.index', request()->query()))->name('books.index');
+        Route::get('users/create-staff', [ManageUserController::class, 'createStaff'])->name('users.create-staff');
         Route::get('books/create', [ManageBookController::class, 'create'])->name('books.create');
         Route::post('books', [ManageBookController::class, 'store'])->name('books.store');
         Route::get('books/{book:id}/edit', [ManageBookController::class, 'edit'])->name('books.edit');

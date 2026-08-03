@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Support\AuditLogChanges;
 use App\Support\UserManagement;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -19,11 +20,13 @@ class UserForm extends Component
 
     public bool $isEditing = false;
 
+    public bool $forceStaff = false;
+
     public string $name = '';
 
     public string $email = '';
 
-    public string $role = 'narys';
+    public string $role = User::ROLE_MEMBER;
 
     public $libraryId = null;
 
@@ -37,11 +40,13 @@ class UserForm extends Component
 
     public string $passwordConfirmation = '';
 
-    public function mount(?User $managedUser = null): void
+    public function mount(?User $managedUser = null, bool $forceStaff = false): void
     {
         $actor = Auth::user();
 
         abort_unless($actor, 403);
+
+        $this->forceStaff = $forceStaff && ! $actor->isSuperAdmin();
 
         if ($managedUser) {
             abort_unless(UserManagement::canManageUser($actor, $managedUser), 404);
@@ -51,7 +56,9 @@ class UserForm extends Component
             $this->name = $managedUser->name;
             $this->email = $managedUser->email;
             $this->role = $managedUser->role;
-            $this->libraryId = $managedUser->defaultLibraryId();
+            $this->libraryId = $actor->isSuperAdmin()
+                ? $managedUser->defaultLibraryId()
+                : $actor->activeLibraryId();
             $this->branchId = $managedUser->assignedBranchId($this->libraryId);
             $this->phone = (string) ($managedUser->phone ?? '');
             $this->isActive = (bool) $managedUser->is_active;
@@ -59,7 +66,7 @@ class UserForm extends Component
             return;
         }
 
-        $this->role = UserManagement::defaultRole($actor);
+        $this->role = $this->forceStaff ? User::ROLE_STAFF : UserManagement::defaultRole($actor);
         $this->libraryId = $actor->isSuperAdmin() ? null : $actor->activeLibraryId();
     }
 
@@ -101,16 +108,12 @@ class UserForm extends Component
             $this->guardSelfMutation($actor);
         }
 
-        if (! $actor->isSuperAdmin() && $this->managedUser && $this->role !== $this->managedUser->role) {
-            throw ValidationException::withMessages([
-                'role' => 'Bibliotekos administratorius negali keisti globalios vartotojo rolės.',
-            ]);
-        }
+        $this->enforceRoleContract($actor);
 
         $this->validate($this->rules(), [], [
             'name' => 'vardas',
             'email' => 'el. paštas',
-            'role' => 'role',
+            'role' => 'paskyros tipas',
             'libraryId' => 'biblioteka',
             'branchId' => 'filialas',
             'phone' => 'telefonas',
@@ -120,7 +123,7 @@ class UserForm extends Component
 
         if (! UserManagement::canManageRole($actor, $this->role)) {
             throw ValidationException::withMessages([
-                'role' => 'Negalite priskirti šios roles.',
+                'role' => 'Negalite priskirti šios rolės.',
             ]);
         }
 
@@ -137,7 +140,7 @@ class UserForm extends Component
             $this->branchId = null;
         }
 
-        if ($this->managedUser?->isSuperAdmin() && $this->role !== 'superadministratorius') {
+        if ($this->managedUser?->isSuperAdmin() && $this->role !== User::ROLE_SUPER_ADMIN) {
             $this->ensureAnotherSuperAdminExists($this->managedUser);
         }
 
@@ -161,11 +164,16 @@ class UserForm extends Component
         }
 
         if ($this->managedUser) {
-            $this->managedUser->fill($payload);
-            $changedFields = array_keys($this->managedUser->getDirty());
-            $changeSummary = AuditLogChanges::fromModel($this->managedUser, $changedFields);
-            $this->managedUser->save();
-            $this->syncMembershipForSavedUser($this->managedUser);
+            $changedFields = [];
+            $changeSummary = [];
+
+            DB::transaction(function () use ($payload, &$changedFields, &$changeSummary): void {
+                $this->managedUser->fill($payload);
+                $changedFields = array_keys($this->managedUser->getDirty());
+                $changeSummary = AuditLogChanges::fromModel($this->managedUser, $changedFields);
+                $this->managedUser->save();
+                $this->syncMembershipForSavedUser($this->managedUser);
+            });
 
             app(RecordAuditLogAction::class)->handle(
                 $actor,
@@ -185,12 +193,16 @@ class UserForm extends Component
                 ->with('success', 'Vartotojas atnaujintas.');
         }
 
-        $managedUser = User::create($payload);
-        $this->syncMembershipForSavedUser($managedUser);
+        $managedUser = DB::transaction(function () use ($payload): User {
+            $user = User::create($payload);
+            $this->syncMembershipForSavedUser($user);
+
+            return $user;
+        });
 
         app(RecordAuditLogAction::class)->handle(
             $actor,
-            'user_created',
+            $this->forceStaff ? 'staff_user_created' : 'user_created',
             $managedUser,
             sprintf('Sukurtas vartotojas "%s".', $managedUser->name),
             [
@@ -203,7 +215,7 @@ class UserForm extends Component
 
         return redirect()
             ->route('manage.users.index')
-            ->with('success', 'Vartotojas sukurtas.');
+            ->with('success', $this->forceStaff ? 'Darbuotojo paskyra sukurta.' : 'Vartotojas sukurtas.');
     }
 
     public function render()
@@ -217,6 +229,9 @@ class UserForm extends Component
                 : collect(),
             'branches' => $this->availableBranches(),
             'previewMembershipNumber' => $this->previewMembershipNumber(),
+            'canEditGlobalRole' => (bool) $actor?->isSuperAdmin(),
+            'accountTypeLabel' => $this->accountTypeLabel($this->role),
+            'isStaffCreation' => $this->forceStaff && ! $this->isEditing,
         ]);
     }
 
@@ -224,6 +239,7 @@ class UserForm extends Component
     {
         $actor = Auth::user();
         $targetId = $this->managedUser?->id;
+        $libraryId = $actor?->isSuperAdmin() ? $this->libraryId : $actor?->activeLibraryId();
 
         return [
             'name' => ['required', 'string', 'max:255'],
@@ -239,7 +255,7 @@ class UserForm extends Component
                 Rule::requiredIf(fn () => $this->role === User::ROLE_STAFF),
                 'nullable',
                 'integer',
-                Rule::exists('branches', 'id')->where(fn ($query) => $query->where('library_id', $this->libraryId)),
+                Rule::exists('branches', 'id')->where(fn ($query) => $query->where('library_id', $libraryId)),
             ],
             'phone' => ['nullable', 'string', 'max:255'],
             'isActive' => ['boolean'],
@@ -253,9 +269,27 @@ class UserForm extends Component
         ];
     }
 
+    private function enforceRoleContract(User $actor): void
+    {
+        if ($actor->isSuperAdmin()) {
+            return;
+        }
+
+        $expectedRole = $this->managedUser?->role ?? ($this->forceStaff ? User::ROLE_STAFF : User::ROLE_MEMBER);
+
+        if ($this->role !== $expectedRole) {
+            throw ValidationException::withMessages([
+                'role' => 'Bibliotekos administratorius negali keisti globalios vartotojo rolės.',
+            ]);
+        }
+
+        $this->role = $expectedRole;
+        $this->libraryId = $actor->activeLibraryId();
+    }
+
     private function resolveMembershipNumber(): ?string
     {
-        if ($this->role !== 'narys') {
+        if ($this->role !== User::ROLE_MEMBER) {
             return null;
         }
 
@@ -268,7 +302,7 @@ class UserForm extends Component
 
     private function previewMembershipNumber(): ?string
     {
-        if ($this->role !== 'narys') {
+        if ($this->role !== User::ROLE_MEMBER) {
             return null;
         }
 
@@ -283,7 +317,7 @@ class UserForm extends Component
     {
         if ($this->role !== $actor->role) {
             throw ValidationException::withMessages([
-                'role' => 'Negalite keisti savo roles.',
+                'role' => 'Negalite keisti savo rolės.',
             ]);
         }
 
@@ -328,7 +362,7 @@ class UserForm extends Component
     private function ensureAnotherSuperAdminExists(User $user): void
     {
         $hasAnother = User::query()
-            ->where('role', 'superadministratorius')
+            ->where('role', User::ROLE_SUPER_ADMIN)
             ->whereKeyNot($user->id)
             ->where('is_active', true)
             ->exists();
@@ -338,5 +372,16 @@ class UserForm extends Component
                 'role' => 'Sistemoje turi likti bent vienas aktyvus superadmin.',
             ]);
         }
+    }
+
+    private function accountTypeLabel(string $role): string
+    {
+        return match ($role) {
+            User::ROLE_SUPER_ADMIN => 'Superadministratorius',
+            User::ROLE_ADMIN => 'Administratorius',
+            User::ROLE_STAFF => 'Darbuotojas',
+            User::ROLE_MEMBER => 'Skaitytojas',
+            default => $role,
+        };
     }
 }

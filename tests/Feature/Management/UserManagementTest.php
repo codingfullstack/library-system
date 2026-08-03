@@ -9,6 +9,7 @@ use App\Models\Loan;
 use App\Models\Location;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Support\UserManagement;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\PersonalAccessToken;
 use Livewire\Livewire;
@@ -280,6 +281,159 @@ test('admin cannot change an existing users global role through livewire form', 
         ->assertHasErrors(['role']);
 
     expect($member->fresh()->role)->toBe(User::ROLE_MEMBER);
+});
+
+test('admin edit form shows readonly account type instead of editable global role select', function () {
+    $library = Library::factory()->create();
+    $admin = User::factory()->for($library)->admin()->create();
+    $member = User::factory()->for($library)->member()->create();
+
+    $this
+        ->actingAs($admin)
+        ->get(route('manage.users.edit', $member))
+        ->assertOk()
+        ->assertSee('Paskyros tipas')
+        ->assertSee('Skaitytojas')
+        ->assertSee('Bibliotekos administratorius šio globalaus paskyros tipo nekeičia.')
+        ->assertDontSee('wire:model.live="role"', false)
+        ->assertDontSee('<select id="role"', false);
+});
+
+test('admin create staff page fixes account type server side and does not render role select', function () {
+    $library = Library::factory()->create();
+    $admin = User::factory()->for($library)->admin()->create();
+
+    $this
+        ->actingAs($admin)
+        ->get(route('manage.users.create-staff'))
+        ->assertOk()
+        ->assertSee('Sukurti darbuotojo paskyrą')
+        ->assertSee('Darbuotojas')
+        ->assertSee('Darbuotojo paskyros tipas nustatomas serveryje.')
+        ->assertDontSee('wire:model.live="role"', false)
+        ->assertDontSee('<select id="role"', false);
+});
+
+test('admin can create a staff account only in own library branch through dedicated flow', function () {
+    $library = Library::factory()->create();
+    $branch = Branch::factory()->for($library)->create();
+    $admin = User::factory()->for($library)->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(UserForm::class, ['forceStaff' => true])
+        ->set('name', 'New Staff')
+        ->set('email', 'new-staff@example.test')
+        ->set('branchId', $branch->id)
+        ->set('phone', '+37060000001')
+        ->set('password', 'password123')
+        ->set('passwordConfirmation', 'password123')
+        ->call('save')
+        ->assertRedirect(route('manage.users.index'));
+
+    $staff = User::query()->where('email', 'new-staff@example.test')->firstOrFail();
+
+    expect($staff->role)->toBe(User::ROLE_STAFF)
+        ->and($staff->is_active)->toBeTrue()
+        ->and($staff->membership_number)->toStartWith('MEM:')
+        ->and($staff->libraryMemberships()->where('library_id', $library->id)->where('branch_id', $branch->id)->where('is_active', true)->exists())->toBeTrue();
+});
+
+test('admin staff creation rejects admin and super admin role tampering', function (string $role) {
+    $library = Library::factory()->create();
+    $branch = Branch::factory()->for($library)->create();
+    $admin = User::factory()->for($library)->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(UserForm::class, ['forceStaff' => true])
+        ->set('name', 'Bad Staff')
+        ->set('email', 'bad-staff@example.test')
+        ->set('role', $role)
+        ->set('branchId', $branch->id)
+        ->set('password', 'password123')
+        ->set('passwordConfirmation', 'password123')
+        ->call('save')
+        ->assertHasErrors(['role']);
+
+    expect(User::query()->where('email', 'bad-staff@example.test')->exists())->toBeFalse();
+})->with([User::ROLE_ADMIN, User::ROLE_SUPER_ADMIN]);
+
+test('admin staff creation rejects a branch from another library and leaves no partial user', function () {
+    $library = Library::factory()->create();
+    $otherLibrary = Library::factory()->create();
+    $foreignBranch = Branch::factory()->for($otherLibrary)->create();
+    $admin = User::factory()->for($library)->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(UserForm::class, ['forceStaff' => true])
+        ->set('name', 'Foreign Branch Staff')
+        ->set('email', 'foreign-branch-staff@example.test')
+        ->set('branchId', $foreignBranch->id)
+        ->set('password', 'password123')
+        ->set('passwordConfirmation', 'password123')
+        ->call('save')
+        ->assertHasErrors(['branchId']);
+
+    expect(User::query()->where('email', 'foreign-branch-staff@example.test')->exists())->toBeFalse();
+});
+
+test('admin staff creation does not overwrite an existing member account with same email', function () {
+    $library = Library::factory()->create();
+    $branch = Branch::factory()->for($library)->create();
+    $admin = User::factory()->for($library)->admin()->create();
+    $member = User::factory()->for($library)->member()->create(['email' => 'shared@example.test']);
+
+    Livewire::actingAs($admin)
+        ->test(UserForm::class, ['forceStaff' => true])
+        ->set('name', 'Shared Email Staff')
+        ->set('email', 'shared@example.test')
+        ->set('branchId', $branch->id)
+        ->set('password', 'password123')
+        ->set('passwordConfirmation', 'password123')
+        ->call('save')
+        ->assertHasErrors(['email']);
+
+    expect($member->fresh()->role)->toBe(User::ROLE_MEMBER)
+        ->and(User::query()->where('email', 'shared@example.test')->count())->toBe(1);
+});
+
+test('admin can move existing staff between own library branches without changing global role or account activity', function () {
+    $library = Library::factory()->create();
+    $firstBranch = Branch::factory()->for($library)->create();
+    $secondBranch = Branch::factory()->for($library)->create();
+    $admin = User::factory()->for($library)->admin()->create();
+    $staff = User::factory()->staff()->create(['is_active' => true]);
+    UserManagement::syncLibraryMembership($staff, $library->id, $firstBranch->id);
+
+    Livewire::actingAs($admin)
+        ->test(UserForm::class, ['managedUser' => $staff])
+        ->set('branchId', $secondBranch->id)
+        ->call('save')
+        ->assertRedirect(route('manage.users.index'));
+
+    $membership = $staff->libraryMemberships()->where('library_id', $library->id)->firstOrFail();
+
+    expect($staff->fresh()->role)->toBe(User::ROLE_STAFF)
+        ->and($staff->fresh()->is_active)->toBeTrue()
+        ->and($membership->fresh()->branch_id)->toBe($secondBranch->id);
+});
+
+test('admin cannot assign existing staff to a branch from another library', function () {
+    $library = Library::factory()->create();
+    $otherLibrary = Library::factory()->create();
+    $branch = Branch::factory()->for($library)->create();
+    $foreignBranch = Branch::factory()->for($otherLibrary)->create();
+    $admin = User::factory()->for($library)->admin()->create();
+    $staff = User::factory()->staff()->create(['is_active' => true]);
+    UserManagement::syncLibraryMembership($staff, $library->id, $branch->id);
+
+    Livewire::actingAs($admin)
+        ->test(UserForm::class, ['managedUser' => $staff])
+        ->set('branchId', $foreignBranch->id)
+        ->call('save')
+        ->assertHasErrors(['branchId']);
+
+    expect($staff->fresh()->role)->toBe(User::ROLE_STAFF)
+        ->and($staff->libraryMemberships()->where('library_id', $library->id)->value('branch_id'))->toBe($branch->id);
 });
 
 test('super admin can open manageable user show page with summary', function () {
