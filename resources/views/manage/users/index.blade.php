@@ -10,6 +10,7 @@
         $actor = auth()->user();
         $currentLibraryId = $actor?->activeLibraryId();
         $isSuperAdmin = (bool) $actor?->isSuperAdmin();
+        $canCreateUsers = $actor && \App\Support\UserManagement::canCreateUsers($actor);
         $statusFor = fn ($user) => $isSuperAdmin
             ? (bool) $user->is_active
             : (bool) $user->libraryMemberships->firstWhere('library_id', $currentLibraryId)?->is_active;
@@ -31,17 +32,12 @@
                             <flux:icon.arrow-down-tray class="size-4" />
                             Eksportuoti
                         </a>
-                        @if(!$isSuperAdmin)
-                            <a href="{{ route('manage.users.create-staff') }}" class="inline-flex h-11 items-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 dark:border-emerald-900/60 dark:bg-zinc-900 dark:text-emerald-300 dark:hover:bg-emerald-950/30">
-                                <flux:icon.identification class="size-4" />
-                                Sukurti darbuotojo paskyrą
-                            </a>
-                        @endif
+                        @if($canCreateUsers)
                         <a href="{{ route('manage.users.create') }}" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600">
                             <flux:icon.plus class="size-4" />
                             Pridėti vartotoją
-                            <flux:icon.chevron-down class="size-4" />
                         </a>
+                        @endif
                     </div>
                 </div>
 

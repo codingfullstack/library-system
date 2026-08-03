@@ -20,8 +20,6 @@ class UserForm extends Component
 
     public bool $isEditing = false;
 
-    public bool $forceStaff = false;
-
     public string $name = '';
 
     public string $email = '';
@@ -40,13 +38,11 @@ class UserForm extends Component
 
     public string $passwordConfirmation = '';
 
-    public function mount(?User $managedUser = null, bool $forceStaff = false): void
+    public function mount(?User $managedUser = null): void
     {
         $actor = Auth::user();
 
         abort_unless($actor, 403);
-
-        $this->forceStaff = $forceStaff && ! $actor->isSuperAdmin();
 
         if ($managedUser) {
             abort_unless(UserManagement::canManageUser($actor, $managedUser), 404);
@@ -66,7 +62,9 @@ class UserForm extends Component
             return;
         }
 
-        $this->role = $this->forceStaff ? User::ROLE_STAFF : UserManagement::defaultRole($actor);
+        abort_unless(UserManagement::canCreateUsers($actor), 403);
+
+        $this->role = UserManagement::defaultRole($actor);
         $this->libraryId = $actor->isSuperAdmin() ? null : $actor->activeLibraryId();
     }
 
@@ -104,6 +102,10 @@ class UserForm extends Component
             abort_unless(UserManagement::canManageUser($actor, $this->managedUser), 404);
         }
 
+        if (! $this->isEditing) {
+            abort_unless(UserManagement::canCreateUsers($actor), 403);
+        }
+
         if ($actor->id === $this->managedUser?->id) {
             $this->guardSelfMutation($actor);
         }
@@ -121,9 +123,13 @@ class UserForm extends Component
             'password' => 'slaptažodis',
         ]);
 
-        if (! UserManagement::canManageRole($actor, $this->role)) {
+        $allowedRoles = $this->isEditing
+            ? UserManagement::manageableRoles($actor)
+            : UserManagement::creatableRoles($actor);
+
+        if (! in_array($this->role, $allowedRoles, true)) {
             throw ValidationException::withMessages([
-                'role' => 'Negalite priskirti šios rolės.',
+                'role' => 'Negalite priskirti šio paskyros tipo.',
             ]);
         }
 
@@ -202,7 +208,7 @@ class UserForm extends Component
 
         app(RecordAuditLogAction::class)->handle(
             $actor,
-            $this->forceStaff ? 'staff_user_created' : 'user_created',
+            'user_created',
             $managedUser,
             sprintf('Sukurtas vartotojas "%s".', $managedUser->name),
             [
@@ -215,23 +221,26 @@ class UserForm extends Component
 
         return redirect()
             ->route('manage.users.index')
-            ->with('success', $this->forceStaff ? 'Darbuotojo paskyra sukurta.' : 'Vartotojas sukurtas.');
+            ->with('success', 'Vartotojas sukurtas.');
     }
 
     public function render()
     {
         $actor = Auth::user();
+        $canEditGlobalRole = (bool) $actor?->isSuperAdmin();
+        $canChooseAccountType = ! $this->isEditing && UserManagement::canCreateUsers($actor);
 
         return view('livewire.manage.users.user-form', [
-            'roleOptions' => $actor ? UserManagement::manageableRoles($actor) : [],
+            'roleOptions' => $this->roleOptions($actor),
             'libraries' => $actor?->isSuperAdmin()
                 ? Library::query()->orderBy('name')->get(['id', 'name', 'code'])
                 : collect(),
             'branches' => $this->availableBranches(),
             'previewMembershipNumber' => $this->previewMembershipNumber(),
-            'canEditGlobalRole' => (bool) $actor?->isSuperAdmin(),
+            'canEditGlobalRole' => $canEditGlobalRole,
+            'canChooseAccountType' => $canChooseAccountType,
             'accountTypeLabel' => $this->accountTypeLabel($this->role),
-            'isStaffCreation' => $this->forceStaff && ! $this->isEditing,
+            'canCreateUsers' => $actor ? UserManagement::canCreateUsers($actor) : false,
         ]);
     }
 
@@ -244,7 +253,7 @@ class UserForm extends Component
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($targetId)],
-            'role' => ['required', Rule::in($actor ? UserManagement::manageableRoles($actor) : [])],
+            'role' => ['required', Rule::in($this->roleOptions($actor))],
             'libraryId' => [
                 Rule::requiredIf(fn () => UserManagement::requiresLibrary($this->role)),
                 'nullable',
@@ -275,16 +284,45 @@ class UserForm extends Component
             return;
         }
 
-        $expectedRole = $this->managedUser?->role ?? ($this->forceStaff ? User::ROLE_STAFF : User::ROLE_MEMBER);
+        if ($this->managedUser) {
+            if ($this->role !== $this->managedUser->role) {
+                throw ValidationException::withMessages([
+                    'role' => 'Bibliotekos administratorius negali keisti globalios vartotojo rolės.',
+                ]);
+            }
 
-        if ($this->role !== $expectedRole) {
+            $this->role = $this->managedUser->role;
+            $this->libraryId = $actor->activeLibraryId();
+
+            return;
+        }
+
+        if (! in_array($this->role, UserManagement::creatableRoles($actor), true)) {
             throw ValidationException::withMessages([
-                'role' => 'Bibliotekos administratorius negali keisti globalios vartotojo rolės.',
+                'role' => 'Bibliotekos administratorius gali kurti tik skaitytojo arba darbuotojo paskyrą.',
             ]);
         }
 
-        $this->role = $expectedRole;
         $this->libraryId = $actor->activeLibraryId();
+
+        if ($this->role !== User::ROLE_STAFF) {
+            $this->branchId = null;
+        }
+    }
+
+    private function roleOptions(?User $actor): array
+    {
+        if (! $actor) {
+            return [];
+        }
+
+        if ($this->isEditing) {
+            return $actor->isSuperAdmin()
+                ? UserManagement::manageableRoles($actor)
+                : [$this->managedUser?->role ?? $this->role];
+        }
+
+        return UserManagement::creatableRoles($actor);
     }
 
     private function resolveMembershipNumber(): ?string

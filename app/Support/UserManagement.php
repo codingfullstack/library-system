@@ -28,6 +28,24 @@ class UserManagement
         return in_array($role, self::manageableRoles($actor), true);
     }
 
+    public static function canCreateUsers(User $actor): bool
+    {
+        return in_array($actor->role, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN], true);
+    }
+
+    public static function creatableRoles(User $actor): array
+    {
+        if ($actor->isSuperAdmin()) {
+            return self::manageableRoles($actor);
+        }
+
+        if ($actor->role === User::ROLE_ADMIN) {
+            return [User::ROLE_MEMBER, User::ROLE_STAFF];
+        }
+
+        return [];
+    }
+
     public static function scopeVisibleUsers(Builder $query, User $actor): Builder
     {
         $roles = self::manageableRoles($actor);

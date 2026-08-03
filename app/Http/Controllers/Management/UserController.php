@@ -35,14 +35,9 @@ class UserController extends Controller
 
     public function create(Request $request): View
     {
+        abort_unless(UserManagement::canCreateUsers($request->user()), 403);
+
         return view('manage.users.create');
-    }
-
-    public function createStaff(Request $request): View
-    {
-        abort_unless(! $request->user()->isSuperAdmin(), 404);
-
-        return view('manage.users.create-staff');
     }
 
     public function show(

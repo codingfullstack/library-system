@@ -296,33 +296,68 @@ test('admin edit form shows readonly account type instead of editable global rol
         ->assertSee('Skaitytojas')
         ->assertSee('Bibliotekos administratorius šio globalaus paskyros tipo nekeičia.')
         ->assertDontSee('wire:model.live="role"', false)
-        ->assertDontSee('<select id="role"', false);
+        ->assertDontSee('<select id="role"', false)
+        ->assertSee('Pridėti naują vartotoją')
+        ->assertSee(route('manage.users.create'), false);
 });
 
-test('admin create staff page fixes account type server side and does not render role select', function () {
+test('create form opened from edit route starts empty and does not carry edited user state', function () {
+    $library = Library::factory()->create();
+    $admin = User::factory()->for($library)->admin()->create();
+    $member = User::factory()->for($library)->member()->create([
+        'name' => 'Edited Member',
+        'email' => 'edited-member@example.test',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('manage.users.create'))
+        ->assertOk()
+        ->assertDontSee('Edited Member')
+        ->assertDontSee('edited-member@example.test')
+        ->assertSee('value="narys"', false);
+});
+
+test('users index shows one add user action and no duplicate staff creation action', function () {
     $library = Library::factory()->create();
     $admin = User::factory()->for($library)->admin()->create();
 
     $this
         ->actingAs($admin)
-        ->get(route('manage.users.create-staff'))
+        ->get(route('manage.users.index'))
         ->assertOk()
-        ->assertSee('Sukurti darbuotojo paskyrą')
-        ->assertSee('Darbuotojas')
-        ->assertSee('Darbuotojo paskyros tipas nustatomas serveryje.')
-        ->assertDontSee('wire:model.live="role"', false)
-        ->assertDontSee('<select id="role"', false);
+        ->assertSee('Pridėti vartotoją')
+        ->assertDontSee('Sukurti darbuotojo paskyrą')
+        ->assertDontSee('create-staff');
 });
 
-test('admin can create a staff account only in own library branch through dedicated flow', function () {
+test('admin create form allows choosing only member or staff account type', function () {
+    $library = Library::factory()->create();
+    $admin = User::factory()->for($library)->admin()->create();
+
+    $this
+        ->actingAs($admin)
+        ->get(route('manage.users.create'))
+        ->assertOk()
+        ->assertSee('Paskyros tipas')
+        ->assertSee('Skaitytojas')
+        ->assertSee('Darbuotojas')
+        ->assertSee('value="narys"', false)
+        ->assertSee('value="darbuotojas"', false)
+        ->assertDontSee('value="administratorius"', false)
+        ->assertDontSee('value="superadministratorius"', false);
+});
+
+test('admin can create a staff account from the shared create form', function () {
     $library = Library::factory()->create();
     $branch = Branch::factory()->for($library)->create();
     $admin = User::factory()->for($library)->admin()->create();
 
     Livewire::actingAs($admin)
-        ->test(UserForm::class, ['forceStaff' => true])
+        ->test(UserForm::class)
         ->set('name', 'New Staff')
         ->set('email', 'new-staff@example.test')
+        ->set('role', User::ROLE_STAFF)
         ->set('branchId', $branch->id)
         ->set('phone', '+37060000001')
         ->set('password', 'password123')
@@ -338,13 +373,54 @@ test('admin can create a staff account only in own library branch through dedica
         ->and($staff->libraryMemberships()->where('library_id', $library->id)->where('branch_id', $branch->id)->where('is_active', true)->exists())->toBeTrue();
 });
 
+test('admin staff creation requires a branch', function () {
+    $library = Library::factory()->create();
+    $admin = User::factory()->for($library)->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(UserForm::class)
+        ->set('name', 'Branchless Staff')
+        ->set('email', 'branchless-staff@example.test')
+        ->set('role', User::ROLE_STAFF)
+        ->set('password', 'password123')
+        ->set('passwordConfirmation', 'password123')
+        ->call('save')
+        ->assertHasErrors(['branchId']);
+
+    expect(User::query()->where('email', 'branchless-staff@example.test')->exists())->toBeFalse();
+});
+
+test('admin can create a member from the shared create form and hidden branch state is not saved', function () {
+    $library = Library::factory()->create();
+    $branch = Branch::factory()->for($library)->create();
+    $admin = User::factory()->for($library)->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(UserForm::class)
+        ->set('name', 'New Member')
+        ->set('email', 'new-member@example.test')
+        ->set('role', User::ROLE_STAFF)
+        ->set('branchId', $branch->id)
+        ->set('role', User::ROLE_MEMBER)
+        ->set('password', 'password123')
+        ->set('passwordConfirmation', 'password123')
+        ->call('save')
+        ->assertRedirect(route('manage.users.index'));
+
+    $member = User::query()->where('email', 'new-member@example.test')->firstOrFail();
+    $membership = $member->libraryMemberships()->where('library_id', $library->id)->firstOrFail();
+
+    expect($member->role)->toBe(User::ROLE_MEMBER)
+        ->and($membership->branch_id)->toBeNull();
+});
+
 test('admin staff creation rejects admin and super admin role tampering', function (string $role) {
     $library = Library::factory()->create();
     $branch = Branch::factory()->for($library)->create();
     $admin = User::factory()->for($library)->admin()->create();
 
     Livewire::actingAs($admin)
-        ->test(UserForm::class, ['forceStaff' => true])
+        ->test(UserForm::class)
         ->set('name', 'Bad Staff')
         ->set('email', 'bad-staff@example.test')
         ->set('role', $role)
@@ -364,9 +440,10 @@ test('admin staff creation rejects a branch from another library and leaves no p
     $admin = User::factory()->for($library)->admin()->create();
 
     Livewire::actingAs($admin)
-        ->test(UserForm::class, ['forceStaff' => true])
+        ->test(UserForm::class)
         ->set('name', 'Foreign Branch Staff')
         ->set('email', 'foreign-branch-staff@example.test')
+        ->set('role', User::ROLE_STAFF)
         ->set('branchId', $foreignBranch->id)
         ->set('password', 'password123')
         ->set('passwordConfirmation', 'password123')
@@ -383,9 +460,10 @@ test('admin staff creation does not overwrite an existing member account with sa
     $member = User::factory()->for($library)->member()->create(['email' => 'shared@example.test']);
 
     Livewire::actingAs($admin)
-        ->test(UserForm::class, ['forceStaff' => true])
+        ->test(UserForm::class)
         ->set('name', 'Shared Email Staff')
         ->set('email', 'shared@example.test')
+        ->set('role', User::ROLE_STAFF)
         ->set('branchId', $branch->id)
         ->set('password', 'password123')
         ->set('passwordConfirmation', 'password123')
@@ -434,6 +512,22 @@ test('admin cannot assign existing staff to a branch from another library', func
 
     expect($staff->fresh()->role)->toBe(User::ROLE_STAFF)
         ->and($staff->libraryMemberships()->where('library_id', $library->id)->value('branch_id'))->toBe($branch->id);
+});
+
+test('staff cannot open the user creation route', function () {
+    $library = Library::factory()->create();
+    $staff = User::factory()->for($library)->staff()->create();
+
+    $this
+        ->actingAs($staff)
+        ->get(route('manage.users.index'))
+        ->assertOk()
+        ->assertDontSee('Pridėti vartotoją');
+
+    $this
+        ->actingAs($staff)
+        ->get(route('manage.users.create'))
+        ->assertForbidden();
 });
 
 test('super admin can open manageable user show page with summary', function () {

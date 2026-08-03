@@ -22,7 +22,7 @@
             @error('email') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
         </div>
 
-        @if($canEditGlobalRole)
+        @if($canEditGlobalRole || $canChooseAccountType)
             <div>
                 <label for="role" class="app-label">Paskyros tipas</label>
                 <select id="role" wire:model.live="role" class="app-input" required>
@@ -30,7 +30,9 @@
                         <option value="{{ $option }}">{{ $roleLabels[$option] ?? $option }}</option>
                     @endforeach
                 </select>
-                <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Globalų paskyros tipą gali keisti tik superadministratorius.</p>
+                @if($canEditGlobalRole)
+                    <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Globalų paskyros tipą gali keisti tik superadministratorius.</p>
+                @endif
                 @error('role') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
             </div>
         @else
@@ -39,11 +41,7 @@
                 <div class="app-input flex items-center bg-zinc-50 text-zinc-600 dark:bg-zinc-950/40 dark:text-zinc-300">
                     {{ $accountTypeLabel }}
                 </div>
-                @if($isStaffCreation)
-                    <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Darbuotojo paskyros tipas nustatomas serveryje.</p>
-                @else
-                    <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Bibliotekos administratorius šio globalaus paskyros tipo nekeičia.</p>
-                @endif
+                <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Bibliotekos administratorius šio globalaus paskyros tipo nekeičia.</p>
                 @error('role') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
             </div>
         @endif
@@ -133,9 +131,12 @@
 
     <div class="flex flex-col gap-3 sm:flex-row">
         <button type="submit" class="app-button-primary" wire:loading.attr="disabled">
-            <span wire:loading.remove wire:target="save">{{ $isEditing ? 'Išsaugoti pakeitimus' : ($isStaffCreation ? 'Sukurti darbuotojo paskyrą' : 'Sukurti vartotoją') }}</span>
+            <span wire:loading.remove wire:target="save">{{ $isEditing ? 'Išsaugoti pakeitimus' : 'Pridėti vartotoją' }}</span>
             <span wire:loading wire:target="save">{{ $isEditing ? 'Saugoma...' : 'Kuriama...' }}</span>
         </button>
+        @if($isEditing && $canCreateUsers)
+            <a href="{{ route('manage.users.create') }}" class="app-button-secondary">Pridėti naują vartotoją</a>
+        @endif
         <a href="{{ route('manage.users.index') }}" class="app-button-secondary">Grįžti</a>
     </div>
 </form>
