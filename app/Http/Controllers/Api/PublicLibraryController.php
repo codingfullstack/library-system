@@ -4,30 +4,28 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Library;
-use App\Models\LibraryMembership;
+use App\Support\LibraryJoinService;
 use App\Support\UserManagement;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PublicLibraryController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, LibraryJoinService $libraryJoinService): JsonResponse
     {
         $user = $request->user();
 
         abort_unless($user?->role === 'narys', 403);
-
-        $memberLibraryIds = $user->activeLibraryMemberships()
-            ->pluck('library_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
 
         $libraries = Library::query()
             ->where('is_active', true)
             ->where('is_public', true)
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'address', 'city'])
-            ->map(fn (Library $library) => $this->libraryPayload($library, in_array($library->id, $memberLibraryIds, true)))
+            ->map(fn (Library $library) => $this->libraryPayload(
+                $library,
+                $libraryJoinService->statusFor($user, $library)
+            ))
             ->values();
 
         return response()->json([
@@ -35,7 +33,7 @@ class PublicLibraryController extends Controller
         ]);
     }
 
-    public function join(Request $request, Library $library): JsonResponse
+    public function join(Request $request, Library $library, LibraryJoinService $libraryJoinService): JsonResponse
     {
         $user = $request->user();
 
@@ -48,28 +46,28 @@ class PublicLibraryController extends Controller
             ])->save();
         }
 
-        LibraryMembership::query()->updateOrCreate(
-            [
-                'library_id' => $library->id,
-                'user_id' => $user->id,
-            ],
-            [
-                'membership_number' => $user->membership_number ?: UserManagement::generateMembershipNumber(),
-                'is_active' => true,
-                'joined_at' => now(),
-            ]
-        );
+        $result = $libraryJoinService->join($user, $library);
+
+        if ($result->isInactive()) {
+            return response()->json([
+                'message' => LibraryJoinService::INACTIVE_MESSAGE,
+            ], 403);
+        }
 
         return response()->json([
             'message' => sprintf('Prisijungėte prie bibliotekos "%s".', $library->name),
-            'library' => $this->libraryPayload($library, true),
+            'library' => $this->libraryPayload($library, [
+                'membership_status' => LibraryJoinService::STATUS_ACTIVE,
+                'can_join' => false,
+            ]),
         ]);
     }
 
     /**
+     * @param  array{membership_status: string, can_join: bool}  $membershipState
      * @return array<string, mixed>
      */
-    private function libraryPayload(Library $library, bool $isMember): array
+    private function libraryPayload(Library $library, array $membershipState): array
     {
         return [
             'id' => $library->id,
@@ -77,7 +75,9 @@ class PublicLibraryController extends Controller
             'code' => $library->code,
             'address' => $library->address,
             'city' => $library->city,
-            'is_member' => $isMember,
+            'is_member' => $membershipState['membership_status'] === LibraryJoinService::STATUS_ACTIVE,
+            'membership_status' => $membershipState['membership_status'],
+            'can_join' => $membershipState['can_join'],
         ];
     }
 }

@@ -22,7 +22,8 @@
                     @php
                         $user = auth()->user();
                         $isMember = $user?->role === 'narys';
-                        $alreadyJoined = $isMember && $user->belongsToLibrary($library->id);
+                        $membershipStatus = $isMember ? ($library->membership_status ?? 'none') : 'none';
+                        $canJoin = $isMember && (bool) ($library->can_join ?? false);
                     @endphp
 
                     <article class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
@@ -47,15 +48,24 @@
                         <div class="mt-5">
                             @auth
                                 @if($isMember)
-                                    @if($alreadyJoined)
+                                    @if($membershipStatus === 'active')
                                         <span class="block rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
                                             Jau prisijungta
                                         </span>
-                                    @else
+                                    @elseif($membershipStatus === 'inactive')
+                                        <div class="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+                                            <p class="font-semibold">Narystė neaktyvi</p>
+                                            <p class="mt-1">Jūsų narystė šioje bibliotekoje yra deaktyvuota. Dėl atkūrimo kreipkitės į bibliotekos administratorių.</p>
+                                        </div>
+                                    @elseif($canJoin)
                                         <form method="POST" action="{{ route('libraries.join', $library) }}">
                                             @csrf
                                             <button type="submit" class="app-button-primary w-full">Prisijungti prie bibliotekos</button>
                                         </form>
+                                    @else
+                                        <span class="block rounded-xl bg-zinc-50 px-4 py-3 text-sm font-semibold text-zinc-500 dark:bg-zinc-950 dark:text-zinc-400">
+                                            Prisijungimas negalimas
+                                        </span>
                                     @endif
                                 @else
                                     <span class="block rounded-xl bg-zinc-50 px-4 py-3 text-sm font-semibold text-zinc-500 dark:bg-zinc-950 dark:text-zinc-400">Darbo paskyros prie viešųjų bibliotekų nejungiamos.</span>
