@@ -13,6 +13,7 @@ use App\Models\Reservation;
 use App\Models\ReservationQueue;
 use App\Models\User;
 use App\Services\ReservationQueueService;
+use App\Support\Notifications\NotificationType;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -21,6 +22,7 @@ use Symfony\Component\Process\Process;
 use Tests\Support\UsesTemporaryMariaDbDatabase;
 use Tests\TestCase;
 
+#[Group('mysql')]
 #[Group('mariadb')]
 #[Group('concurrency')]
 #[Group('database-invariants')]
@@ -387,6 +389,259 @@ class ReservationConcurrencyProcessTest extends TestCase
             ->count());
     }
 
+    public function test_return_and_ready_cancel_can_overlap_without_duplicate_ready_assignment_or_active_loans(): void
+    {
+        $library = Library::factory()->create();
+        $book = Book::factory()->create();
+        $branch = Branch::factory()->create(['library_id' => $library->id]);
+        $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+        $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+        $staff->libraryMemberships()->where('library_id', $library->id)->update(['branch_id' => $branch->id]);
+        $borrower = User::factory()->member()->create(['library_id' => $library->id]);
+        $reservationMember = User::factory()->member()->create(['library_id' => $library->id]);
+
+        $returningCopy = BookCopy::factory()->create([
+            'library_id' => $library->id,
+            'book_id' => $book->id,
+            'branch_id' => $branch->id,
+            'location_id' => $location->id,
+            'status' => BookCopy::STATUS_LOANED,
+        ]);
+        $readyCopy = BookCopy::factory()->create([
+            'library_id' => $library->id,
+            'book_id' => $book->id,
+            'branch_id' => $branch->id,
+            'location_id' => $location->id,
+            'status' => BookCopy::STATUS_AVAILABLE,
+        ]);
+
+        Loan::factory()->create([
+            'library_id' => $library->id,
+            'book_copy_id' => $returningCopy->id,
+            'user_id' => $borrower->id,
+            'status' => Loan::STATUS_ACTIVE,
+            'returned_at' => null,
+        ]);
+
+        $readyReservation = Reservation::factory()->create([
+            'library_id' => $library->id,
+            'book_id' => $book->id,
+            'user_id' => $reservationMember->id,
+            'scope' => Reservation::SCOPE_LIBRARY,
+            'pickup_branch_id' => $branch->id,
+            'assigned_book_copy_id' => $readyCopy->id,
+            'status' => Reservation::STATUS_READY,
+            'ready_at' => now()->subMinute(),
+            'expires_at' => now()->addDay(),
+            'fulfilled_at' => null,
+            'cancelled_at' => null,
+        ]);
+
+        $return = $this->returnCopyProcess($staff->id, $returningCopy->id);
+        $cancel = $this->cancelReservationProcess($staff->id, $readyReservation->id, 'parallel cancel');
+
+        $return->start();
+        $cancel->start();
+        $return->wait();
+        $cancel->wait();
+
+        $this->assertTrue($return->isSuccessful(), $return->getErrorOutput().$return->getOutput());
+        $this->assertTrue($cancel->isSuccessful(), $cancel->getErrorOutput().$cancel->getOutput());
+        $this->assertSame(0, Loan::query()->whereIn('book_copy_id', [$returningCopy->id, $readyCopy->id])->active()->count());
+        $this->assertSame(0, Reservation::query()->whereKey($readyReservation->id)->where('status', Reservation::STATUS_READY)->count());
+        $this->assertSame(
+            Reservation::query()
+                ->where('library_id', $library->id)
+                ->where('book_id', $book->id)
+                ->where('status', Reservation::STATUS_READY)
+                ->whereNotNull('assigned_book_copy_id')
+                ->distinct('assigned_book_copy_id')
+                ->count('assigned_book_copy_id'),
+            Reservation::query()
+                ->where('library_id', $library->id)
+                ->where('book_id', $book->id)
+                ->where('status', Reservation::STATUS_READY)
+                ->whereNotNull('assigned_book_copy_id')
+                ->count()
+        );
+    }
+
+    public function test_expire_and_borrow_same_ready_reservation_do_not_create_active_loan(): void
+    {
+        $library = Library::factory()->create();
+        $book = Book::factory()->create();
+        $branch = Branch::factory()->create(['library_id' => $library->id]);
+        $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+        $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+        $member = User::factory()->member()->create(['library_id' => $library->id]);
+        $copy = BookCopy::factory()->create([
+            'library_id' => $library->id,
+            'book_id' => $book->id,
+            'branch_id' => $branch->id,
+            'location_id' => $location->id,
+            'status' => BookCopy::STATUS_AVAILABLE,
+        ]);
+        $reservation = Reservation::factory()->create([
+            'library_id' => $library->id,
+            'book_id' => $book->id,
+            'user_id' => $member->id,
+            'scope' => Reservation::SCOPE_LIBRARY,
+            'pickup_branch_id' => $branch->id,
+            'assigned_book_copy_id' => $copy->id,
+            'status' => Reservation::STATUS_READY,
+            'ready_at' => now()->subDays(15),
+            'expires_at' => now()->subMinute(),
+            'fulfilled_at' => null,
+            'cancelled_at' => null,
+        ]);
+
+        $expire = $this->expireReservationsProcess();
+        $borrow = $this->borrowCopyProcess($staff->id, $member->id, $copy->id);
+
+        $expire->start();
+        $borrow->start();
+        $expire->wait();
+        $borrow->wait();
+
+        $this->assertTrue($expire->isSuccessful(), $expire->getErrorOutput().$expire->getOutput());
+        $this->assertTrue($borrow->isSuccessful(), $borrow->getErrorOutput().$borrow->getOutput());
+        $this->assertSame(Reservation::STATUS_EXPIRED, $reservation->fresh()->status);
+        $this->assertNull($reservation->fresh()->assigned_book_copy_id);
+        $this->assertSame(0, Loan::query()->where('book_copy_id', $copy->id)->active()->count());
+    }
+
+    public function test_ready_cancel_and_borrow_same_copy_leave_one_terminal_outcome(): void
+    {
+        $library = Library::factory()->create();
+        $book = Book::factory()->create();
+        $branch = Branch::factory()->create(['library_id' => $library->id]);
+        $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+        $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+        $member = User::factory()->member()->create(['library_id' => $library->id]);
+        $copy = BookCopy::factory()->create([
+            'library_id' => $library->id,
+            'book_id' => $book->id,
+            'branch_id' => $branch->id,
+            'location_id' => $location->id,
+            'status' => BookCopy::STATUS_AVAILABLE,
+        ]);
+        $reservation = Reservation::factory()->create([
+            'library_id' => $library->id,
+            'book_id' => $book->id,
+            'user_id' => $member->id,
+            'scope' => Reservation::SCOPE_LIBRARY,
+            'pickup_branch_id' => $branch->id,
+            'assigned_book_copy_id' => $copy->id,
+            'status' => Reservation::STATUS_READY,
+            'ready_at' => now()->subMinute(),
+            'expires_at' => now()->addDay(),
+            'fulfilled_at' => null,
+            'cancelled_at' => null,
+        ]);
+
+        $cancel = $this->cancelReservationProcess($staff->id, $reservation->id, 'parallel cancel');
+        $borrow = $this->borrowCopyProcess($staff->id, $member->id, $copy->id);
+
+        $cancel->start();
+        $borrow->start();
+        $cancel->wait();
+        $borrow->wait();
+
+        $this->assertTrue($cancel->isSuccessful(), $cancel->getErrorOutput().$cancel->getOutput());
+        $this->assertTrue($borrow->isSuccessful(), $borrow->getErrorOutput().$borrow->getOutput());
+
+        $fresh = $reservation->fresh();
+        $this->assertContains($fresh->status, [Reservation::STATUS_CANCELLED, Reservation::STATUS_FULFILLED]);
+        $this->assertSame($fresh->status === Reservation::STATUS_FULFILLED ? 1 : 0, Loan::query()->where('book_copy_id', $copy->id)->active()->count());
+        $this->assertSame(0, Reservation::query()->where('assigned_book_copy_id', $copy->id)->where('status', Reservation::STATUS_READY)->count());
+    }
+
+    public function test_two_copies_can_be_returned_concurrently_without_active_loan_or_ready_duplicates(): void
+    {
+        $library = Library::factory()->create();
+        $book = Book::factory()->create();
+        $branch = Branch::factory()->create(['library_id' => $library->id]);
+        $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+        $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+        $staff->libraryMemberships()->where('library_id', $library->id)->update(['branch_id' => $branch->id]);
+        $members = User::factory()->count(4)->member()->create(['library_id' => $library->id])->values();
+
+        $copies = collect([1, 2])->map(fn (int $index) => BookCopy::factory()->create([
+            'library_id' => $library->id,
+            'book_id' => $book->id,
+            'branch_id' => $branch->id,
+            'location_id' => $location->id,
+            'status' => BookCopy::STATUS_LOANED,
+        ]));
+
+        foreach ($copies as $index => $copy) {
+            Loan::factory()->create([
+                'library_id' => $library->id,
+                'book_copy_id' => $copy->id,
+                'user_id' => $members[$index]->id,
+                'status' => Loan::STATUS_ACTIVE,
+                'returned_at' => null,
+            ]);
+        }
+
+        foreach ([0, 1] as $index) {
+            Reservation::factory()->create([
+                'library_id' => $library->id,
+                'book_id' => $book->id,
+                'user_id' => $members[$index + 2]->id,
+                'scope' => Reservation::SCOPE_LIBRARY,
+                'status' => Reservation::STATUS_WAITING,
+                'reserved_at' => now()->subMinutes(2 - $index),
+                'expires_at' => null,
+                'fulfilled_at' => null,
+                'cancelled_at' => null,
+            ]);
+        }
+
+        $first = $this->returnCopyProcess($staff->id, $copies[0]->id);
+        $second = $this->returnCopyProcess($staff->id, $copies[1]->id);
+
+        $first->start();
+        $second->start();
+        $first->wait();
+        $second->wait();
+
+        $this->assertTrue($first->isSuccessful(), $first->getErrorOutput().$first->getOutput());
+        $this->assertTrue($second->isSuccessful(), $second->getErrorOutput().$second->getOutput());
+        $this->assertSame(0, Loan::query()->whereIn('book_copy_id', $copies->pluck('id'))->active()->count());
+        $this->assertSame(2, Reservation::query()->where('status', Reservation::STATUS_READY)->count());
+        $this->assertSame(2, Reservation::query()->where('status', Reservation::STATUS_READY)->distinct('assigned_book_copy_id')->count('assigned_book_copy_id'));
+    }
+
+    public function test_related_notification_creation_is_serialized_for_duplicate_retry(): void
+    {
+        $library = Library::factory()->create();
+        $member = User::factory()->member()->create(['library_id' => $library->id]);
+        $book = Book::factory()->create();
+        $reservation = Reservation::factory()->create([
+            'library_id' => $library->id,
+            'book_id' => $book->id,
+            'user_id' => $member->id,
+            'status' => Reservation::STATUS_WAITING,
+        ]);
+
+        $first = $this->relatedNotificationProcess($member->id, $reservation->id);
+        $second = $this->relatedNotificationProcess($member->id, $reservation->id);
+
+        $first->start();
+        $second->start();
+        $first->wait();
+        $second->wait();
+
+        $this->assertTrue($first->isSuccessful(), $first->getErrorOutput().$first->getOutput());
+        $this->assertTrue($second->isSuccessful(), $second->getErrorOutput().$second->getOutput());
+        $this->assertSame(1, $member->notifications()
+            ->where('type', NotificationType::RESERVATION_READY->value)
+            ->where('data->related_type', Reservation::class)
+            ->where('data->related_id', $reservation->id)
+            ->count());
+    }
+
     public function test_creating_reservation_does_not_lock_same_user_loans_from_another_queue(): void
     {
         $library = Library::factory()->create();
@@ -627,6 +882,157 @@ PHP;
             (string) $actorId,
             (string) $memberId,
             (string) $bookId,
+        ], base_path(), $this->temporaryDatabaseEnvironment());
+
+        $process->setTimeout(60);
+
+        return $process;
+    }
+
+    private function borrowCopyProcess(int $actorId, int $memberId, int $copyId): Process
+    {
+        $code = <<<'PHP'
+require 'vendor/autoload.php';
+$app = require 'bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+try {
+    app(App\Actions\Loans\BorrowBookCopyAction::class)->handle(
+        App\Models\User::query()->findOrFail((int) $argv[1]),
+        App\Models\BookCopy::query()->withoutGlobalScope('library')->findOrFail((int) $argv[3]),
+        [
+            'user_id' => (int) $argv[2],
+            'due_at' => now()->addDays(14)->toDateString(),
+            'no_due_date' => false,
+        ],
+    );
+
+    echo 'borrowed';
+} catch (Illuminate\Validation\ValidationException) {
+    echo 'validation';
+}
+PHP;
+
+        $process = new Process([
+            PHP_BINARY,
+            '-r',
+            $code,
+            (string) $actorId,
+            (string) $memberId,
+            (string) $copyId,
+        ], base_path(), $this->temporaryDatabaseEnvironment());
+
+        $process->setTimeout(60);
+
+        return $process;
+    }
+
+    private function returnCopyProcess(int $actorId, int $copyId): Process
+    {
+        $code = <<<'PHP'
+require 'vendor/autoload.php';
+$app = require 'bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+try {
+    app(App\Actions\Loans\ReturnBookCopyAction::class)->handle(
+        App\Models\User::query()->findOrFail((int) $argv[1]),
+        App\Models\BookCopy::query()->withoutGlobalScope('library')->findOrFail((int) $argv[2]),
+    );
+
+    echo 'returned';
+} catch (Illuminate\Validation\ValidationException) {
+    echo 'validation';
+}
+PHP;
+
+        $process = new Process([
+            PHP_BINARY,
+            '-r',
+            $code,
+            (string) $actorId,
+            (string) $copyId,
+        ], base_path(), $this->temporaryDatabaseEnvironment());
+
+        $process->setTimeout(60);
+
+        return $process;
+    }
+
+    private function cancelReservationProcess(int $actorId, int $reservationId, string $reason): Process
+    {
+        $code = <<<'PHP'
+require 'vendor/autoload.php';
+$app = require 'bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+try {
+    app(App\Actions\Reservations\CancelReservationAction::class)->handle(
+        App\Models\User::query()->findOrFail((int) $argv[1]),
+        App\Models\Reservation::query()->withoutGlobalScope('library')->findOrFail((int) $argv[2]),
+        (string) $argv[3],
+    );
+
+    echo 'cancelled';
+} catch (Illuminate\Validation\ValidationException) {
+    echo 'validation';
+}
+PHP;
+
+        $process = new Process([
+            PHP_BINARY,
+            '-r',
+            $code,
+            (string) $actorId,
+            (string) $reservationId,
+            $reason,
+        ], base_path(), $this->temporaryDatabaseEnvironment());
+
+        $process->setTimeout(60);
+
+        return $process;
+    }
+
+    private function expireReservationsProcess(): Process
+    {
+        $process = new Process([
+            PHP_BINARY,
+            'artisan',
+            'reservations:expire',
+        ], base_path(), $this->temporaryDatabaseEnvironment());
+
+        $process->setTimeout(60);
+
+        return $process;
+    }
+
+    private function relatedNotificationProcess(int $memberId, int $reservationId): Process
+    {
+        $code = <<<'PHP'
+require 'vendor/autoload.php';
+$app = require 'bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+app(App\Actions\Notifications\CreateUserNotificationAction::class)->handle(
+    App\Models\User::query()->findOrFail((int) $argv[1]),
+    null,
+    App\Support\Notifications\NotificationType::RESERVATION_READY,
+    null,
+    'Paralelinis retry',
+    ['reservation_id' => (int) $argv[2]],
+    App\Models\Reservation::class,
+    (int) $argv[2],
+);
+
+echo 'notified';
+PHP;
+
+        $process = new Process([
+            PHP_BINARY,
+            '-r',
+            $code,
+            (string) $memberId,
+            (string) $reservationId,
         ], base_path(), $this->temporaryDatabaseEnvironment());
 
         $process->setTimeout(60);

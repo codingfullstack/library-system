@@ -1,0 +1,452 @@
+openapi: 3.1.0
+info:
+  title: Library System Android API
+  version: 1.0.0
+servers:
+  - url: /api
+security:
+  - bearerAuth: []
+paths:
+  /auth/login:
+    post:
+      tags: [authentication]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200":
+          description: Login success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, token, user]
+                properties:
+                  message: { type: string }
+                  token: { type: string }
+                  user: { $ref: "#/components/schemas/AuthUser" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /auth/me:
+    get:
+      tags: [authentication]
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties:
+                  user: { $ref: "#/components/schemas/AuthUser" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /auth/books:
+    get:
+      tags: [books, pagination, capabilities]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+        - { name: search, in: query, schema: { type: string, nullable: true } }
+        - { name: availability, in: query, schema: { type: string, enum: [laisva, unavailable], nullable: true } }
+      responses:
+        "200":
+          description: Paginated books
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedBooks" }
+  /auth/books/{book}:
+    get:
+      tags: [book details, book copies, reservations, capabilities]
+      parameters:
+        - { name: book, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Book details
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BookDetails" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /auth/book-copies/{bookCopy}:
+    get:
+      tags: [book copies, loans, capabilities]
+      parameters:
+        - { name: bookCopy, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Book copy details
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BookCopy" }
+  /auth/reservations:
+    get:
+      tags: [reservations, pagination, capabilities]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [active, rezervuota, paruošta, įvykdyta, atšaukta, pasibaigusi], nullable: true } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: Paginated reservations
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedReservations" }
+    post:
+      tags: [reservations]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [book_id, scope]
+              properties:
+                book_id: { type: integer }
+                user_id: { type: integer, nullable: true }
+                scope: { type: string, enum: [library, branch] }
+                branch_id: { type: integer, nullable: true }
+                notes: { type: string, nullable: true }
+      responses:
+        "201":
+          description: Reservation created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, reservation]
+                properties:
+                  message: { type: string }
+                  reservation: { $ref: "#/components/schemas/Reservation" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /auth/reservations/{reservation}/cancel:
+    patch:
+      tags: [reservations, capabilities]
+      parameters:
+        - { name: reservation, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, nullable: true }
+      responses:
+        "200":
+          description: Reservation cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, reservation]
+                properties:
+                  message: { type: string }
+                  reservation: { $ref: "#/components/schemas/Reservation" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /auth/loans/active:
+    get:
+      tags: [loans, pagination, capabilities]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [aktyvi, vėluoja, grąžinta, prarasta], nullable: true } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: Paginated loans
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedLoans" }
+  /auth/book-copies/{bookCopy}/borrow:
+    post:
+      tags: [book copies, loans]
+      parameters:
+        - { name: bookCopy, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, no_due_date]
+              properties:
+                user_id: { type: integer }
+                due_at: { type: string, format: date, nullable: true }
+                no_due_date: { type: boolean }
+                notes: { type: string, nullable: true }
+      responses:
+        "200": { description: Copy borrowed }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /auth/book-copies/{bookCopy}/return:
+    post:
+      tags: [book copies, loans]
+      parameters:
+        - { name: bookCopy, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { description: Copy returned }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /auth/notifications:
+    get:
+      tags: [notifications, pagination]
+      responses:
+        "200":
+          description: Paginated notifications
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedNotifications" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum token
+  responses:
+    Unauthenticated:
+      description: Missing or invalid bearer token
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Authenticated but not authorized
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Resource not found or outside active tenant scope
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: State conflict
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ValidationError" }
+  schemas:
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+    ValidationError:
+      type: object
+      required: [message, errors]
+      properties:
+        message: { type: string }
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+    PaginationLinks:
+      type: object
+      required: [first, last, prev, next]
+      properties:
+        first: { type: string, nullable: true }
+        last: { type: string, nullable: true }
+        prev: { type: string, nullable: true }
+        next: { type: string, nullable: true }
+    PaginationMeta:
+      type: object
+      required: [current_page, last_page, per_page, total]
+      properties:
+        current_page: { type: integer }
+        last_page: { type: integer }
+        per_page: { type: integer }
+        total: { type: integer }
+    AuthUser:
+      type: object
+      required: [id, library_id, library_name, branch_id, branch_name, name, email, role, global_role, phone, membership_number, is_active]
+      properties:
+        id: { type: integer }
+        library_id: { type: integer, nullable: true }
+        library_name: { type: string, nullable: true }
+        branch_id: { type: integer, nullable: true }
+        branch_name: { type: string, nullable: true }
+        name: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [superadministratorius, administratorius, darbuotojas, narys], nullable: true }
+        global_role: { type: string, enum: [superadministratorius], nullable: true }
+        phone: { type: string, nullable: true }
+        membership_number: { type: string, nullable: true }
+        is_active: { type: boolean }
+    Book:
+      type: object
+      required: [id, slug, title, subtitle, isbn, description, cover_image, publication_year, language, page_count, copies_count, available_copies_count, is_available, can_reserve, display_status]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        title: { type: string }
+        subtitle: { type: string, nullable: true }
+        isbn: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        cover_image: { type: string, nullable: true }
+        publication_year: { type: integer, nullable: true }
+        language: { type: string, nullable: true }
+        page_count: { type: integer, nullable: true }
+        copies_count: { type: integer }
+        available_copies_count: { type: integer, nullable: true }
+        is_available: { type: boolean }
+        can_reserve: { type: boolean }
+        display_status: { type: string }
+    BookDetails:
+      allOf:
+        - $ref: "#/components/schemas/Book"
+        - type: object
+          required: [edition, publisher, category, categories, authors, reservations, book_copies]
+          properties:
+            edition: { type: string, nullable: true }
+            publisher: { $ref: "#/components/schemas/NamedEntityNullable" }
+            category: { $ref: "#/components/schemas/NamedEntityNullable" }
+            categories: { type: array, items: { $ref: "#/components/schemas/NamedEntity" } }
+            authors: { type: array, items: { $ref: "#/components/schemas/NamedEntity" } }
+            reservations: { type: array, items: { $ref: "#/components/schemas/Reservation" } }
+            book_copies: { type: array, items: { $ref: "#/components/schemas/BookCopy" } }
+    BookCopy:
+      type: object
+      required: [id, library_id, inventory_code, qr_code, barcode, status, status_label, condition_status, condition_label, notes, status_history, book, branch, location, active_loan, current_reservation, can_borrow, can_return, can_manage, available_lifecycle_transitions, lifecycle_transition_labels]
+      properties:
+        id: { type: integer }
+        library_id: { type: integer }
+        inventory_code: { type: string }
+        qr_code: { type: string, nullable: true }
+        barcode: { type: string, nullable: true }
+        status: { type: string, enum: [laisva, išduota, prarasta, tvarkoma, nurašyta] }
+        status_label: { type: string }
+        condition_status: { type: string, nullable: true }
+        condition_label: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        status_history: { type: array }
+        book: { $ref: "#/components/schemas/BookSummaryNullable" }
+        branch: { $ref: "#/components/schemas/NamedEntityNullable" }
+        location: { type: object, nullable: true }
+        active_loan: { type: object, nullable: true }
+        current_reservation: { $ref: "#/components/schemas/ReservationNullable" }
+        can_borrow: { type: boolean }
+        can_return: { type: boolean }
+        can_manage: { type: boolean }
+        available_lifecycle_transitions: { type: array, items: { type: string } }
+        lifecycle_transition_labels: { type: object }
+    Reservation:
+      type: object
+      required: [status, status_label, is_active, is_pending, is_ready, is_current, can_cancel, display_status, queue_position, queue_size, reservation_scope, ready_at, expires_at]
+      properties:
+        status: { type: string, enum: [rezervuota, paruošta, įvykdyta, atšaukta, pasibaigusi] }
+        status_label: { type: string }
+        is_active: { type: boolean }
+        is_pending: { type: boolean }
+        is_ready: { type: boolean }
+        is_current: { type: boolean }
+        can_cancel: { type: boolean }
+        display_status: { type: string }
+        queue_position: { type: integer, nullable: true }
+        queue_size: { type: integer, nullable: true }
+        reservation_scope: { type: string, enum: [library, branch], nullable: true }
+        ready_at: { type: string, nullable: true }
+        expires_at: { type: string, nullable: true }
+    ReservationNullable:
+      oneOf:
+        - $ref: "#/components/schemas/Reservation"
+        - type: "null"
+    Loan:
+      type: object
+      required: [status, status_label, display_status, is_overdue, is_due_soon, overdue_days, can_renew, can_return, book_copy]
+      properties:
+        status: { type: string, enum: [aktyvi, vėluoja, grąžinta, prarasta] }
+        status_label: { type: string }
+        display_status: { type: string }
+        is_overdue: { type: boolean }
+        is_due_soon: { type: boolean }
+        overdue_days: { type: integer }
+        can_renew: { type: boolean }
+        can_return: { type: boolean }
+        book_copy: { type: object, nullable: true }
+    UserNotification:
+      type: object
+      required: [id, type, kind, ui, category, icon, color, badge, priority, title, message, url, metadata, read_at, created_at, sender]
+      properties:
+        id: { type: string }
+        type: { type: string }
+        kind: { type: string }
+        ui: { type: object }
+        category: { type: string }
+        icon: { type: string }
+        color: { type: string }
+        badge: { type: string }
+        priority: { type: string }
+        title: { type: string }
+        message: { type: string }
+        url: { type: string }
+        metadata: { type: object }
+        read_at: { type: string, nullable: true }
+        created_at: { type: string, nullable: true }
+        sender: { type: object, nullable: true }
+    PaginatedBooks:
+      type: object
+      required: [data, links, meta]
+      properties:
+        data: { type: array, items: { $ref: "#/components/schemas/Book" } }
+        links: { $ref: "#/components/schemas/PaginationLinks" }
+        meta: { $ref: "#/components/schemas/PaginationMeta" }
+    PaginatedReservations:
+      type: object
+      required: [data, links, meta, summary]
+      properties:
+        data: { type: array, items: { $ref: "#/components/schemas/Reservation" } }
+        links: { $ref: "#/components/schemas/PaginationLinks" }
+        meta: { $ref: "#/components/schemas/PaginationMeta" }
+        summary: { type: object }
+    PaginatedLoans:
+      type: object
+      required: [data, links, meta]
+      properties:
+        data: { type: array, items: { $ref: "#/components/schemas/Loan" } }
+        links: { $ref: "#/components/schemas/PaginationLinks" }
+        meta: { $ref: "#/components/schemas/PaginationMeta" }
+    PaginatedNotifications:
+      type: object
+      required: [data, links, meta, unread_count]
+      properties:
+        data: { type: array, items: { $ref: "#/components/schemas/UserNotification" } }
+        links: { $ref: "#/components/schemas/PaginationLinks" }
+        meta: { $ref: "#/components/schemas/PaginationMeta" }
+        unread_count: { type: integer }
+    NamedEntity:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+    NamedEntityNullable:
+      oneOf:
+        - $ref: "#/components/schemas/NamedEntity"
+        - type: "null"
+    BookSummaryNullable:
+      oneOf:
+        - type: object
+          required: [id, title, subtitle, isbn]
+          properties:
+            id: { type: integer }
+            title: { type: string }
+            subtitle: { type: string, nullable: true }
+            isbn: { type: string, nullable: true }
+        - type: "null"

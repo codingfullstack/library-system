@@ -13,7 +13,8 @@ uses(RefreshDatabase::class);
 
 it('does not return expired reservations in the active api filter', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create();
 
@@ -59,7 +60,8 @@ it('does not return expired reservations in the active api filter', function () 
 
 it('returns waiting and ready reservations for the active api filter', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $readyMember = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create();
@@ -104,7 +106,8 @@ it('returns waiting and ready reservations for the active api filter', function 
 
 it('accepts canonical reservation status constants in api filters', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create();
 
@@ -137,7 +140,8 @@ it('accepts canonical reservation status constants in api filters', function () 
 
 it('labels explicitly expired reservations as expired in api responses', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create();
 
@@ -162,10 +166,10 @@ it('labels explicitly expired reservations as expired in api responses', functio
 
 it('returns pickup branch from pickup_branch_id in api responses', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create();
     $requestedBranch = Branch::factory()->create(['library_id' => $library->id, 'name' => 'Uzsakytas filialas']);
+    $staff = staffInBranch($library, $requestedBranch);
     $pickupBranch = Branch::factory()->create(['library_id' => $library->id, 'name' => 'Centrinis filialas']);
 
     $reservation = Reservation::factory()->create([
@@ -257,7 +261,8 @@ it('reports ready reservations consistently across reservation book and copy end
 
 it('returns null pickup branch for reservations that are not ready', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create();
     $pickupBranch = Branch::factory()->create(['library_id' => $library->id]);
@@ -330,7 +335,8 @@ it('matches can cancel with the cancellation action for inactive reservations', 
 
 it('orders api reservations by creation date descending', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create();
 

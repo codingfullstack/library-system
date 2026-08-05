@@ -46,6 +46,10 @@ trait BuildsLibraryNotificationPayload
      */
     public function via(object $notifiable): array
     {
+        if (($this->metadata['database_stored'] ?? false) === true) {
+            return ['broadcast', FcmChannel::class];
+        }
+
         return ['database', 'broadcast', FcmChannel::class];
     }
 

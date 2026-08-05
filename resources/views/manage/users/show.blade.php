@@ -6,6 +6,19 @@
             'darbuotojas' => 'Darbuotojas',
             'narys' => 'Narys',
         ];
+        $actor = auth()->user();
+        $currentLibraryId = $actor?->activeLibraryId();
+        $isSuperAdmin = (bool) $actor?->isSuperAdmin();
+        $membership = $currentLibraryId
+            ? $managedUser->libraryMemberships->firstWhere('library_id', $currentLibraryId)
+            : null;
+        $displayActive = $isSuperAdmin ? (bool) $managedUser->is_active : (bool) $membership?->is_active;
+        $toggleRoute = $isSuperAdmin
+            ? route('manage.users.toggle-global-active', $managedUser)
+            : route('manage.users.toggle-membership', $managedUser);
+        $toggleLabel = $isSuperAdmin
+            ? ($managedUser->is_active ? 'Blokuoti paskyrą visoje sistemoje' : 'Atkurti paskyrą')
+            : ($displayActive ? 'Deaktyvuoti narystę' : 'Atkurti narystę');
     @endphp
 
     <x-ui.page>
@@ -13,11 +26,11 @@
             <x-slot:actions>
                 <div class="flex flex-col gap-3 sm:flex-row">
                     @if(auth()->id() !== $managedUser->id)
-                        <form method="POST" action="{{ route('manage.users.toggle-active', $managedUser) }}">
+                        <form method="POST" action="{{ $toggleRoute }}">
                             @csrf
                             @method('PATCH')
                             <button type="submit" class="app-button-secondary">
-                                {{ $managedUser->is_active ? 'Deaktyvuoti' : 'Aktyvuoti' }}
+                                {{ $toggleLabel }}
                             </button>
                         </form>
                     @endif
@@ -77,8 +90,8 @@
                     <div class="app-muted-card">
                         <dt class="app-label">Statusas</dt>
                         <dd class="mt-2">
-                            <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium {{ $managedUser->is_active ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' }}">
-                                {{ $managedUser->is_active ? 'Aktyvus' : 'Neaktyvus' }}
+                            <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium {{ $displayActive ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' }}">
+                                {{ $displayActive ? 'Aktyvus' : 'Neaktyvus' }}
                             </span>
                         </dd>
                     </div>

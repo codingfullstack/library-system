@@ -11,10 +11,14 @@ class DashboardSummaryController extends Controller
 {
     public function __invoke(Request $request, GetDashboardReportDataQuery $getDashboardReportDataQuery): JsonResponse
     {
-        $dashboard = $getDashboardReportDataQuery->handle($request->user());
+        $user = $request->user();
+
+        if (! $user->isSuperAdmin() && ! $user->activeLibraryId()) {
+            abort(403, 'Neturite aktyvios narystes pasirinktoje bibliotekoje.');
+        }
 
         return response()->json([
-            'summary' => $dashboard['summary'],
+            'summary' => $getDashboardReportDataQuery->summary($user),
         ]);
     }
 }

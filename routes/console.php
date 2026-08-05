@@ -15,4 +15,5 @@ Schedule::command('sitemap:generate')
 
 Schedule::command('reservations:expire')
     ->everyMinute()
-    ->withoutOverlapping();
+    ->withoutOverlapping()
+    ->onOneServer();

@@ -8,6 +8,8 @@ use App\Support\Notifications\NotificationMetadataBuilder;
 use App\Support\Notifications\NotificationType;
 use App\Support\Notifications\NotificationUiConfig;
 use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class CreateUserNotificationAction
 {
@@ -27,6 +29,46 @@ class CreateUserNotificationAction
         $type = NotificationType::normalize($type);
         $ui = NotificationUiConfig::for($type);
         $metadata = NotificationMetadataBuilder::compact($metadata);
+
+        if ($relatedType && $relatedId) {
+            return DB::transaction(function () use ($recipient, $sender, $type, $title, $message, $metadata, $relatedType, $relatedId, $ui): ?DatabaseNotification {
+                User::query()
+                    ->whereKey($recipient->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                return $this->createOrUpdate(
+                    $recipient,
+                    $sender,
+                    $type,
+                    $title,
+                    $message,
+                    $metadata,
+                    $relatedType,
+                    $relatedId,
+                    $ui
+                );
+            });
+        }
+
+        return $this->createOrUpdate($recipient, $sender, $type, $title, $message, $metadata, $relatedType, $relatedId, $ui);
+    }
+
+    /**
+     * @param  array<string, mixed>  $metadata
+     * @param  array<string, mixed>  $ui
+     */
+    private function createOrUpdate(
+        User $recipient,
+        ?User $sender,
+        NotificationType $type,
+        ?string $title,
+        string $message,
+        array $metadata,
+        ?string $relatedType,
+        ?int $relatedId,
+        array $ui
+    ): ?DatabaseNotification {
         $existing = null;
 
         if ($relatedType && $relatedId) {
@@ -68,6 +110,40 @@ class CreateUserNotificationAction
             $existing->save();
 
             return $existing;
+        }
+
+        if ($relatedType && $relatedId) {
+            $notification = $recipient->notifications()->create([
+                'id' => (string) Str::uuid(),
+                'type' => $type->value,
+                'data' => array_merge($payload, [
+                    'sender' => $sender ? [
+                        'id' => $sender->id,
+                        'name' => $sender->name,
+                        'email' => $sender->email,
+                    ] : null,
+                ]),
+                'read_at' => null,
+            ]);
+
+            DB::afterCommit(fn () => $recipient->notify(new LibraryNotification(
+                kind: $type,
+                title: $title ?: $type->defaultTitle(),
+                message: $message,
+                url: $payload['url'],
+                metadata: array_merge($metadata, [
+                    'database_stored' => true,
+                    'sender' => $sender ? [
+                        'id' => $sender->id,
+                        'name' => $sender->name,
+                        'email' => $sender->email,
+                    ] : null,
+                ]),
+                relatedType: $relatedType,
+                relatedId: $relatedId,
+            )));
+
+            return $notification;
         }
 
         $recipient->notify(new LibraryNotification(

@@ -42,29 +42,17 @@ class UserFactory extends Factory
                     return;
                 }
 
-                $membership = LibraryMembership::query()->updateOrCreate(
+                LibraryMembership::query()->updateOrCreate(
                     [
                         'library_id' => $libraryId,
                         'user_id' => $user->id,
                     ],
                     [
-                        'role' => $user->role,
                         'membership_number' => $user->membership_number,
                         'is_active' => $user->is_active,
                         'joined_at' => $user->created_at,
                     ]
                 );
-
-                if ($user->role === User::ROLE_STAFF && ! $membership->branch_id) {
-                    $branch = \App\Models\Branch::query()
-                        ->where('library_id', $libraryId)
-                        ->orderBy('id')
-                        ->first();
-
-                    if ($branch) {
-                        $membership->update(['branch_id' => $branch->id]);
-                    }
-                }
             });
     }
 
@@ -128,5 +116,3 @@ class UserFactory extends Factory
         ]);
     }
 }
-
-

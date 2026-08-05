@@ -221,8 +221,9 @@ it('filters book copies on the book page by lifecycle group', function () {
         'book_id' => $book->id,
         'branch_id' => $branch->id,
         'location_id' => $location->id,
-        'inventory_code' => 'INV-ISSUE-001',
-        'status' => 'tvarkoma',
+        'inventory_code' => 'INV-ACTIVE-GOOD',
+        'status' => BookCopy::STATUS_AVAILABLE,
+        'condition_status' => BookCopy::CONDITION_GOOD,
     ]);
 
     BookCopy::factory()->create([
@@ -230,7 +231,7 @@ it('filters book copies on the book page by lifecycle group', function () {
         'book_id' => $book->id,
         'branch_id' => $branch->id,
         'location_id' => $location->id,
-        'inventory_code' => 'INV-REMOVED-001',
+        'inventory_code' => 'INV-ACTIVE-DAMAGED',
         'status' => 'nurašyta',
     ]);
 
@@ -239,10 +240,53 @@ it('filters book copies on the book page by lifecycle group', function () {
         'book_id' => $book->id,
         'branch_id' => $branch->id,
         'location_id' => $location->id,
-        'inventory_code' => 'INV-ACTIVE-001',
-        'status' => 'laisva',
+        'inventory_code' => 'INV-MAINTENANCE',
+        'status' => BookCopy::STATUS_MAINTENANCE,
         'condition_status' => BookCopy::CONDITION_GOOD,
     ]);
+
+    BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'inventory_code' => 'INV-LOANED-DAMAGED',
+        'status' => BookCopy::STATUS_LOANED,
+        'condition_status' => BookCopy::CONDITION_DAMAGED,
+    ]);
+
+    BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'inventory_code' => 'INV-LOST',
+        'status' => BookCopy::STATUS_LOST,
+        'condition_status' => BookCopy::CONDITION_DAMAGED,
+    ]);
+
+    BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'inventory_code' => 'INV-REMOVED-GOOD',
+        'status' => BookCopy::STATUS_WITHDRAWN,
+        'condition_status' => BookCopy::CONDITION_GOOD,
+    ]);
+
+    $activeResponse = $this->actingAs($user)->get(route('books.show', [
+        'book' => $book,
+        'copy_lifecycle' => 'aktyvi',
+    ]));
+
+    $activeResponse->assertOk();
+    $activeResponse->assertSee('INV-ACTIVE-GOOD');
+    $activeResponse->assertSee('INV-LOANED-DAMAGED');
+    $activeResponse->assertDontSee('INV-MAINTENANCE');
+    $activeResponse->assertDontSee('INV-LOST');
+    $activeResponse->assertDontSee('INV-ACTIVE-DAMAGED');
+    $activeResponse->assertDontSee('INV-REMOVED-GOOD');
 
     $issuesResponse = $this->actingAs($user)->get(route('books.show', [
         'book' => $book,
@@ -250,9 +294,12 @@ it('filters book copies on the book page by lifecycle group', function () {
     ]));
 
     $issuesResponse->assertOk();
-    $issuesResponse->assertSee('INV-ISSUE-001');
-    $issuesResponse->assertDontSee('INV-REMOVED-001');
-    $issuesResponse->assertDontSee('INV-ACTIVE-001');
+    $issuesResponse->assertSee('INV-LOANED-DAMAGED');
+    $issuesResponse->assertSee('INV-MAINTENANCE');
+    $issuesResponse->assertSee('INV-LOST');
+    $issuesResponse->assertDontSee('INV-ACTIVE-GOOD');
+    $issuesResponse->assertDontSee('INV-ACTIVE-DAMAGED');
+    $issuesResponse->assertDontSee('INV-REMOVED-GOOD');
 
     $removedResponse = $this->actingAs($user)->get(route('books.show', [
         'book' => $book,
@@ -260,20 +307,23 @@ it('filters book copies on the book page by lifecycle group', function () {
     ]));
 
     $removedResponse->assertOk();
-    $removedResponse->assertSee('INV-REMOVED-001');
-    $removedResponse->assertDontSee('INV-ISSUE-001');
-    $removedResponse->assertDontSee('INV-ACTIVE-001');
+    $removedResponse->assertSee('INV-ACTIVE-DAMAGED');
+    $removedResponse->assertSee('INV-REMOVED-GOOD');
+    $removedResponse->assertDontSee('INV-ACTIVE-GOOD');
+    $removedResponse->assertDontSee('INV-LOANED-DAMAGED');
+    $removedResponse->assertDontSee('INV-MAINTENANCE');
+    $removedResponse->assertDontSee('INV-LOST');
 });
 
 it('filters loans by member employee and overdue status', function () {
     $library = Library::factory()->create();
-    $user = User::factory()->staff()->create(['library_id' => $library->id]);
-    $employee = User::factory()->staff()->create(['library_id' => $library->id, 'name' => 'Darbuotojas A']);
-    $otherEmployee = User::factory()->staff()->create(['library_id' => $library->id, 'name' => 'Darbuotojas B']);
     $member = User::factory()->member()->create(['library_id' => $library->id, 'name' => 'Narys A']);
     $otherMember = User::factory()->member()->create(['library_id' => $library->id, 'name' => 'Narys B']);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
     $otherBranch = Branch::factory()->create(['library_id' => $library->id]);
+    $user = staffInBranch($library, $branch);
+    $employee = staffInBranch($library, $branch, ['name' => 'Darbuotojas A']);
+    $otherEmployee = staffInBranch($library, $otherBranch, ['name' => 'Darbuotojas B']);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $otherLocation = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $otherBranch->id]);
 
@@ -475,7 +525,8 @@ it('filters library reservations by branch for administrators', function () {
 
 it('filters explicitly expired reservations separately from waiting reservations', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $member = User::factory()->member()->create(['library_id' => $library->id, 'name' => 'Lukas Petrauskas']);
     $book = Book::factory()->create(['title' => 'Haris Poteris ir Išminties akmuo']);
 

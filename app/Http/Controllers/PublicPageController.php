@@ -8,6 +8,7 @@ use App\Models\Library;
 use App\Models\Reservation;
 use App\Models\User;
 use App\Services\SeoService;
+use App\Support\LibraryJoinService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
 use RalphJSmit\Laravel\SEO\SchemaCollection;
@@ -45,13 +46,24 @@ class PublicPageController extends Controller
         ]);
     }
 
-    public function libraries(SeoService $seoService): View
+    public function libraries(SeoService $seoService, LibraryJoinService $libraryJoinService): View
     {
         $libraries = Library::query()
             ->where('is_active', true)
             ->where('is_public', true)
             ->orderBy('name')
             ->get(['id', 'slug', 'name', 'code', 'address', 'city']);
+
+        $user = auth()->user();
+
+        if ($user?->role === User::ROLE_MEMBER) {
+            $libraries->each(function (Library $library) use ($libraryJoinService, $user): void {
+                $state = $libraryJoinService->statusFor($user, $library);
+
+                $library->setAttribute('membership_status', $state['membership_status']);
+                $library->setAttribute('can_join', $state['can_join']);
+            });
+        }
 
         return view('libraries.index', [
             'libraries' => $libraries,

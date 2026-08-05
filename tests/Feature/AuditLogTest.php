@@ -113,7 +113,6 @@ it('records an audit log when a book is updated', function () {
 
 it('records an audit log when a book is issued and when copy status changes', function () {
     $library = Library::factory()->create(['name' => 'Testine biblioteka']);
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create([
         'library_id' => $library->id,
         'name' => 'Jonas Skaitytojas',
@@ -121,6 +120,7 @@ it('records an audit log when a book is issued and when copy status changes', fu
     ]);
     $book = Book::factory()->create(['title' => 'Išskirtinė knyga']);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $bookCopy = BookCopy::factory()->create([
         'library_id' => $library->id,
@@ -182,7 +182,6 @@ it('shows recent audit logs on the managed user page for superadmin', function (
 it('shows related reservation and issue audit logs on the book page for superadmin', function () {
     $superAdmin = User::factory()->superAdmin()->create();
     $library = Library::factory()->create(['name' => 'Audit biblioteka']);
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create([
         'library_id' => $library->id,
         'name' => 'Rezervacijos narys',
@@ -195,6 +194,7 @@ it('shows related reservation and issue audit logs on the book page for superadm
     ]);
     $book = Book::factory()->create(['title' => 'Istorijos knyga']);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $bookCopy = BookCopy::factory()->create([
         'library_id' => $library->id,

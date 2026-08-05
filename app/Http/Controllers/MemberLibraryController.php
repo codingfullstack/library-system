@@ -3,14 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\Library;
-use App\Models\LibraryMembership;
+use App\Support\LibraryJoinService;
 use App\Support\UserManagement;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class MemberLibraryController extends Controller
 {
-    public function join(Request $request, Library $library): RedirectResponse
+    public function join(Request $request, Library $library, LibraryJoinService $libraryJoinService): RedirectResponse|Response
     {
         $user = $request->user();
 
@@ -23,18 +24,10 @@ class MemberLibraryController extends Controller
             ])->save();
         }
 
-        if (! $user->belongsToLibrary($library->id)) {
-            LibraryMembership::query()->updateOrCreate(
-                [
-                    'library_id' => $library->id,
-                    'user_id' => $user->id,
-                ],
-                [
-                    'membership_number' => $user->membership_number ?: UserManagement::generateMembershipNumber(),
-                    'is_active' => true,
-                    'joined_at' => now(),
-                ]
-            );
+        $result = $libraryJoinService->join($user, $library);
+
+        if ($result->isInactive()) {
+            return response(LibraryJoinService::INACTIVE_MESSAGE, 403);
         }
 
         return redirect()
@@ -42,11 +35,3 @@ class MemberLibraryController extends Controller
             ->with('success', sprintf('Prisijungėte prie bibliotekos "%s".', $library->name));
     }
 }
-
-
-
-
-
-
-
-

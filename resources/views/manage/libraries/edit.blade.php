@@ -46,7 +46,7 @@
                                 <div class="truncate text-sm font-semibold text-zinc-950 dark:text-white">{{ $staffUser->name }}</div>
                                 <div class="truncate text-xs text-zinc-500 dark:text-zinc-400">{{ $staffUser->email }}</div>
                                 <div class="mt-2 flex flex-wrap gap-2">
-                                    <span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">{{ ucfirst($staffUser->pivot->role) }}</span>
+                                    <span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">{{ ucfirst($staffUser->role) }}</span>
                                     <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $staffUser->pivot->is_active ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300' }}">
                                         {{ $staffUser->pivot->is_active ? 'Aktyvus' : 'Neaktyvus' }}
                                     </span>

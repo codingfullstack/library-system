@@ -86,8 +86,8 @@
 
                 <section class="overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                     <div class="px-5 py-4">
-                        <form method="GET" action="{{ route('manage.book-copies.index') }}" class="grid gap-3 xl:grid-cols-[minmax(320px,1.4fr)_190px_190px_190px_auto_auto] xl:items-center">
-                            <div class="relative xl:min-w-0">
+                        <form method="GET" action="{{ route('manage.book-copies.index') }}" class="flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-center">
+                            <div class="relative xl:min-w-[380px] xl:flex-1">
                                 <input
                                     type="text"
                                     name="search"
@@ -100,7 +100,7 @@
                                 </div>
                             </div>
 
-                            <div class="xl:min-w-0">
+                            <div class="xl:w-48">
                                 <select name="status" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
                                     <option value="">Būsena</option>
                                     @foreach($statusLabels as $statusValue => $statusLabel)
@@ -109,7 +109,7 @@
                                 </select>
                             </div>
 
-                            <div class="xl:min-w-0">
+                            <div class="xl:w-48">
                                 <select name="condition_status" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
                                     <option value="">Fizinė būklė</option>
                                     @foreach($conditionLabels as $conditionValue => $conditionLabel)
@@ -118,7 +118,7 @@
                                 </select>
                             </div>
 
-                            <div class="xl:min-w-0">
+                            <div class="xl:w-48">
                                 <select name="branch_id" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
                                     <option value="">Filialas</option>
                                     @foreach($branches as $branch)
@@ -127,14 +127,16 @@
                                 </select>
                             </div>
 
-                            <button type="submit" class="app-button-secondary h-11 rounded-2xl px-4">
-                                <flux:icon.funnel class="mr-2 size-4" />
-                                Filtruoti
-                            </button>
+                            <div class="flex flex-col gap-3 sm:flex-row xl:w-auto xl:shrink-0">
+                                <button type="submit" class="app-button-secondary h-11 rounded-2xl px-4 sm:w-auto">
+                                    <flux:icon.funnel class="mr-2 size-4" />
+                                    Filtruoti
+                                </button>
 
-                            <a href="{{ route('manage.book-copies.index') }}" class="app-button-secondary h-11 rounded-2xl px-4">
-                                Išvalyti
-                            </a>
+                                <a href="{{ route('manage.book-copies.index') }}" class="app-button-secondary h-11 rounded-2xl px-4 sm:w-auto">
+                                    Išvalyti
+                                </a>
+                            </div>
                         </form>
                     </div>
                 </section>
@@ -240,10 +242,5 @@
         </div>
     </x-ui.page>
 </x-layouts::app>
-
-
-
-
-
 
 

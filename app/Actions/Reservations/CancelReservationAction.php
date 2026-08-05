@@ -12,8 +12,10 @@ use App\Services\ReservationQueueService;
 use App\Support\Notifications\NotificationMessageBuilder;
 use App\Support\Notifications\NotificationMetadataBuilder;
 use App\Support\Notifications\NotificationType;
+use App\Support\Observability\OperationDiagnostics;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class CancelReservationAction
 {
@@ -42,14 +44,15 @@ class CancelReservationAction
             ]);
         }
 
-        $reservation = DB::transaction(function () use ($reservation, $normalizedReason, &$wasReady, &$pickupBranchId, &$pickupBranchName): Reservation {
-            $queueService = app(ReservationQueueService::class);
+        try {
+            $reservation = DB::transaction(function () use ($reservation, $normalizedReason, &$wasReady, &$pickupBranchId, &$pickupBranchName): Reservation {
+                $queueService = app(ReservationQueueService::class);
 
-            $reservationContext = Reservation::query()
-                ->whereKey($reservation->id)
-                ->firstOrFail();
+                $reservationContext = Reservation::query()
+                    ->whereKey($reservation->id)
+                    ->firstOrFail();
 
-            $queueService->lockQueueContext((int) $reservationContext->library_id, (int) $reservationContext->book_id);
+                $queueService->lockQueueContext((int) $reservationContext->library_id, (int) $reservationContext->book_id);
 
             $lockedReservation = Reservation::query()
                 ->with('pickupBranch:id,name')
@@ -60,6 +63,12 @@ class CancelReservationAction
             $wasReady = $lockedReservation->isReady();
             $pickupBranchId = $lockedReservation->pickup_branch_id;
             $pickupBranchName = $lockedReservation->pickupBranch?->name;
+
+            if (! $lockedReservation->isActive()) {
+                throw ValidationException::withMessages([
+                    'reservation' => 'Galima atÅ¡aukti tik aktyviÄ… rezervacijÄ….',
+                ]);
+            }
 
             $queueService->activeReservationsQuery($lockedReservation->library_id, $lockedReservation->book_id)
                 ->lockForUpdate()
@@ -97,8 +106,18 @@ class CancelReservationAction
                 'new_positions' => $queueService->getPositionsForBook($lockedReservation->library_id, $lockedReservation->book_id),
             ]);
 
-            return $lockedReservation->fresh();
-        });
+                return $lockedReservation->fresh();
+            });
+        } catch (Throwable $exception) {
+            app(OperationDiagnostics::class)->failure('reservation_cancel_failed', $exception, [
+                'operation' => 'reservation_cancel',
+                'library_id' => $reservation->library_id,
+                'book_id' => $reservation->book_id,
+                'reservation_id' => $reservation->id,
+            ]);
+
+            throw $exception;
+        }
 
         $reservation->loadMissing(['book:id,slug,title', 'user:id,name,email']);
 

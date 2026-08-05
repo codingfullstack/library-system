@@ -10,9 +10,13 @@ use App\Models\Reservation;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\UsesTemporaryMariaDbDatabase;
 use Tests\TestCase;
 
+#[Group('mysql')]
+#[Group('mariadb')]
+#[Group('database-invariants')]
 class ReservationPreflightCommandTest extends TestCase
 {
     use UsesTemporaryMariaDbDatabase;

@@ -37,6 +37,7 @@ Route::get('/pagalba', [PublicPageController::class, 'help'])->name('help');
 Route::middleware(['auth', 'overdue.notifications', 'verified', 'library.context', 'role:superadministratorius,administratorius,darbuotojas'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/dashboard/export/{format}', DashboardExportController::class)->name('dashboard.export');
+    Route::get('/exports/{resource}.csv', ListExportController::class)->name('exports.list');
 });
 
 Route::middleware(['auth', 'overdue.notifications'])->group(function () {
@@ -46,8 +47,6 @@ Route::middleware(['auth', 'overdue.notifications'])->group(function () {
     Route::get('/knygos/{book:slug}', [BookController::class, 'show'])->name('books.show');
 
     Route::post('/bibliotekos/{library:id}/prisijungti', [MemberLibraryController::class, 'join'])->middleware(['verified'])->name('libraries.join');
-
-    Route::get('/exports/{resource}.csv', ListExportController::class)->name('exports.list');
 
     Route::middleware(['verified', 'library.context', 'role:narys'])
         ->prefix('account')
@@ -65,14 +64,19 @@ Route::middleware(['auth', 'overdue.notifications'])->group(function () {
     Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.mark-read');
     Route::get('/book-copies/{id}', [BookCopyController::class, 'showPage'])->name('book-copies.show');
     Route::get('/book-copies/{id}/qr', [BookCopyQrController::class, 'show'])->name('book-copies.qr');
-    // LOANS
-    Route::get('/loans', [LoanController::class, 'index'])->name('loans.index');
-    Route::get('/loans/search-members', [LoanController::class, 'searchMembers'])->name('loans.search-members');
-    Route::post('/book-copies/{bookCopy}/return', [LoanController::class, 'returnBook'])->name('loans.return');
-    // RESERVATIONS
-    Route::get('/reservations', [ReservationController::class, 'index'])->name('reservations.index');
-    Route::post('/reservations', [ReservationController::class, 'store'])->name('reservations.store');
-    Route::patch('/reservations/{reservation}/cancel', [ReservationController::class, 'cancel'])->name('reservations.cancel');
+    Route::middleware(['verified', 'library.context', 'role:superadministratorius,administratorius,darbuotojas,narys'])->group(function () {
+        // LOANS
+        Route::get('/loans', [LoanController::class, 'index'])->name('loans.index');
+        Route::post('/book-copies/{bookCopy}/return', [LoanController::class, 'returnBook'])->name('loans.return');
+        // RESERVATIONS
+        Route::get('/reservations', [ReservationController::class, 'index'])->name('reservations.index');
+        Route::post('/reservations', [ReservationController::class, 'store'])->name('reservations.store');
+        Route::patch('/reservations/{reservation}/cancel', [ReservationController::class, 'cancel'])->name('reservations.cancel');
+    });
+
+    Route::middleware(['verified', 'library.context', 'role:superadministratorius,administratorius,darbuotojas'])->group(function () {
+        Route::get('/loans/search-members', [LoanController::class, 'searchMembers'])->name('loans.search-members');
+    });
 
 });
 
@@ -93,7 +97,8 @@ Route::middleware(['auth', 'overdue.notifications', 'verified', 'library.context
         Route::resource('authors', ManageAuthorController::class)->except('show');
         Route::resource('locations', ManageLocationController::class)->except('show');
         Route::resource('users', ManageUserController::class)->except(['store', 'update']);
-        Route::patch('users/{user}/toggle-active', [ManageUserController::class, 'toggleActive'])->name('users.toggle-active');
+        Route::patch('users/{user}/toggle-membership', [ManageUserController::class, 'toggleMembership'])->name('users.toggle-membership');
+        Route::patch('users/{user}/toggle-global-active', [ManageUserController::class, 'toggleGlobalActive'])->name('users.toggle-global-active');
         Route::post('users/{user}/memberships', [ManageUserMembershipController::class, 'store'])->name('users.memberships.store');
         Route::patch('users/{user}/memberships/{membership}/toggle', [ManageUserMembershipController::class, 'toggle'])->name('users.memberships.toggle');
         Route::delete('users/{user}/memberships/{membership}', [ManageUserMembershipController::class, 'destroy'])->name('users.memberships.destroy');

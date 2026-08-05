@@ -17,6 +17,7 @@ use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\UsesTemporaryMariaDbDatabase;
 use Tests\TestCase;
 
+#[Group('mysql')]
 #[Group('mariadb')]
 #[Group('database-invariants')]
 class ReservationLegacyReadyAuditCommandTest extends TestCase
@@ -246,6 +247,8 @@ class ReservationLegacyReadyAuditCommandTest extends TestCase
         foreach ([
             'ALTER TABLE reservations DROP INDEX reservations_active_ready_book_copy_unique',
             'ALTER TABLE reservations DROP COLUMN active_ready_book_copy_id',
+            'ALTER TABLE reservations DROP FOREIGN KEY reservations_assigned_copy_library_fk',
+            'ALTER TABLE reservations DROP INDEX reservations_assigned_copy_library_index',
             'ALTER TABLE reservations DROP FOREIGN KEY reservations_assigned_book_copy_id_foreign',
             'ALTER TABLE reservations DROP COLUMN assigned_book_copy_id',
         ] as $statement) {

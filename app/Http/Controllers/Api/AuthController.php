@@ -30,7 +30,15 @@ class AuthController extends Controller
 
         if (! $user->is_active) {
             return response()->json([
-                'message' => 'Paskyra neaktyvi.',
+                'message' => trans('auth.inactive'),
+                'code' => 'account_inactive',
+            ], 403);
+        }
+
+        if (! $user->isSuperAdmin() && ! $user->activeLibraryMemberships()->exists()) {
+            return response()->json([
+                'message' => trans('auth.no_active_membership'),
+                'code' => 'no_active_membership',
             ], 403);
         }
 
@@ -85,18 +93,9 @@ class AuthController extends Controller
             'email' => $user->email,
             'role' => $user->effectiveRole($libraryId),
             'global_role' => $user->isSuperAdmin() ? User::ROLE_SUPER_ADMIN : null,
-            'membership_role' => $libraryId ? $user->effectiveRole($libraryId) : null,
             'phone' => $user->phone,
             'membership_number' => $user->membership_number,
             'is_active' => (bool) $user->is_active,
         ];
     }
 }
-
-
-
-
-
-
-
-

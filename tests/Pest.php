@@ -44,9 +44,112 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+function memberInLibrary(App\Models\Library $library, array $attributes = []): App\Models\User
 {
-    // ..
+    return App\Models\User::factory()->member()->create(array_merge([
+        'library_id' => $library->id,
+        'is_active' => true,
+    ], $attributes));
+}
+
+function adminInLibrary(App\Models\Library $library, array $attributes = []): App\Models\User
+{
+    return App\Models\User::factory()->admin()->create(array_merge([
+        'library_id' => $library->id,
+        'is_active' => true,
+    ], $attributes));
+}
+
+function staffInBranch(App\Models\Library $library, App\Models\Branch $branch, array $attributes = []): App\Models\User
+{
+    if ((int) $branch->library_id !== (int) $library->id) {
+        throw new InvalidArgumentException('Valid staff fixture branch must belong to the same library.');
+    }
+
+    $user = App\Models\User::factory()->staff()->create(array_merge([
+        'library_id' => $library->id,
+        'is_active' => true,
+    ], $attributes));
+
+    $user->libraryMemberships()
+        ->where('library_id', $library->id)
+        ->update([
+            'branch_id' => $branch->id,
+            'is_active' => true,
+        ]);
+
+    return $user->refresh();
+}
+
+function superAdmin(array $attributes = []): App\Models\User
+{
+    return App\Models\User::factory()->superAdmin()->create(array_merge([
+        'is_active' => true,
+    ], $attributes));
+}
+
+function inactiveMemberInLibrary(App\Models\Library $library, array $attributes = []): App\Models\User
+{
+    $user = memberInLibrary($library, array_merge(['is_active' => true], $attributes));
+    $user->libraryMemberships()->where('library_id', $library->id)->update(['is_active' => false]);
+
+    return $user->refresh();
+}
+
+function userWithoutMembership(array $attributes = []): App\Models\User
+{
+    return App\Models\User::factory()->create(array_merge([
+        'is_active' => true,
+    ], $attributes));
+}
+
+function staffWithoutBranch(App\Models\Library $library, array $attributes = []): App\Models\User
+{
+    $user = App\Models\User::factory()->staff()->create(array_merge([
+        'library_id' => $library->id,
+        'is_active' => true,
+    ], $attributes));
+
+    $user->libraryMemberships()
+        ->where('library_id', $library->id)
+        ->update([
+            'branch_id' => null,
+            'is_active' => true,
+        ]);
+
+    return $user->refresh();
+}
+
+function staffWithForeignBranch(App\Models\Library $library, App\Models\Branch $foreignBranch, array $attributes = []): App\Models\User
+{
+    $user = staffWithoutBranch($library, $attributes);
+
+    withTestForeignKeysDisabled(fn () => $user->libraryMemberships()
+        ->where('library_id', $library->id)
+        ->update(['branch_id' => $foreignBranch->id]));
+
+    return $user->refresh();
+}
+
+function withTestForeignKeysDisabled(Closure $callback): mixed
+{
+    $driver = Illuminate\Support\Facades\DB::getDriverName();
+
+    if ($driver === 'mysql') {
+        Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=0');
+    } elseif ($driver === 'sqlite') {
+        Illuminate\Support\Facades\DB::statement('PRAGMA foreign_keys = OFF');
+    }
+
+    try {
+        return $callback();
+    } finally {
+        if ($driver === 'mysql') {
+            Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=1');
+        } elseif ($driver === 'sqlite') {
+            Illuminate\Support\Facades\DB::statement('PRAGMA foreign_keys = ON');
+        }
+    }
 }
 
 

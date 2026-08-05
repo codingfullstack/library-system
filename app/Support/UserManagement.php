@@ -2,10 +2,13 @@
 
 namespace App\Support;
 
-use App\Models\User;
+use App\Models\Branch;
 use App\Models\LibraryMembership;
 use App\Models\Reservation;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class UserManagement
@@ -25,6 +28,24 @@ class UserManagement
         return in_array($role, self::manageableRoles($actor), true);
     }
 
+    public static function canCreateUsers(User $actor): bool
+    {
+        return in_array($actor->role, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN], true);
+    }
+
+    public static function creatableRoles(User $actor): array
+    {
+        if ($actor->isSuperAdmin()) {
+            return self::manageableRoles($actor);
+        }
+
+        if ($actor->role === User::ROLE_ADMIN) {
+            return [User::ROLE_MEMBER, User::ROLE_STAFF];
+        }
+
+        return [];
+    }
+
     public static function scopeVisibleUsers(Builder $query, User $actor): Builder
     {
         $roles = self::manageableRoles($actor);
@@ -33,8 +54,7 @@ class UserManagement
         return $query
             ->when(! $actor->isSuperAdmin(), function (Builder $builder) use ($libraryIds) {
                 $builder->whereHas('libraryMemberships', fn (Builder $membershipQuery) => $membershipQuery
-                    ->whereIn('library_id', $libraryIds)
-                    ->where('is_active', true));
+                    ->whereIn('library_id', $libraryIds));
             })
             ->when($actor->role === User::ROLE_STAFF, function (Builder $builder) use ($actor) {
                 $libraryId = $actor->activeLibraryId();
@@ -83,8 +103,12 @@ class UserManagement
             return true;
         }
 
+        if ($actor->role === User::ROLE_STAFF) {
+            return self::scopeVisibleUsers(User::query()->whereKey($target->id), $actor)->exists();
+        }
+
         return collect($actor->manageableLibraryIds())
-            ->contains(fn (int $libraryId) => $target->belongsToLibrary($libraryId));
+            ->contains(fn (int $libraryId) => $target->hasMembershipInLibrary($libraryId));
     }
 
     public static function requiresLibrary(string $role): bool
@@ -103,7 +127,7 @@ class UserManagement
     public static function generateMembershipNumber(): string
     {
         do {
-            $candidate = 'MEM:' . (string) Str::ulid();
+            $candidate = 'MEM:'.(string) Str::ulid();
         } while (User::query()->where('membership_number', $candidate)->exists());
 
         return $candidate;
@@ -115,36 +139,78 @@ class UserManagement
             throw new \InvalidArgumentException('Superadministratoriui bibliotekos narystė nepriskiriama.');
         }
 
-        return LibraryMembership::query()->updateOrCreate(
-            [
-                'library_id' => $libraryId,
-                'user_id' => $user->id,
-            ],
-            [
-                'branch_id' => $user->role === User::ROLE_STAFF ? $branchId : null,
-                'membership_number' => $user->membership_number,
-                'is_active' => $user->is_active,
-                'joined_at' => $user->created_at,
-            ]
-        );
+        if ($user->role === User::ROLE_STAFF) {
+            if ($branchId === null) {
+                throw new \InvalidArgumentException('Darbuotojo narystei privalomas filialas.');
+            }
+
+            $branchBelongsToLibrary = Branch::query()
+                ->whereKey($branchId)
+                ->where('library_id', $libraryId)
+                ->exists();
+
+            if (! $branchBelongsToLibrary) {
+                throw new \InvalidArgumentException('Darbuotojo filialas turi priklausyti tai pačiai bibliotekai.');
+            }
+        }
+
+        $membership = LibraryMembership::query()->firstOrNew([
+            'library_id' => $libraryId,
+            'user_id' => $user->id,
+        ]);
+
+        $membership->fill([
+            'branch_id' => $user->role === User::ROLE_STAFF ? $branchId : null,
+            'membership_number' => $user->membership_number,
+            'joined_at' => $membership->joined_at ?: $user->created_at,
+        ]);
+
+        if (! $membership->exists) {
+            $membership->is_active = true;
+        }
+
+        $membership->save();
+
+        return $membership;
     }
 
-    public static function syncUserMembershipActivity(User $user): void
+    public static function membershipForActor(User $actor, User $target): ?LibraryMembership
     {
-        if ($user->isSuperAdmin()) {
+        if ($actor->isSuperAdmin()) {
+            return null;
+        }
+
+        $libraryId = $actor->activeLibraryId();
+
+        if (! $libraryId) {
+            return null;
+        }
+
+        return $target->libraryMemberships()
+            ->where('library_id', $libraryId)
+            ->first();
+    }
+
+    public static function revokeWebSessions(User $user): void
+    {
+        if (config('session.driver') !== 'database') {
             return;
         }
 
-        $user->libraryMemberships()->update([
-            'is_active' => $user->is_active,
-        ]);
+        $table = config('session.table', 'sessions');
+
+        if (! $table || ! Schema::hasTable($table)) {
+            return;
+        }
+
+        DB::table($table)
+            ->where('user_id', $user->id)
+            ->delete();
+    }
+
+    public static function revokeAllAccess(User $user): void
+    {
+        $user->tokens()->delete();
+        self::revokeWebSessions($user);
     }
 }
-
-
-
-
-
-
-
-

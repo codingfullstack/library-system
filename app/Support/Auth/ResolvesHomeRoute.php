@@ -18,7 +18,7 @@ class ResolvesHomeRoute
 
         $libraryId = $user->activeLibraryId();
 
-        if ($user->effectiveRole($libraryId) === User::ROLE_MEMBER || ($libraryId === null && $user->role === User::ROLE_MEMBER)) {
+        if ($user->effectiveRole($libraryId) === User::ROLE_MEMBER) {
             return 'account.dashboard';
         }
 

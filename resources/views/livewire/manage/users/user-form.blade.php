@@ -4,7 +4,7 @@
         'superadministratorius' => 'Superadministratorius',
         'administratorius' => 'Administratorius',
         'darbuotojas' => 'Darbuotojas',
-        'narys' => 'Narys',
+        'narys' => 'Skaitytojas',
     ];
 @endphp
 
@@ -22,15 +22,29 @@
             @error('email') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
         </div>
 
-        <div>
-            <label for="role" class="app-label">Rolė</label>
-            <select id="role" wire:model.live="role" class="app-input" required>
-                @foreach($roleOptions as $option)
-                    <option value="{{ $option }}">{{ $roleLabels[$option] ?? $option }}</option>
-                @endforeach
-            </select>
-            @error('role') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
-        </div>
+        @if($canEditGlobalRole || $canChooseAccountType)
+            <div>
+                <label for="role" class="app-label">Paskyros tipas</label>
+                <select id="role" wire:model.live="role" class="app-input" required>
+                    @foreach($roleOptions as $option)
+                        <option value="{{ $option }}">{{ $roleLabels[$option] ?? $option }}</option>
+                    @endforeach
+                </select>
+                @if($canEditGlobalRole)
+                    <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Globalų paskyros tipą gali keisti tik superadministratorius.</p>
+                @endif
+                @error('role') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+            </div>
+        @else
+            <div>
+                <label class="app-label">Paskyros tipas</label>
+                <div class="app-input flex items-center bg-zinc-50 text-zinc-600 dark:bg-zinc-950/40 dark:text-zinc-300">
+                    {{ $accountTypeLabel }}
+                </div>
+                <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Bibliotekos administratorius šio globalaus paskyros tipo nekeičia.</p>
+                @error('role') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+            </div>
+        @endif
 
         @if($actor?->isSuperAdmin())
             <div>
@@ -44,7 +58,7 @@
                     @endforeach
                 </select>
                 <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                    {{ $role === 'superadministratorius' ? 'Superadministratoriui biblioteka nepriskiriama.' : 'Nario rolei nario numeris generuojamas automatiškai.' }}
+                    {{ $role === 'superadministratorius' ? 'Superadministratoriui biblioteka nepriskiriama.' : 'Skaitytojo paskyrai nario numeris generuojamas automatiškai.' }}
                 </p>
                 @error('libraryId') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
             </div>
@@ -59,7 +73,7 @@
 
         @if($role === 'darbuotojas')
             <div>
-                <label for="branchId" class="app-label">Filialas</label>
+                <label for="branchId" class="app-label">Priskirtas filialas</label>
                 <select id="branchId" wire:model="branchId" class="app-input" required>
                     <option value="">Pasirinkti filialą</option>
                     @foreach($branches as $branch)
@@ -89,7 +103,7 @@
             <label for="password" class="app-label">{{ $isEditing ? 'Naujas slaptažodis' : 'Slaptažodis' }}</label>
             <input id="password" type="password" wire:model="password" class="app-input" {{ $isEditing ? '' : 'required' }}>
             <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                {{ $isEditing ? 'Palik tusčia, jei keisti nereikia.' : 'Bent 8 simboliai.' }}
+                {{ $isEditing ? 'Palik tuščią, jei keisti nereikia.' : 'Bent 8 simboliai.' }}
             </p>
             @error('password') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
         </div>
@@ -100,33 +114,29 @@
             @error('passwordConfirmation') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
         </div>
 
-        <div class="lg:col-span-2">
-            <label class="flex items-center gap-3 text-sm text-zinc-700 dark:text-zinc-300">
-                <input
-                    type="checkbox"
-                    wire:model="isActive"
-                    class="rounded border-zinc-300 text-teal-700 focus:ring-teal-600 dark:border-zinc-700 dark:bg-zinc-900"
-                >
-                Aktyvus vartotojas
-            </label>
-            @error('isActive') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
-        </div>
+        @if($actor?->isSuperAdmin())
+            <div class="lg:col-span-2">
+                <label class="flex items-center gap-3 text-sm text-zinc-700 dark:text-zinc-300">
+                    <input
+                        type="checkbox"
+                        wire:model="isActive"
+                        class="rounded border-zinc-300 text-teal-700 focus:ring-teal-600 dark:border-zinc-700 dark:bg-zinc-900"
+                    >
+                    Aktyvi paskyra visoje sistemoje
+                </label>
+                @error('isActive') <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+            </div>
+        @endif
     </div>
 
     <div class="flex flex-col gap-3 sm:flex-row">
         <button type="submit" class="app-button-primary" wire:loading.attr="disabled">
-            <span wire:loading.remove wire:target="save">{{ $isEditing ? 'Išsaugoti pakeitimus' : 'Sukurti vartotoją' }}</span>
+            <span wire:loading.remove wire:target="save">{{ $isEditing ? 'Išsaugoti pakeitimus' : 'Pridėti vartotoją' }}</span>
             <span wire:loading wire:target="save">{{ $isEditing ? 'Saugoma...' : 'Kuriama...' }}</span>
         </button>
+        @if($isEditing && $canCreateUsers)
+            <a href="{{ route('manage.users.create') }}" class="app-button-secondary">Pridėti naują vartotoją</a>
+        @endif
         <a href="{{ route('manage.users.index') }}" class="app-button-secondary">Grįžti</a>
     </div>
 </form>
-
-
-
-
-
-
-
-
-

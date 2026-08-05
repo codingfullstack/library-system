@@ -60,6 +60,10 @@ class ManageUserRequest extends FormRequest
                     return;
                 }
 
+                if (! $actor->isSuperAdmin() && $this->route('user') instanceof User && $role !== $this->route('user')->role) {
+                    $validator->errors()->add('role', 'Bibliotekos administratorius negali keisti globalios vartotojo rolės.');
+                }
+
                 if (! UserManagement::canManageRole($actor, $role)) {
                     $validator->errors()->add('role', 'Negalite priskirti šios roles.');
                 }
@@ -81,11 +85,3 @@ class ManageUserRequest extends FormRequest
         ];
     }
 }
-
-
-
-
-
-
-
-

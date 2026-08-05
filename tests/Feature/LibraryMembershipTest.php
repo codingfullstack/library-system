@@ -1,7 +1,11 @@
 <?php
 
+use App\Models\Book;
+use App\Models\BookCopy;
+use App\Models\Branch;
 use App\Models\Library;
 use App\Models\LibraryMembership;
+use App\Models\Loan;
 use App\Models\User;
 use App\Support\UserManagement;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,15 +29,30 @@ it('allows a member to belong to more than one public library as member only', f
         ->and($user->fresh()->effectiveRole($secondLibrary->id))->toBe('narys');
 });
 
-it('lets staff manage users through memberships in their library', function () {
+it('lets staff manage visible member users through their assigned branch activity', function () {
     $library = Library::factory()->create();
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
     $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create(['library_id' => null]);
+    $book = Book::factory()->create();
+    $copy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+    ]);
 
     LibraryMembership::factory()->member()->create([
         'library_id' => $library->id,
         'user_id' => $member->id,
         'membership_number' => 'MEMBERSHIP-001',
+    ]);
+    UserManagement::syncLibraryMembership($staff, $library->id, $branch->id);
+    Loan::factory()->create([
+        'library_id' => $library->id,
+        'book_copy_id' => $copy->id,
+        'user_id' => $member->id,
+        'status' => Loan::STATUS_ACTIVE,
+        'returned_at' => null,
     ]);
 
     expect(UserManagement::canManageUser($staff, $member->fresh()))->toBeTrue();
@@ -106,6 +125,192 @@ it('lets a member join only public libraries', function () {
         'library_id' => $privateLibrary->id,
         'user_id' => $member->id,
     ]);
+});
+
+it('shows none active and inactive membership states in the public libraries list', function () {
+    $noneLibrary = Library::factory()->create(['is_public' => true, 'name' => 'Biblioteka be narystės']);
+    $activeLibrary = Library::factory()->create(['is_public' => true, 'name' => 'Aktyvi biblioteka']);
+    $inactiveLibrary = Library::factory()->create(['is_public' => true, 'name' => 'Neaktyvi biblioteka']);
+    $member = User::factory()->member()->create(['library_id' => $activeLibrary->id]);
+
+    LibraryMembership::factory()->member()->create([
+        'library_id' => $inactiveLibrary->id,
+        'user_id' => $member->id,
+        'membership_number' => 'INACTIVE-MEM-001',
+        'is_active' => false,
+    ]);
+
+    $response = $this->actingAs($member)
+        ->get(route('public.libraries.index'));
+
+    $response
+        ->assertOk()
+        ->assertSee($noneLibrary->name)
+        ->assertSee($activeLibrary->name)
+        ->assertSee($inactiveLibrary->name)
+        ->assertSee('Prisijungti prie bibliotekos')
+        ->assertSee('Jau prisijungta')
+        ->assertSee('Narystė neaktyvi')
+        ->assertSee('Jūsų narystė šioje bibliotekoje yra deaktyvuota. Dėl atkūrimo kreipkitės į bibliotekos administratorių.');
+});
+
+it('does not show an active join action for inactive memberships', function () {
+    $library = Library::factory()->create(['is_public' => true, 'name' => 'Užblokuota biblioteka']);
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+
+    $member->libraryMemberships()->where('library_id', $library->id)->update(['is_active' => false]);
+
+    $this->actingAs($member)
+        ->get(route('public.libraries.index'))
+        ->assertOk()
+        ->assertSee('Narystė neaktyvi')
+        ->assertDontSee('action="'.route('libraries.join', $library).'"', false);
+});
+
+it('rejects a direct web join request for an inactive membership without reactivating it', function () {
+    $library = Library::factory()->create(['is_public' => true]);
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $membership = $member->libraryMemberships()->where('library_id', $library->id)->firstOrFail();
+
+    $membership->update(['is_active' => false]);
+
+    $this->actingAs($member)
+        ->post(route('libraries.join', $library))
+        ->assertForbidden()
+        ->assertSee('Jūsų narystė šioje bibliotekoje yra deaktyvuota. Dėl atkūrimo kreipkitės į bibliotekos administratorių.');
+
+    expect($membership->fresh()->is_active)->toBeFalse()
+        ->and(LibraryMembership::query()
+            ->where('library_id', $library->id)
+            ->where('user_id', $member->id)
+            ->count())->toBe(1);
+});
+
+it('returns membership state and blocks inactive membership rejoin through the api', function () {
+    $activeLibrary = Library::factory()->create(['is_public' => true]);
+    $inactiveLibrary = Library::factory()->create(['is_public' => true, 'name' => 'API neaktyvi biblioteka']);
+    $joinableLibrary = Library::factory()->create(['is_public' => true, 'name' => 'API nauja biblioteka']);
+    $member = User::factory()->member()->create(['library_id' => $activeLibrary->id]);
+
+    LibraryMembership::factory()->member()->create([
+        'library_id' => $inactiveLibrary->id,
+        'user_id' => $member->id,
+        'membership_number' => 'INACTIVE-API-001',
+        'is_active' => false,
+    ]);
+
+    $this->actingAs($member)
+        ->getJson('/api/auth/libraries/public')
+        ->assertOk()
+        ->assertJsonFragment([
+            'id' => $activeLibrary->id,
+            'membership_status' => 'active',
+            'can_join' => false,
+        ])
+        ->assertJsonFragment([
+            'id' => $inactiveLibrary->id,
+            'membership_status' => 'inactive',
+            'can_join' => false,
+        ])
+        ->assertJsonFragment([
+            'id' => $joinableLibrary->id,
+            'membership_status' => 'none',
+            'can_join' => true,
+        ]);
+
+    $this->actingAs($member)
+        ->postJson('/api/auth/libraries/'.$inactiveLibrary->id.'/join')
+        ->assertForbidden()
+        ->assertJsonPath('message', 'Jūsų narystė šioje bibliotekoje yra deaktyvuota. Dėl atkūrimo kreipkitės į bibliotekos administratorių.');
+
+    $this->assertDatabaseHas('library_memberships', [
+        'library_id' => $inactiveLibrary->id,
+        'user_id' => $member->id,
+        'is_active' => false,
+    ]);
+
+    expect(LibraryMembership::query()
+        ->where('library_id', $inactiveLibrary->id)
+        ->where('user_id', $member->id)
+        ->count())->toBe(1);
+});
+
+it('keeps public library join idempotent without creating duplicate memberships', function () {
+    $library = Library::factory()->create(['is_public' => true]);
+    $member = User::factory()->member()->create(['library_id' => null]);
+
+    $this->actingAs($member)
+        ->post(route('libraries.join', $library))
+        ->assertRedirect(route('account.dashboard'));
+
+    $this->actingAs($member)
+        ->post(route('libraries.join', $library))
+        ->assertRedirect(route('account.dashboard'));
+
+    expect(LibraryMembership::query()
+        ->where('library_id', $library->id)
+        ->where('user_id', $member->id)
+        ->count())->toBe(1);
+});
+
+it('allows only the owning library administrator to restore an inactive membership', function () {
+    $libraryA = Library::factory()->create();
+    $libraryB = Library::factory()->create();
+    $adminA = User::factory()->admin()->create(['library_id' => $libraryA->id]);
+    $adminB = User::factory()->admin()->create(['library_id' => $libraryB->id]);
+    $member = User::factory()->member()->create(['library_id' => $libraryA->id]);
+    $membership = $member->libraryMemberships()->where('library_id', $libraryA->id)->firstOrFail();
+
+    $membership->update(['is_active' => false]);
+
+    $this->actingAs($member)
+        ->patch(route('manage.users.memberships.toggle', [$member, $membership]))
+        ->assertForbidden();
+
+    $this->actingAs($adminB)
+        ->withSession(['active_library_id' => $libraryB->id])
+        ->patch(route('manage.users.memberships.toggle', [$member, $membership]))
+        ->assertForbidden();
+
+    expect($membership->fresh()->is_active)->toBeFalse();
+
+    $this->actingAs($adminA)
+        ->withSession(['active_library_id' => $libraryA->id])
+        ->patch(route('manage.users.memberships.toggle', [$member, $membership]))
+        ->assertRedirect();
+
+    expect($membership->fresh()->is_active)->toBeTrue();
+});
+
+it('denies protected web and api access to an inactive membership while another active membership still works', function () {
+    $libraryA = Library::factory()->create();
+    $libraryB = Library::factory()->create();
+    $member = User::factory()->member()->create(['library_id' => $libraryA->id]);
+
+    $member->libraryMemberships()->create([
+        'library_id' => $libraryB->id,
+        'membership_number' => $member->membership_number,
+        'is_active' => true,
+        'joined_at' => now(),
+    ]);
+    $member->libraryMemberships()->where('library_id', $libraryA->id)->update(['is_active' => false]);
+
+    $this->actingAs($member)
+        ->withSession(['active_library_id' => $libraryA->id])
+        ->get(route('account.dashboard'))
+        ->assertOk()
+        ->assertSessionHas('active_library_id', $libraryB->id);
+
+    $this->actingAs($member)
+        ->withHeader('X-Library-Id', (string) $libraryA->id)
+        ->getJson('/api/auth/me')
+        ->assertForbidden();
+
+    $this->actingAs($member)
+        ->withHeader('X-Library-Id', (string) $libraryB->id)
+        ->getJson('/api/auth/me')
+        ->assertOk()
+        ->assertJsonPath('user.library_id', $libraryB->id);
 });
 
 it('lists public libraries and lets a member join one through the api', function () {
@@ -192,7 +397,7 @@ it('lets staff add an existing member to a private library by scanned membership
     $this->assertDatabaseHas('audit_logs', [
         'library_id' => $privateLibrary->id,
         'action' => 'user_membership_added_by_scan',
-        'auditable_type' => (new User())->getMorphClass(),
+        'auditable_type' => (new User)->getMorphClass(),
         'auditable_id' => $member->id,
     ]);
 
@@ -284,8 +489,3 @@ it('shows public libraries navigation to members', function () {
         ->assertOk()
         ->assertSee('Viešosios bibliotekos');
 });
-
-
-
-
-

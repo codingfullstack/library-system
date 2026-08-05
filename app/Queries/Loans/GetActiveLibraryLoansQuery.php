@@ -5,7 +5,9 @@ namespace App\Queries\Loans;
 use App\Models\Loan;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
+use LogicException;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class GetActiveLibraryLoansQuery
@@ -19,7 +21,7 @@ class GetActiveLibraryLoansQuery
                 'user:id,name,email,membership_number',
                 'issuer:id,name',
                 'receiver:id,name',
-                'bookCopy:id,book_id,inventory_code,status,branch_id,location_id',
+                'bookCopy:id,library_id,book_id,inventory_code,status,branch_id,location_id',
                 'bookCopy.book:id,slug,title,subtitle,isbn',
                 'bookCopy.branch:id,name',
                 'bookCopy.location:id,name,room,shelf',
@@ -70,22 +72,34 @@ class GetActiveLibraryLoansQuery
         $memberId = $filters['member_id'] ?? null;
         $employeeId = $filters['employee_id'] ?? null;
         $overdue = $filters['overdue'] ?? null;
+        $globalScope = $user->isSuperAdmin() && ($filters['scope'] ?? null) === 'global';
         $libraryId = $user->isSuperAdmin() ? ($filters['library_id'] ?? null) : $user->activeLibraryId();
         $branchId = filled($filters['branch_id'] ?? null) ? (int) $filters['branch_id'] : null;
         $dueDate = $filters['due_date'] ?? null;
+        $effectiveRole = $user->effectiveRole($libraryId);
+
+        if (! $globalScope && empty($libraryId)) {
+            throw new LogicException('Library-scoped loan query requires a library ID.');
+        }
+
+        if (! in_array($effectiveRole, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_STAFF], true)) {
+            throw new AuthorizationException();
+        }
 
         $query = Loan::query()
             ->when(! empty($libraryId), fn ($builder) => $builder->where('library_id', $libraryId));
 
-        if ($user->effectiveRole($libraryId) === User::ROLE_STAFF) {
+        if ($effectiveRole === User::ROLE_STAFF) {
             $branchId = $user->assignedBranchId($libraryId);
 
-            $query->whereHas('bookCopy', fn ($copyQuery) => $branchId
-                ? $copyQuery->where('branch_id', $branchId)
-                : $copyQuery->whereRaw('1 = 0'));
+            if ($branchId === null) {
+                throw new AuthorizationException();
+            }
+
+            $query->whereHas('bookCopy', fn ($copyQuery) => $copyQuery->where('branch_id', $branchId));
         }
 
-        if ($branchId && $user->effectiveRole($libraryId) !== User::ROLE_STAFF) {
+        if ($branchId && $effectiveRole !== User::ROLE_STAFF) {
             $query->whereHas('bookCopy', fn ($copyQuery) => $copyQuery->where('branch_id', $branchId));
         }
 

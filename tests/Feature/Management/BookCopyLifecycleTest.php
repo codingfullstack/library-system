@@ -17,7 +17,8 @@ uses(RefreshDatabase::class);
 
 test('book copy creation page selects a book through livewire drawer', function () {
     $library = Library::factory()->create(['name' => 'Centrine biblioteka']);
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $book = Book::factory()->create(['title' => 'Livewire pasirinkta knyga']);
 
     $this->actingAs($staff)
@@ -71,8 +72,8 @@ test('staff creates book copy only in assigned branch', function () {
 
 test('staff can change book copy lifecycle and see status history', function () {
     $library = Library::factory()->create(['name' => 'Centrine biblioteka']);
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $book = Book::factory()->create(['title' => 'Gyvenimo ciklo knyga']);
 
@@ -131,8 +132,8 @@ test('damaged remains a physical condition and is not a lifecycle status', funct
 
 test('staff marks physical condition as damaged without changing lifecycle status', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $book = Book::factory()->create();
     $copy = BookCopy::factory()->create([
@@ -202,9 +203,9 @@ test('edit form can not directly change lifecycle status', function () {
 
 test('maintenance and withdrawn copies can not be borrowed', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $book = Book::factory()->create();
     $maintenanceCopy = BookCopy::factory()->create([
@@ -240,9 +241,9 @@ test('maintenance and withdrawn copies can not be borrowed', function () {
 
 test('book copy lifecycle can not be changed while copy has active loan', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $book = Book::factory()->create();
 
@@ -289,8 +290,8 @@ test('book copy lifecycle can not be changed while copy has active loan', functi
 
 test('staff can delete book copy from own library', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $book = Book::factory()->create();
     $copy = BookCopy::factory()->create([
@@ -311,9 +312,9 @@ test('staff can delete book copy from own library', function () {
 
 test('staff can not delete book copy with reservation history', function () {
     $library = Library::factory()->create();
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
     $book = Book::factory()->create();
     $copy = BookCopy::factory()->create([
@@ -369,7 +370,6 @@ test('staff can not delete book copy from another library', function () {
         'id' => $copy->id,
     ]);
 });
-
 
 
 

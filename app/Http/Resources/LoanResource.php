@@ -13,6 +13,10 @@ class LoanResource extends JsonResource
     public function toArray(Request $request): array
     {
         $canViewSensitiveDetails = $request->user()?->canViewSensitiveLoanDetails($this->resource) ?? false;
+        $bookCopy = $this->resource->relationLoaded('bookCopy') ? $this->bookCopy : null;
+        $canReturn = $bookCopy !== null
+            ? (($request->user()?->can('return', $bookCopy) ?? false) && $this->returned_at === null)
+            : false;
 
         $safe = [
             'status' => $this->status,
@@ -22,7 +26,7 @@ class LoanResource extends JsonResource
             'is_due_soon' => $this->isDueSoon(),
             'overdue_days' => $this->overdue_days,
             'can_renew' => false,
-            'can_return' => $canViewSensitiveDetails && $this->returned_at === null,
+            'can_return' => $canReturn,
             'book_copy' => $this->bookCopy ? [
                 'id' => $this->bookCopy->id,
                 'inventory_code' => $this->bookCopy->inventory_code,
@@ -80,8 +84,6 @@ class LoanResource extends JsonResource
         ]);
     }
 }
-
-
 
 
 

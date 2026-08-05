@@ -58,17 +58,20 @@ jobs:
         run: npm run build
 
       - name: Run Laravel Fast Tests
-        run: php artisan test --exclude-group=database-invariants --exclude-group=concurrency --exclude-group=mariadb
+        run: php artisan test --exclude-group=mysql --exclude-group=database-invariants --exclude-group=concurrency --exclude-group=mariadb
 
       - name: Run Android Unit Tests
         working-directory: LibraryApp
         run: ./gradlew testDebugUnitTest
 
-  mariadb:
+  mysql-production-invariants:
+    name: MySQL/MariaDB production invariant suite
     runs-on: ubuntu-latest
     environment: Testing
     services:
       mariadb:
+        # Production-like LTS target for generated columns, CHECK constraints,
+        # real FKs, and InnoDB transaction semantics.
         image: mariadb:10.11
         env:
           MYSQL_DATABASE: library_system_testing
@@ -105,6 +108,9 @@ jobs:
           tools: composer:v2
           coverage: none
 
+      - name: Verify PDO MySQL Driver
+        run: php -r "extension_loaded('pdo_mysql') || exit(1); in_array('mysql', PDO::getAvailableDrivers(), true) || exit(1);"
+
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
@@ -137,8 +143,12 @@ jobs:
           echo "MariaDB did not become ready in time"
           exit 1
 
+      - name: Show MariaDB Version
+        run: mysql -h 127.0.0.1 -uroot -ppassword -e "SELECT VERSION() AS version"
+
       - name: Prepare Testing Database
         run: |
+          mysql -h 127.0.0.1 -uroot -ppassword -e "DROP DATABASE IF EXISTS library_system_testing"
           mysql -h 127.0.0.1 -uroot -ppassword -e "CREATE DATABASE IF NOT EXISTS library_system_testing CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 
       - name: Migrate MariaDB Schema
@@ -147,14 +157,5 @@ jobs:
       - name: Reservation Assignment Preflight
         run: php artisan reservations:preflight-assignment-migration
 
-      - name: Run Full Laravel Test Suite On MariaDB
-        run: php artisan test --fail-on-skipped
-
-      - name: Run MariaDB Database Invariant Tests
-        run: php artisan test --group=database-invariants --fail-on-skipped
-
-      - name: Run MariaDB Concurrency Tests
-        run: php artisan test --group=concurrency --fail-on-skipped
-
-      - name: Run MariaDB Tagged Tests
-        run: php artisan test --group=mariadb --fail-on-skipped
+      - name: Run MySQL Production Invariant Suite
+        run: php artisan test --group=mysql --fail-on-skipped

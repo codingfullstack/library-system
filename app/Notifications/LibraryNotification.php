@@ -13,6 +13,13 @@ class LibraryNotification extends Notification implements ShouldQueue
     use BuildsLibraryNotificationPayload;
     use Queueable;
 
+    public int $tries = 3;
+
+    /**
+     * @var array<int, int>
+     */
+    public array $backoff = [30, 120, 300];
+
     /**
      * @param  array<string, mixed>  $metadata
      */

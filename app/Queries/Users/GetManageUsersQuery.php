@@ -28,17 +28,19 @@ class GetManageUsersQuery
                 });
             })
             ->when($role && in_array($role, UserManagement::manageableRoles($actor), true), fn ($query) => $query->where('role', $role))
-            ->when($active !== null && $active !== '', fn ($query) => $query->where('is_active', $active === '1'))
+            ->when($active !== null && $active !== '', function ($query) use ($actor, $active) {
+                if ($actor->isSuperAdmin()) {
+                    $query->where('is_active', $active === '1');
+
+                    return;
+                }
+
+                $query->whereHas('libraryMemberships', fn ($membershipQuery) => $membershipQuery
+                    ->where('library_id', $actor->activeLibraryId())
+                    ->where('is_active', $active === '1'));
+            })
             ->orderBy('name')
             ->paginate($perPage)
             ->withQueryString();
     }
 }
-
-
-
-
-
-
-
-

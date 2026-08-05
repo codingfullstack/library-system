@@ -5,9 +5,11 @@ namespace App\Queries\Reservations;
 use App\Models\Reservation;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 
 class GetLibraryReservationsQuery
 {
@@ -75,26 +77,32 @@ class GetLibraryReservationsQuery
     {
         $search = trim((string) ($filters['search'] ?? ''));
         $status = $filters['status'] ?? null;
+        $globalScope = $user->isSuperAdmin() && ($filters['scope'] ?? null) === 'global';
         $libraryId = $user->isSuperAdmin() ? ($filters['library_id'] ?? null) : $user->activeLibraryId();
         $branchId = filled($filters['branch_id'] ?? null) ? (int) $filters['branch_id'] : null;
         $reservationDate = $filters['reservation_date'] ?? null;
+        $effectiveRole = $user->effectiveRole($libraryId);
+
+        if (! $globalScope && empty($libraryId)) {
+            throw new LogicException('Library-scoped reservation query requires a library ID.');
+        }
+
+        if (! in_array($effectiveRole, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_STAFF], true)) {
+            throw new AuthorizationException();
+        }
 
         $reservationDateRange = $this->dateRange($reservationDate);
 
         return Reservation::query()
             ->when(! empty($libraryId), fn ($builder) => $builder->where('library_id', $libraryId))
-            ->when($user->effectiveRole($libraryId) === User::ROLE_STAFF, function (Builder $builder) use ($user, $libraryId) {
+            ->when($effectiveRole === User::ROLE_STAFF, function (Builder $builder) use ($user, $libraryId) {
                 $branchId = $user->assignedBranchId($libraryId);
 
+                if ($branchId === null) {
+                    throw new AuthorizationException();
+                }
+
                 $builder->where(function (Builder $scopeQuery) use ($branchId) {
-                    if ($branchId === null) {
-                        $scopeQuery
-                            ->where('scope', Reservation::SCOPE_LIBRARY)
-                            ->whereNull('branch_id');
-
-                        return;
-                    }
-
                     $scopeQuery
                         ->where(function (Builder $branchScopeQuery) use ($branchId) {
                             $branchScopeQuery

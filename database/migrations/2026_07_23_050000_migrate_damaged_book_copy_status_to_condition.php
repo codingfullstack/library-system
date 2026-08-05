@@ -48,16 +48,20 @@ return new class extends Migration
         });
 
         if (DB::getDriverName() === 'mysql') {
+            $enumValues = collect([
+                BookCopy::STATUS_AVAILABLE,
+                BookCopy::STATUS_LOANED,
+                BookCopy::STATUS_LOST,
+                BookCopy::STATUS_MAINTENANCE,
+                BookCopy::STATUS_WITHDRAWN,
+            ])
+                ->map(fn (string $status) => DB::getPdo()->quote($status))
+                ->implode(', ');
+
             DB::statement("
                 ALTER TABLE book_copies
-                MODIFY status ENUM(
-                    'laisva',
-                    'išduota',
-                    'prarasta',
-                    'tvarkoma',
-                    'nurašyta'
-                ) NOT NULL DEFAULT 'laisva'
-            ");
+                MODIFY status ENUM({$enumValues}) NOT NULL DEFAULT ".DB::getPdo()->quote(BookCopy::STATUS_AVAILABLE)
+            );
         }
     }
 

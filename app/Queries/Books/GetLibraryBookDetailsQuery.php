@@ -5,6 +5,7 @@ namespace App\Queries\Books;
 use App\Models\Book;
 use App\Models\BookCopy;
 use App\Models\Library;
+use App\Models\Loan;
 use App\Models\Reservation;
 use App\Models\User;
 use App\Queries\BookCopies\AttachCurrentReservationForCopies;
@@ -87,7 +88,11 @@ class GetLibraryBookDetailsQuery
                             'issues' => $copyQuery->where(function ($issuesQuery) {
                                 $issuesQuery
                                     ->whereIn('status', ['prarasta', 'tvarkoma'])
-                                    ->orWhere('condition_status', BookCopy::CONDITION_DAMAGED);
+                                    ->orWhere(function ($damagedQuery) {
+                                        $damagedQuery
+                                            ->where('condition_status', BookCopy::CONDITION_DAMAGED)
+                                            ->where('status', '<>', BookCopy::STATUS_WITHDRAWN);
+                                    });
                             }),
                             'removed' => $copyQuery->where('status', 'nurašyta'),
                             default => null,
@@ -163,6 +168,34 @@ class GetLibraryBookDetailsQuery
                 }
 
                 $q->where('status', 'laisva');
+            },
+            'reservations as current_user_active_reservations_count' => function ($q) use ($libraryIds, $user) {
+                if ($user?->effectiveRole($user->activeLibraryId()) !== User::ROLE_MEMBER) {
+                    $q->whereRaw('1 = 0');
+
+                    return;
+                }
+
+                if (is_array($libraryIds)) {
+                    $q->whereIn('library_id', $libraryIds);
+                }
+
+                $q->where('user_id', $user->id)->active();
+            },
+            'loans as current_user_active_loans_count' => function ($q) use ($libraryIds, $user) {
+                if ($user?->effectiveRole($user->activeLibraryId()) !== User::ROLE_MEMBER) {
+                    $q->whereRaw('1 = 0');
+
+                    return;
+                }
+
+                if (is_array($libraryIds)) {
+                    $q->whereIn('loans.library_id', $libraryIds);
+                }
+
+                $q->where('loans.user_id', $user->id)
+                    ->whereNull('loans.returned_at')
+                    ->whereIn('loans.status', Loan::ACTIVE_STATUSES);
             },
         ]);
 

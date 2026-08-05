@@ -13,7 +13,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 
-uses(RefreshDatabase::class);
+uses(RefreshDatabase::class)->group('mysql', 'mariadb', 'database-invariants', 'concurrency');
 
 function loanInvariantFixture(): array
 {
@@ -31,7 +31,7 @@ function loanInvariantFixture(): array
         'location_id' => $location->id,
         'status' => BookCopy::STATUS_AVAILABLE,
     ]);
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $member = User::factory()->member()->create(['library_id' => $library->id]);
 
     return [$library, $copy, $staff, $member];

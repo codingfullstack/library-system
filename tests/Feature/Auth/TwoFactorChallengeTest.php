@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Library;
 use App\Models\User;
 use Laravel\Fortify\Features;
 
@@ -19,14 +20,13 @@ test('two factor challenge can be rendered', function () {
         'confirmPassword' => true,
     ]);
 
-    $user = User::factory()->withTwoFactor()->create();
+    $library = Library::factory()->create();
+    $user = User::factory()->withTwoFactor()->create([
+        'library_id' => $library->id,
+    ]);
 
     $this->post(route('login.store'), [
         'email' => $user->email,
         'password' => 'password',
     ])->assertRedirect(route('two-factor.login'));
 });
-
-
-
-
