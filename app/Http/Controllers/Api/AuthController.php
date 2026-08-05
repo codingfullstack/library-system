@@ -31,12 +31,14 @@ class AuthController extends Controller
         if (! $user->is_active) {
             return response()->json([
                 'message' => trans('auth.inactive'),
+                'code' => 'account_inactive',
             ], 403);
         }
 
         if (! $user->isSuperAdmin() && ! $user->activeLibraryMemberships()->exists()) {
             return response()->json([
                 'message' => trans('auth.no_active_membership'),
+                'code' => 'no_active_membership',
             ], 403);
         }
 

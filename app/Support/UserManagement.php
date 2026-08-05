@@ -103,6 +103,10 @@ class UserManagement
             return true;
         }
 
+        if ($actor->role === User::ROLE_STAFF) {
+            return self::scopeVisibleUsers(User::query()->whereKey($target->id), $actor)->exists();
+        }
+
         return collect($actor->manageableLibraryIds())
             ->contains(fn (int $libraryId) => $target->hasMembershipInLibrary($libraryId));
     }

@@ -1,7 +1,11 @@
 <?php
 
+use App\Models\Book;
+use App\Models\BookCopy;
+use App\Models\Branch;
 use App\Models\Library;
 use App\Models\LibraryMembership;
+use App\Models\Loan;
 use App\Models\User;
 use App\Support\UserManagement;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,15 +29,30 @@ it('allows a member to belong to more than one public library as member only', f
         ->and($user->fresh()->effectiveRole($secondLibrary->id))->toBe('narys');
 });
 
-it('lets staff manage users through memberships in their library', function () {
+it('lets staff manage visible member users through their assigned branch activity', function () {
     $library = Library::factory()->create();
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
     $staff = User::factory()->staff()->create(['library_id' => $library->id]);
     $member = User::factory()->member()->create(['library_id' => null]);
+    $book = Book::factory()->create();
+    $copy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+    ]);
 
     LibraryMembership::factory()->member()->create([
         'library_id' => $library->id,
         'user_id' => $member->id,
         'membership_number' => 'MEMBERSHIP-001',
+    ]);
+    UserManagement::syncLibraryMembership($staff, $library->id, $branch->id);
+    Loan::factory()->create([
+        'library_id' => $library->id,
+        'book_copy_id' => $copy->id,
+        'user_id' => $member->id,
+        'status' => Loan::STATUS_ACTIVE,
+        'returned_at' => null,
     ]);
 
     expect(UserManagement::canManageUser($staff, $member->fresh()))->toBeTrue();

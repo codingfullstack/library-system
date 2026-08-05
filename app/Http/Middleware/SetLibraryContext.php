@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Support\LibraryContext;
+use App\Support\UserManagement;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -21,6 +22,19 @@ class SetLibraryContext
         $user = $request->user();
 
         if ($user) {
+            if (! $user->is_active) {
+                UserManagement::revokeAllAccess($user);
+
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'message' => 'Account is inactive.',
+                        'code' => 'account_inactive',
+                    ], 403);
+                }
+
+                abort(403, 'Paskyra neaktyvi.');
+            }
+
             $requestedLibraryId = $request->integer('library_id') ?: (int) $request->header('X-Library-Id');
 
             if ($requestedLibraryId && ! $user->isSuperAdmin() && ! $user->belongsToLibrary($requestedLibraryId)) {

@@ -30,7 +30,7 @@ class LibraryMembership extends Model
     protected static function booted(): void
     {
         static::updated(function (LibraryMembership $membership) {
-            if ($membership->wasChanged(['branch_id', 'library_id', 'user_id'])) {
+            if ($membership->wasChanged(['branch_id', 'library_id', 'user_id', 'is_active'])) {
                 $membership->user?->tokens()->delete();
             }
         });
