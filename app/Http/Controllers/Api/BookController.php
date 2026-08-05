@@ -29,6 +29,7 @@ class BookController extends Controller
             'direction' => ['nullable', Rule::in(['asc', 'desc'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'page' => ['nullable', 'integer', 'min:1'],
+            'scope_to_assigned_branch' => ['nullable', 'boolean'],
         ]);
 
         $books = $getLibraryBooksQuery->handle($request->user(), [
@@ -41,6 +42,7 @@ class BookController extends Controller
             'sort' => $validated['sort'] ?? 'title',
             'direction' => $validated['direction'] ?? 'asc',
             'per_page' => $validated['per_page'] ?? 25,
+            'scope_to_assigned_branch' => $request->boolean('scope_to_assigned_branch'),
         ]);
 
         return BookResource::collection($books);

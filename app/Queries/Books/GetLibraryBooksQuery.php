@@ -242,6 +242,15 @@ class GetLibraryBooksQuery
     {
         $branchId = filled($filters['branch_id'] ?? null) ? (int) $filters['branch_id'] : null;
 
+        if (
+            ! $branchId
+            && ($filters['scope_to_assigned_branch'] ?? false)
+            && $user?->role === User::ROLE_STAFF
+            && ! $user->isAdmin()
+        ) {
+            return $user->assignedBranchId($user->activeLibraryId()) ?? -1;
+        }
+
         if (! $branchId) {
             return null;
         }

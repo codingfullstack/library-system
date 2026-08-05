@@ -21,18 +21,112 @@ use Illuminate\Support\Facades\DB;
 class GetDashboardReportDataQuery
 {
     /**
+     * @return array<string, int>
+     */
+    public function summary(User $user, array $filters = []): array
+    {
+        $libraryId = $user->isSuperAdmin() ? null : $user->activeLibraryId();
+
+        if (! $user->isSuperAdmin() && ! $libraryId) {
+            return $this->emptySummary();
+        }
+
+        $effectiveRole = $libraryId ? $user->effectiveRole($libraryId) : $user->role;
+        $staffBranchId = $effectiveRole === User::ROLE_STAFF ? ($user->assignedBranchId($libraryId) ?? 0) : null;
+        $dateFrom = $filters['date_from'] ?? null;
+        $dateTo = $filters['date_to'] ?? null;
+
+        $copiesQuery = BookCopy::query()
+            ->when($libraryId, fn (Builder $query) => $query->where('library_id', $libraryId));
+        $this->applyStaffBookCopyScope($copiesQuery, $staffBranchId);
+        $this->applyBookCopyPeriod($copiesQuery, $dateFrom, $dateTo);
+
+        $loansQuery = Loan::query()
+            ->when($libraryId, fn (Builder $query) => $query->where('library_id', $libraryId));
+        $this->applyStaffLoanScope($loansQuery, $staffBranchId);
+        $this->applyLoanPeriod($loansQuery, $dateFrom, $dateTo);
+
+        $reservationsQuery = Reservation::query()
+            ->when($libraryId, fn (Builder $query) => $query->where('library_id', $libraryId));
+        $this->applyStaffReservationScope($reservationsQuery, $staffBranchId);
+        $this->applyReservationPeriod($reservationsQuery, $dateFrom, $dateTo);
+
+        $membersQuery = User::query()
+            ->where('is_active', true)
+            ->when(
+                $libraryId,
+                fn (Builder $query) => $query->whereHas('libraryMemberships', fn (Builder $membershipQuery) => $membershipQuery
+                    ->where('library_id', $libraryId)
+                    ->where('is_active', true)),
+                fn (Builder $query) => $query->where('role', User::ROLE_MEMBER)
+            );
+        $this->applyStaffMemberScope($membersQuery, $libraryId, $staffBranchId);
+
+        return [
+            'book_copies_count' => (clone $copiesQuery)->count(),
+            'available_book_copies_count' => (clone $copiesQuery)->where('status', BookCopy::STATUS_AVAILABLE)->count(),
+            'active_loans_count' => (clone $loansQuery)->active()->count(),
+            'returned_loans_count' => (clone $loansQuery)->whereNotNull('returned_at')->count(),
+            'active_reservations_count' => (clone $reservationsQuery)->active()->count(),
+            'fulfilled_reservations_count' => (clone $reservationsQuery)->where('status', Reservation::STATUS_FULFILLED)->count(),
+            'overdue_loans_count' => (clone $loansQuery)
+                ->whereNull('returned_at')
+                ->where(function (Builder $query) {
+                    $query->where('status', Loan::STATUS_OVERDUE)
+                        ->orWhere(function (Builder $dateQuery) {
+                            $dateQuery->whereNotNull('due_at')
+                                ->where('due_at', '<', now());
+                        });
+                })
+                ->count(),
+            'lost_book_copies_count' => (clone $copiesQuery)->where('status', BookCopy::STATUS_LOST)->count(),
+            'damaged_book_copies_count' => (clone $copiesQuery)->where('condition_status', BookCopy::CONDITION_DAMAGED)->count(),
+            'maintenance_book_copies_count' => (clone $copiesQuery)->where('status', BookCopy::STATUS_MAINTENANCE)->count(),
+            'withdrawn_book_copies_count' => (clone $copiesQuery)->where('status', BookCopy::STATUS_WITHDRAWN)->count(),
+            'active_members_count' => (clone $membersQuery)->count(),
+            'loans_count' => (clone $loansQuery)->count(),
+            'reservations_count' => (clone $reservationsQuery)->count(),
+        ];
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function emptySummary(): array
+    {
+        return [
+            'book_copies_count' => 0,
+            'available_book_copies_count' => 0,
+            'active_loans_count' => 0,
+            'returned_loans_count' => 0,
+            'active_reservations_count' => 0,
+            'fulfilled_reservations_count' => 0,
+            'overdue_loans_count' => 0,
+            'lost_book_copies_count' => 0,
+            'damaged_book_copies_count' => 0,
+            'maintenance_book_copies_count' => 0,
+            'withdrawn_book_copies_count' => 0,
+            'active_members_count' => 0,
+            'loans_count' => 0,
+            'reservations_count' => 0,
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function handle(User $user, array $filters = []): array
     {
         $libraryId = $user->isSuperAdmin() ? null : $user->activeLibraryId();
-        $staffBranchId = $user->role === User::ROLE_STAFF ? ($user->assignedBranchId($libraryId) ?? 0) : null;
+        $effectiveRole = $libraryId ? $user->effectiveRole($libraryId) : $user->role;
+        $staffBranchId = $effectiveRole === User::ROLE_STAFF ? ($user->assignedBranchId($libraryId) ?? 0) : null;
         $dateFrom = $filters['date_from'] ?? null;
         $dateTo = $filters['date_to'] ?? null;
         $periodLabel = $filters['period_label'] ?? 'Visas laikotarpis';
 
         $copiesQuery = BookCopy::query()
             ->when($libraryId, fn (Builder $query) => $query->where('library_id', $libraryId));
+        $this->applyStaffBookCopyScope($copiesQuery, $staffBranchId);
         $this->applyBookCopyPeriod($copiesQuery, $dateFrom, $dateTo);
 
         $loansQuery = Loan::query()
@@ -56,38 +150,7 @@ class GetDashboardReportDataQuery
             );
         $this->applyStaffMemberScope($membersQuery, $libraryId, $staffBranchId);
 
-        $summary = [
-            'book_copies_count' => (clone $copiesQuery)->count(),
-            'available_book_copies_count' => (clone $copiesQuery)->where('status', BookCopy::STATUS_AVAILABLE)->count(),
-            'active_loans_count' => (clone $loansQuery)
-                ->whereNull('returned_at')
-                ->whereIn('status', ['aktyvi', 'vėluoja'])
-                ->count(),
-            'returned_loans_count' => (clone $loansQuery)
-                ->whereNotNull('returned_at')
-                ->count(),
-            'active_reservations_count' => (clone $reservationsQuery)->active()->count(),
-            'fulfilled_reservations_count' => (clone $reservationsQuery)
-                ->where('status', Reservation::STATUS_FULFILLED)
-                ->count(),
-            'overdue_loans_count' => (clone $loansQuery)
-                ->whereNull('returned_at')
-                ->where(function (Builder $query) {
-                    $query->where('status', 'vėluoja')
-                        ->orWhere(function (Builder $dateQuery) {
-                            $dateQuery->whereNotNull('due_at')
-                                ->where('due_at', '<', now());
-                        });
-                })
-                ->count(),
-            'lost_book_copies_count' => (clone $copiesQuery)->where('status', BookCopy::STATUS_LOST)->count(),
-            'damaged_book_copies_count' => (clone $copiesQuery)->where('condition_status', BookCopy::CONDITION_DAMAGED)->count(),
-            'maintenance_book_copies_count' => (clone $copiesQuery)->where('status', BookCopy::STATUS_MAINTENANCE)->count(),
-            'withdrawn_book_copies_count' => (clone $copiesQuery)->where('status', BookCopy::STATUS_WITHDRAWN)->count(),
-            'active_members_count' => (clone $membersQuery)->count(),
-            'loans_count' => (clone $loansQuery)->count(),
-            'reservations_count' => (clone $reservationsQuery)->count(),
-        ];
+        $summary = $this->summary($user, $filters);
 
         $libraryComparison = $this->getLibraryComparison($libraryId, $dateFrom, $dateTo);
         $popularBooks = $this->getPopularBooks($libraryId, $dateFrom, $dateTo);
@@ -617,6 +680,19 @@ class GetDashboardReportDataQuery
         }
 
         return $query->whereBetween('borrowed_at', [$dateFrom, $dateTo]);
+    }
+
+    protected function applyStaffBookCopyScope(Builder $query, ?int $staffBranchId): Builder
+    {
+        if ($staffBranchId === null) {
+            return $query;
+        }
+
+        if ($staffBranchId <= 0) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where('branch_id', $staffBranchId);
     }
 
     protected function applyReservationPeriod(Builder $query, ?CarbonImmutable $dateFrom, ?CarbonImmutable $dateTo): Builder
