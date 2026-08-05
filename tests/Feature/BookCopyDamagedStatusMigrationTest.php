@@ -37,6 +37,8 @@ it('migrates legacy damaged lifecycle status into physical condition', function 
             ALTER TABLE book_copies
             MODIFY status ENUM({$enumValues}) NOT NULL DEFAULT ".DB::getPdo()->quote(BookCopy::STATUS_AVAILABLE)
         );
+    } elseif (DB::getDriverName() === 'sqlite') {
+        DB::statement('PRAGMA ignore_check_constraints = ON');
     }
 
     $availableLegacyId = DB::table('book_copies')->insertGetId([
@@ -91,6 +93,10 @@ it('migrates legacy damaged lifecycle status into physical condition', function 
 
     $migration = require database_path('migrations/2026_07_23_050000_migrate_damaged_book_copy_status_to_condition.php');
     $migration->up();
+
+    if (DB::getDriverName() === 'sqlite') {
+        DB::statement('PRAGMA ignore_check_constraints = OFF');
+    }
 
     $this->assertDatabaseHas('book_copies', [
         'id' => $availableLegacyId,
