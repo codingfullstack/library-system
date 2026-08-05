@@ -207,7 +207,7 @@ class AuditUserAccessCommand extends Command
 
     private function demoLibrariesWithoutAdmin(): Collection
     {
-        $libraryCodes = collect(config('demo_libraries.libraries', []))->keys();
+        $libraryCodes = collect(config('demo.libraries', []))->keys();
 
         return DB::table('libraries')
             ->select('libraries.id', 'libraries.code')

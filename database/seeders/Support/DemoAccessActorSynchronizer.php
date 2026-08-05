@@ -10,6 +10,7 @@ use App\Support\UserManagement;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 
 class DemoAccessActorSynchronizer
@@ -19,7 +20,7 @@ class DemoAccessActorSynchronizer
      */
     public function syncLibrary(Library $library): array
     {
-        $definition = config("demo_libraries.libraries.{$library->code}");
+        $definition = config("demo.libraries.{$library->code}");
 
         if (! is_array($definition)) {
             return [
@@ -52,13 +53,13 @@ class DemoAccessActorSynchronizer
      */
     public function syncSuperadmins(): Collection
     {
-        return collect(config('demo_libraries.superadmins', []))
+        return collect(config('demo.superadmins', []))
             ->map(function (array $actor) {
                 $user = User::query()->updateOrCreate(
                     ['email' => $actor['email']],
                     [
                         'name' => $actor['name'],
-                        'password' => Hash::make(config('demo_libraries.password', 'password')),
+                        'password' => Hash::make(config('demo.password', 'password')),
                         'role' => User::ROLE_SUPER_ADMIN,
                         'phone' => $actor['phone'] ?? null,
                         'membership_number' => null,
@@ -88,7 +89,7 @@ class DemoAccessActorSynchronizer
             ['email' => $actor['email']],
             [
                 'name' => $actor['name'],
-                'password' => Hash::make(config('demo_libraries.password', 'password')),
+                'password' => Hash::make(config('demo.password', 'password')),
                 'role' => $role,
                 'phone' => $actor['phone'] ?? null,
                 'membership_number' => $membershipNumber,
@@ -98,7 +99,7 @@ class DemoAccessActorSynchronizer
         );
 
         $branch = $role === User::ROLE_STAFF
-            ? $this->branchFor($library, $actor)
+            ? $this->resolveStaffBranch($library, $actor)
             : null;
 
         UserManagement::syncLibraryMembership($user, $library->id, $branch?->id)
@@ -119,7 +120,7 @@ class DemoAccessActorSynchronizer
      */
     public function expectedActors(): Collection
     {
-        $libraries = collect(config('demo_libraries.libraries', []))
+        $libraries = collect(config('demo.libraries', []))
             ->flatMap(function (array $definition, string $libraryCode) {
                 return collect([
                     'admins' => User::ROLE_ADMIN,
@@ -135,7 +136,7 @@ class DemoAccessActorSynchronizer
                 });
             });
 
-        $superadmins = collect(config('demo_libraries.superadmins', []))
+        $superadmins = collect(config('demo.superadmins', []))
             ->map(fn (array $actor) => $actor + [
                 'library_code' => null,
                 'role' => User::ROLE_SUPER_ADMIN,
@@ -145,15 +146,17 @@ class DemoAccessActorSynchronizer
         return $superadmins->merge($libraries)->values();
     }
 
-    private function branchFor(Library $library, array $actor): Branch
+    public function resolveStaffBranch(Library $library, array $actor): Branch
     {
         $branchCode = $actor['branch_code'] ?? null;
+        $email = $actor['email'] ?? 'unknown';
 
         if (! is_string($branchCode) || $branchCode === '') {
             throw new InvalidArgumentException(sprintf(
-                'Demo staff "%s" in library "%s" does not declare branch_code.',
-                $actor['email'] ?? 'unknown',
-                $library->code
+                'Demo staff "%s" in library "%s" must declare a non-empty branch_code; received "%s".',
+                $email,
+                $library->code,
+                is_scalar($branchCode) ? (string) $branchCode : get_debug_type($branchCode)
             ));
         }
 
@@ -163,11 +166,35 @@ class DemoAccessActorSynchronizer
             ->first();
 
         if (! $branch) {
+            $foreignBranch = Branch::query()
+                ->where('code', $branchCode)
+                ->with('library:id,code')
+                ->first();
+
+            if ($foreignBranch) {
+                throw new InvalidArgumentException(sprintf(
+                    'Demo staff "%s" in library "%s" references branch_code "%s", but that branch belongs to library "%s".',
+                    $email,
+                    $library->code,
+                    $branchCode,
+                    $foreignBranch->library?->code ?? $foreignBranch->library_id
+                ));
+            }
+
             throw new InvalidArgumentException(sprintf(
-                'Demo staff "%s" references missing branch "%s" in library "%s".',
-                $actor['email'] ?? 'unknown',
+                'Demo staff "%s" in library "%s" references missing branch_code "%s".',
+                $email,
+                $library->code,
                 $branchCode,
-                $library->code
+            ));
+        }
+
+        if (Schema::hasColumn('branches', 'is_active') && ! (bool) $branch->getAttribute('is_active')) {
+            throw new InvalidArgumentException(sprintf(
+                'Demo staff "%s" in library "%s" references inactive branch_code "%s".',
+                $email,
+                $library->code,
+                $branchCode
             ));
         }
 
