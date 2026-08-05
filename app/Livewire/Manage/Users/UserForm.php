@@ -3,8 +3,10 @@
 namespace App\Livewire\Manage\Users;
 
 use App\Actions\AuditLogs\RecordAuditLogAction;
+use App\Actions\Users\TransferLibraryMembershipAction;
 use App\Models\Branch;
 use App\Models\Library;
+use App\Models\LibraryMembership;
 use App\Models\User;
 use App\Support\AuditLogChanges;
 use App\Support\UserManagement;
@@ -30,6 +32,10 @@ class UserForm extends Component
 
     public $branchId = null;
 
+    public $membershipId = null;
+
+    public $sourceLibraryId = null;
+
     public string $phone = '';
 
     public bool $isActive = true;
@@ -52,10 +58,13 @@ class UserForm extends Component
             $this->name = $managedUser->name;
             $this->email = $managedUser->email;
             $this->role = $managedUser->role;
-            $this->libraryId = $actor->isSuperAdmin()
+            $membership = $this->editableMembershipFor($actor, $managedUser);
+            $this->membershipId = $membership?->id;
+            $this->sourceLibraryId = $membership?->library_id;
+            $this->libraryId = $membership?->library_id ?: ($actor->isSuperAdmin()
                 ? $managedUser->defaultLibraryId()
-                : $actor->activeLibraryId();
-            $this->branchId = $managedUser->assignedBranchId($this->libraryId);
+                : $actor->activeLibraryId());
+            $this->branchId = $membership?->branch_id;
             $this->phone = (string) ($managedUser->phone ?? '');
             $this->isActive = (bool) $managedUser->is_active;
 
@@ -88,6 +97,13 @@ class UserForm extends Component
         }
 
         if ($value !== User::ROLE_STAFF) {
+            $this->branchId = null;
+        }
+    }
+
+    public function updatedLibraryId($value): void
+    {
+        if ((int) ($value ?: 0) !== (int) ($this->sourceLibraryId ?: 0)) {
             $this->branchId = null;
         }
     }
@@ -170,16 +186,30 @@ class UserForm extends Component
         }
 
         if ($this->managedUser) {
-            $changedFields = [];
-            $changeSummary = [];
+            $changeSummary = ['changed_fields' => [], 'changes' => []];
 
-            DB::transaction(function () use ($payload, &$changedFields, &$changeSummary): void {
+            DB::transaction(function () use ($payload, &$changeSummary): void {
                 $this->managedUser->fill($payload);
-                $changedFields = array_keys($this->managedUser->getDirty());
-                $changeSummary = AuditLogChanges::fromModel($this->managedUser, $changedFields);
-                $this->managedUser->save();
-                $this->syncMembershipForSavedUser($this->managedUser);
+                $userChanges = $this->auditChangesForUser($this->managedUser, array_keys($this->managedUser->getDirty()));
+
+                if ($this->managedUser->isDirty()) {
+                    $this->managedUser->save();
+                }
+
+                $membershipBefore = $this->membershipSnapshot($this->managedUser);
+                $membership = $this->syncMembershipForSavedUser($this->managedUser);
+                $membershipChanges = $this->auditChangesForMembership($membershipBefore, $membership);
+
+                $changeSummary = $this->mergeAuditChanges($userChanges, $membershipChanges);
             });
+
+            if ($changeSummary['changes'] === []) {
+                return redirect()
+                    ->route('manage.users.edit', $this->managedUser)
+                    ->with('info', 'Nebuvo atlikta jokių pakeitimų.');
+            }
+
+            $this->managedUser = $this->managedUser->refresh();
 
             app(RecordAuditLogAction::class)->handle(
                 $actor,
@@ -291,6 +321,12 @@ class UserForm extends Component
                 ]);
             }
 
+            if ((int) ($this->libraryId ?: 0) !== (int) ($actor->activeLibraryId() ?: 0)) {
+                throw ValidationException::withMessages([
+                    'libraryId' => 'Bibliotekos administratorius negali perkelti vartotojo į kitą biblioteką.',
+                ]);
+            }
+
             $this->role = $this->managedUser->role;
             $this->libraryId = $actor->activeLibraryId();
 
@@ -372,17 +408,176 @@ class UserForm extends Component
         }
     }
 
-    private function syncMembershipForSavedUser(User $user): void
+    private function syncMembershipForSavedUser(User $user): ?LibraryMembership
     {
         if (! UserManagement::requiresLibrary($this->role) || ! $this->libraryId) {
-            return;
+            return null;
         }
 
-        UserManagement::syncLibraryMembership(
+        if ($this->managedUser && $this->membershipId) {
+            $membership = LibraryMembership::query()->findOrFail($this->membershipId);
+
+            return app(TransferLibraryMembershipAction::class)->execute(
+                Auth::user(),
+                $membership,
+                (int) $this->libraryId,
+                $this->branchId ? (int) $this->branchId : null
+            );
+        }
+
+        return UserManagement::syncLibraryMembership(
             $user,
             (int) $this->libraryId,
             $this->branchId ? (int) $this->branchId : null
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function auditChangesForUser(User $user, array $dirtyFields): array
+    {
+        $businessFields = collect($dirtyFields)
+            ->reject(fn (string $field) => in_array($field, ['updated_at', 'remember_token'], true))
+            ->values()
+            ->all();
+
+        $visibleFields = array_values(array_diff($businessFields, ['password']));
+        $summary = AuditLogChanges::fromModel($user, $visibleFields, [
+            'name' => 'Vardas',
+            'email' => 'El. paštas',
+            'role' => 'Rolė',
+            'phone' => 'Telefonas',
+            'is_active' => 'Globalus vartotojo aktyvumas',
+            'membership_number' => 'Nario numeris',
+        ]);
+
+        if (in_array('password', $businessFields, true)) {
+            $summary['changed_fields'][] = 'password';
+            $summary['changes'][] = [
+                'field' => 'password',
+                'label' => 'Slaptažodis',
+                'from' => '-',
+                'to' => 'Pakeistas',
+            ];
+        }
+
+        return $summary;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function membershipSnapshot(User $user): ?array
+    {
+        if (! UserManagement::requiresLibrary($this->role) || ! $this->libraryId) {
+            return null;
+        }
+
+        $membership = $this->membershipId
+            ? LibraryMembership::query()->whereKey($this->membershipId)->first()
+            : LibraryMembership::query()
+                ->where('user_id', $user->id)
+                ->where('library_id', $this->libraryId)
+                ->first();
+
+        return $membership?->only(['library_id', 'branch_id', 'membership_number', 'is_active']);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $before
+     * @return array<string, mixed>
+     */
+    private function auditChangesForMembership(?array $before, ?LibraryMembership $membership): array
+    {
+        if (! $membership) {
+            return ['changed_fields' => [], 'changes' => []];
+        }
+
+        $after = $membership->only(['library_id', 'branch_id', 'membership_number', 'is_active']);
+        $fields = collect(array_keys($after))
+            ->filter(fn (string $field) => ($before[$field] ?? null) != $after[$field])
+            ->values()
+            ->all();
+
+        $changes = collect($fields)
+            ->map(fn (string $field) => [
+                'field' => 'membership.'.$field,
+                'label' => [
+                    'branch_id' => 'Narystės filialas',
+                    'library_id' => 'Narystės biblioteka',
+                    'membership_number' => 'Narystės numeris',
+                    'is_active' => 'Narystės aktyvumas',
+                ][$field],
+                'from' => $this->formatMembershipAuditValue($field, $before[$field] ?? null),
+                'to' => $this->formatMembershipAuditValue($field, $after[$field] ?? null),
+            ])
+            ->all();
+
+        return [
+            'changed_fields' => array_map(fn (string $field) => 'membership.'.$field, $fields),
+            'changes' => $changes,
+        ];
+    }
+
+    private function formatMembershipAuditValue(string $field, mixed $value): string
+    {
+        if ($field === 'library_id') {
+            return $value
+                ? (Library::query()->whereKey($value)->value('name') ?: (string) $value)
+                : '-';
+        }
+
+        if ($field === 'branch_id') {
+            return $value
+                ? (Branch::query()->whereKey($value)->value('name') ?: (string) $value)
+                : '-';
+        }
+
+        if ($field === 'is_active') {
+            return AuditLogChanges::formatValue('is_active', $value);
+        }
+
+        return AuditLogChanges::formatValue($field, $value);
+    }
+
+    private function editableMembershipFor(User $actor, User $managedUser): ?LibraryMembership
+    {
+        if (! UserManagement::requiresLibrary($managedUser->role)) {
+            return null;
+        }
+
+        if (! $actor->isSuperAdmin()) {
+            return UserManagement::membershipForActor($actor, $managedUser);
+        }
+
+        return $managedUser->activeLibraryMemberships()
+            ->orderBy('joined_at')
+            ->orderBy('id')
+            ->first()
+            ?: $managedUser->libraryMemberships()
+                ->orderBy('joined_at')
+                ->orderBy('id')
+                ->first();
+    }
+
+    /**
+     * @param  array<string, mixed>  ...$summaries
+     * @return array<string, mixed>
+     */
+    private function mergeAuditChanges(array ...$summaries): array
+    {
+        return [
+            'changed_fields' => collect($summaries)
+                ->flatMap(fn (array $summary) => $summary['changed_fields'] ?? [])
+                ->unique()
+                ->values()
+                ->all(),
+            'changes' => collect($summaries)
+                ->flatMap(fn (array $summary) => $summary['changes'] ?? [])
+                ->values()
+                ->all(),
+        ];
     }
 
     private function availableBranches()

@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Manage\Users\UserForm;
+use App\Models\AuditLog;
 use App\Models\Book;
 use App\Models\BookCopy;
 use App\Models\Branch;
@@ -301,6 +302,20 @@ test('admin edit form shows readonly account type instead of editable global rol
         ->assertSee(route('manage.users.create'), false);
 });
 
+test('admin edit form shows readonly library instead of editable library select', function () {
+    $library = Library::factory()->create(['name' => 'Readonly Library']);
+    $admin = User::factory()->for($library)->admin()->create();
+    $member = User::factory()->for($library)->member()->create();
+
+    $this
+        ->actingAs($admin)
+        ->get(route('manage.users.edit', $member))
+        ->assertOk()
+        ->assertSee('Readonly Library')
+        ->assertDontSee('wire:model.live="libraryId"', false)
+        ->assertDontSee('<select id="libraryId"', false);
+});
+
 test('create form opened from edit route starts empty and does not carry edited user state', function () {
     $library = Library::factory()->create();
     $admin = User::factory()->for($library)->admin()->create();
@@ -493,6 +508,275 @@ test('admin can move existing staff between own library branches without changin
     expect($staff->fresh()->role)->toBe(User::ROLE_STAFF)
         ->and($staff->fresh()->is_active)->toBeTrue()
         ->and($membership->fresh()->branch_id)->toBe($secondBranch->id);
+});
+
+test('admin cannot change an existing users library through livewire payload', function () {
+    $library = Library::factory()->create();
+    $otherLibrary = Library::factory()->create();
+    $branch = Branch::factory()->for($library)->create();
+    $otherBranch = Branch::factory()->for($otherLibrary)->create();
+    $admin = User::factory()->for($library)->admin()->create();
+    $staff = User::factory()->staff()->create();
+    UserManagement::syncLibraryMembership($staff, $library->id, $branch->id);
+
+    Livewire::actingAs($admin)
+        ->test(UserForm::class, ['managedUser' => $staff])
+        ->set('libraryId', $otherLibrary->id)
+        ->set('branchId', $otherBranch->id)
+        ->call('save')
+        ->assertHasErrors(['libraryId'])
+        ->assertSessionMissing('success');
+
+    $membership = $staff->libraryMemberships()->where('user_id', $staff->id)->firstOrFail();
+
+    expect($membership->library_id)->toBe($library->id)
+        ->and($membership->branch_id)->toBe($branch->id);
+});
+
+test('admin edit form persists allowed user fields to users table', function () {
+    $library = Library::factory()->create();
+    $admin = User::factory()->for($library)->admin()->create();
+    $member = User::factory()->for($library)->member()->create([
+        'name' => 'Old Name',
+        'email' => 'old-name@example.test',
+        'phone' => '111',
+    ]);
+
+    Livewire::actingAs($admin)
+        ->test(UserForm::class, ['managedUser' => $member])
+        ->set('name', 'New Name')
+        ->set('email', 'new-name@example.test')
+        ->set('phone', '222')
+        ->call('save')
+        ->assertRedirect(route('manage.users.index'));
+
+    expect($member->fresh())
+        ->name->toBe('New Name')
+        ->email->toBe('new-name@example.test')
+        ->phone->toBe('222');
+
+    $this->actingAs($admin)
+        ->get(route('manage.users.index'))
+        ->assertOk()
+        ->assertSee('New Name')
+        ->assertDontSee('Old Name');
+});
+
+test('admin edit form persists user and membership changes in one submit', function () {
+    $library = Library::factory()->create();
+    $firstBranch = Branch::factory()->for($library)->create(['name' => 'Old Branch']);
+    $secondBranch = Branch::factory()->for($library)->create(['name' => 'New Branch']);
+    $admin = User::factory()->for($library)->admin()->create();
+    $staff = User::factory()->staff()->create(['name' => 'Old Staff']);
+    UserManagement::syncLibraryMembership($staff, $library->id, $firstBranch->id);
+
+    Livewire::actingAs($admin)
+        ->test(UserForm::class, ['managedUser' => $staff])
+        ->set('name', 'New Staff')
+        ->set('branchId', $secondBranch->id)
+        ->call('save')
+        ->assertRedirect(route('manage.users.index'));
+
+    $membership = $staff->libraryMemberships()->where('library_id', $library->id)->firstOrFail();
+    $auditLog = AuditLog::query()->where('action', 'user_updated')->latest('id')->firstOrFail();
+
+    expect($staff->fresh()->name)->toBe('New Staff')
+        ->and($membership->fresh()->branch_id)->toBe($secondBranch->id)
+        ->and($auditLog->metadata['changed_fields'])->toContain('name', 'membership.branch_id')
+        ->and($auditLog->metadata['changes'])->toContain([
+            'field' => 'name',
+            'label' => 'Vardas',
+            'from' => 'Old Staff',
+            'to' => 'New Staff',
+        ])
+        ->and($auditLog->metadata['changes'])->toContain([
+            'field' => 'membership.branch_id',
+            'label' => 'Narystės filialas',
+            'from' => 'Old Branch',
+            'to' => 'New Branch',
+        ]);
+});
+
+test('super admin can transfer existing staff membership to another library and branch', function () {
+    $sourceLibrary = Library::factory()->create(['name' => 'Source Library']);
+    $targetLibrary = Library::factory()->create(['name' => 'Target Library']);
+    $sourceBranch = Branch::factory()->for($sourceLibrary)->create(['name' => 'Source Branch']);
+    $targetBranch = Branch::factory()->for($targetLibrary)->create(['name' => 'Target Branch']);
+    $superAdmin = User::factory()->superAdmin()->create();
+    $staff = User::factory()->staff()->create(['name' => 'Transfer Staff']);
+    $membership = UserManagement::syncLibraryMembership($staff, $sourceLibrary->id, $sourceBranch->id);
+    $staff->createToken('android-app');
+
+    Livewire::actingAs($superAdmin)
+        ->test(UserForm::class, ['managedUser' => $staff])
+        ->assertSet('membershipId', $membership->id)
+        ->assertSet('sourceLibraryId', $sourceLibrary->id)
+        ->set('libraryId', $targetLibrary->id)
+        ->assertSet('branchId', null)
+        ->set('branchId', $targetBranch->id)
+        ->call('save')
+        ->assertRedirect(route('manage.users.index'));
+
+    $membership = $membership->fresh();
+    $auditLog = AuditLog::query()->where('action', 'user_updated')->latest('id')->firstOrFail();
+
+    expect($membership->library_id)->toBe($targetLibrary->id)
+        ->and($membership->branch_id)->toBe($targetBranch->id)
+        ->and($staff->libraryMemberships()->count())->toBe(1)
+        ->and(PersonalAccessToken::query()->where('tokenable_id', $staff->id)->count())->toBe(0)
+        ->and($auditLog->metadata['changed_fields'])->toContain('membership.library_id', 'membership.branch_id')
+        ->and($auditLog->metadata['changes'])->toContain([
+            'field' => 'membership.library_id',
+            'label' => 'Narystės biblioteka',
+            'from' => 'Source Library',
+            'to' => 'Target Library',
+        ])
+        ->and($auditLog->metadata['changes'])->toContain([
+            'field' => 'membership.branch_id',
+            'label' => 'Narystės filialas',
+            'from' => 'Source Branch',
+            'to' => 'Target Branch',
+        ]);
+
+    Livewire::actingAs($superAdmin)
+        ->test(UserForm::class, ['managedUser' => $staff->fresh()])
+        ->assertSet('membershipId', $membership->id)
+        ->assertSet('libraryId', $targetLibrary->id)
+        ->assertSet('branchId', $targetBranch->id);
+});
+
+test('super admin membership transfer rejects target library conflicts without changing source membership', function () {
+    $sourceLibrary = Library::factory()->create();
+    $targetLibrary = Library::factory()->create();
+    $sourceBranch = Branch::factory()->for($sourceLibrary)->create();
+    $targetBranch = Branch::factory()->for($targetLibrary)->create();
+    $superAdmin = User::factory()->superAdmin()->create();
+    $staff = User::factory()->staff()->create();
+    $sourceMembership = UserManagement::syncLibraryMembership($staff, $sourceLibrary->id, $sourceBranch->id);
+    $staff->libraryMemberships()->create([
+        'library_id' => $targetLibrary->id,
+        'branch_id' => $targetBranch->id,
+        'membership_number' => $staff->membership_number,
+        'is_active' => true,
+        'joined_at' => now(),
+    ]);
+
+    Livewire::actingAs($superAdmin)
+        ->test(UserForm::class, ['managedUser' => $staff])
+        ->set('libraryId', $targetLibrary->id)
+        ->assertSet('branchId', null)
+        ->set('branchId', $targetBranch->id)
+        ->call('save')
+        ->assertHasErrors(['libraryId'])
+        ->assertSessionMissing('success');
+
+    expect($sourceMembership->fresh()->library_id)->toBe($sourceLibrary->id)
+        ->and($sourceMembership->fresh()->branch_id)->toBe($sourceBranch->id)
+        ->and($staff->libraryMemberships()->count())->toBe(2);
+});
+
+test('super admin membership transfer rejects foreign branch and leaves no partial update', function () {
+    $sourceLibrary = Library::factory()->create();
+    $targetLibrary = Library::factory()->create();
+    $foreignLibrary = Library::factory()->create();
+    $sourceBranch = Branch::factory()->for($sourceLibrary)->create();
+    $foreignBranch = Branch::factory()->for($foreignLibrary)->create();
+    $superAdmin = User::factory()->superAdmin()->create();
+    $staff = User::factory()->staff()->create(['name' => 'No Partial']);
+    $membership = UserManagement::syncLibraryMembership($staff, $sourceLibrary->id, $sourceBranch->id);
+
+    Livewire::actingAs($superAdmin)
+        ->test(UserForm::class, ['managedUser' => $staff])
+        ->set('name', 'Should Roll Back')
+        ->set('libraryId', $targetLibrary->id)
+        ->assertSet('branchId', null)
+        ->set('branchId', $foreignBranch->id)
+        ->call('save')
+        ->assertHasErrors(['branchId'])
+        ->assertSessionMissing('success');
+
+    expect($staff->fresh()->name)->toBe('No Partial')
+        ->and($membership->fresh()->library_id)->toBe($sourceLibrary->id)
+        ->and($membership->fresh()->branch_id)->toBe($sourceBranch->id)
+        ->and(AuditLog::query()->where('action', 'user_updated')->exists())->toBeFalse();
+});
+
+test('super admin membership transfer rejects source library loan history without partial update', function () {
+    $sourceLibrary = Library::factory()->create();
+    $targetLibrary = Library::factory()->create();
+    $sourceBranch = Branch::factory()->for($sourceLibrary)->create();
+    $targetBranch = Branch::factory()->for($targetLibrary)->create();
+    $sourceLocation = Location::factory()->for($sourceLibrary)->for($sourceBranch)->create();
+    $book = Book::factory()->create();
+    $copy = BookCopy::factory()->create([
+        'library_id' => $sourceLibrary->id,
+        'branch_id' => $sourceBranch->id,
+        'location_id' => $sourceLocation->id,
+        'book_id' => $book->id,
+    ]);
+    $superAdmin = User::factory()->superAdmin()->create();
+    $staff = User::factory()->staff()->create();
+    $membership = UserManagement::syncLibraryMembership($staff, $sourceLibrary->id, $sourceBranch->id);
+
+    Loan::factory()->create([
+        'library_id' => $sourceLibrary->id,
+        'book_copy_id' => $copy->id,
+        'user_id' => $staff->id,
+        'returned_at' => now(),
+        'status' => 'grąžinta',
+    ]);
+
+    Livewire::actingAs($superAdmin)
+        ->test(UserForm::class, ['managedUser' => $staff])
+        ->set('libraryId', $targetLibrary->id)
+        ->set('branchId', $targetBranch->id)
+        ->call('save')
+        ->assertHasErrors(['libraryId'])
+        ->assertSessionMissing('success');
+
+    expect($membership->fresh()->library_id)->toBe($sourceLibrary->id)
+        ->and($membership->fresh()->branch_id)->toBe($sourceBranch->id);
+});
+
+test('admin edit form no-op does not update audit log or show false success', function () {
+    $library = Library::factory()->create();
+    $admin = User::factory()->for($library)->admin()->create();
+    $member = User::factory()->for($library)->member()->create([
+        'name' => 'No Op Member',
+        'email' => 'noop@example.test',
+    ]);
+    $auditCountBefore = AuditLog::query()->count();
+
+    Livewire::actingAs($admin)
+        ->test(UserForm::class, ['managedUser' => $member])
+        ->call('save')
+        ->assertRedirect(route('manage.users.edit', $member))
+        ->assertSessionHas('info', 'Nebuvo atlikta jokių pakeitimų.')
+        ->assertSessionMissing('success');
+
+    expect(AuditLog::query()->count())->toBe($auditCountBefore);
+});
+
+test('admin edit form rejects invalid membership branch without partial user update or success audit', function () {
+    $library = Library::factory()->create();
+    $otherLibrary = Library::factory()->create();
+    $branch = Branch::factory()->for($library)->create();
+    $foreignBranch = Branch::factory()->for($otherLibrary)->create();
+    $admin = User::factory()->for($library)->admin()->create();
+    $staff = User::factory()->staff()->create(['name' => 'Stable Staff']);
+    UserManagement::syncLibraryMembership($staff, $library->id, $branch->id);
+
+    Livewire::actingAs($admin)
+        ->test(UserForm::class, ['managedUser' => $staff])
+        ->set('name', 'Should Not Persist')
+        ->set('branchId', $foreignBranch->id)
+        ->call('save')
+        ->assertHasErrors(['branchId'])
+        ->assertSessionMissing('success');
+
+    expect($staff->fresh()->name)->toBe('Stable Staff')
+        ->and($staff->libraryMemberships()->where('library_id', $library->id)->value('branch_id'))->toBe($branch->id)
+        ->and(AuditLog::query()->where('action', 'user_updated')->exists())->toBeFalse();
 });
 
 test('admin cannot assign existing staff to a branch from another library', function () {
