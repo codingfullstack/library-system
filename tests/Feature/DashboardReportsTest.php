@@ -61,7 +61,7 @@ it('shows extended dashboard reports scoped to the staff library', function () {
         'book_id' => $otherBook->id,
         'branch_id' => $branch->id,
         'status' => BookCopy::STATUS_AVAILABLE,
-        'condition_status' => BookCopy::CONDITION_DAMAGED,
+        'condition_status' => BookCopy::CONDITION_WORN,
     ]);
     $otherLibraryCopy = BookCopy::factory()->create([
         'library_id' => $otherLibrary->id,
@@ -157,7 +157,7 @@ it('shows extended dashboard reports scoped to the staff library', function () {
     $response->assertDontSee('Peržiūrėti visus');
     $response->assertDontSee('Ctrl + K');
     $response->assertDontSee('Atnaujinti būsenas');
-    $response->assertSee(route('manage.book-copies.index', ['condition_status' => BookCopy::CONDITION_DAMAGED]), false);
+    $response->assertSee(route('manage.book-copies.index', ['status' => BookCopy::STATUS_MAINTENANCE]), false);
     $response->assertSee('Populiari knyga');
     $response->assertSee('Rasa Autore');
     $response->assertSee('Aktyvus narys');
@@ -178,7 +178,7 @@ it('shows dashboard reports across libraries for super admin', function () {
     BookCopy::factory()->create([
         'library_id' => $otherLibrary->id,
         'status' => BookCopy::STATUS_AVAILABLE,
-        'condition_status' => BookCopy::CONDITION_DAMAGED,
+        'condition_status' => BookCopy::CONDITION_WORN,
     ]);
 
     $response = $this->actingAs($superAdmin)->get(route('dashboard'));
@@ -192,7 +192,8 @@ it('shows dashboard reports across libraries for super admin', function () {
 
 it('filters dashboard activity by the selected period', function () {
     $library = Library::factory()->create(['name' => 'Miesto biblioteka']);
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $member = User::factory()->member()->create([
         'library_id' => $library->id,
         'name' => 'Laikotarpio narys',
@@ -204,6 +205,7 @@ it('filters dashboard activity by the selected period', function () {
 
     $recentCopy = BookCopy::factory()->create([
         'library_id' => $library->id,
+        'branch_id' => $branch->id,
         'book_id' => $recentBook->id,
         'status' => BookCopy::STATUS_AVAILABLE,
         'acquired_at' => now()->subDays(2)->toDateString(),
@@ -211,6 +213,7 @@ it('filters dashboard activity by the selected period', function () {
 
     $oldCopy = BookCopy::factory()->create([
         'library_id' => $library->id,
+        'branch_id' => $branch->id,
         'book_id' => $oldBook->id,
         'status' => BookCopy::STATUS_AVAILABLE,
         'acquired_at' => now()->subDays(45)->toDateString(),
@@ -270,10 +273,12 @@ it('filters dashboard activity by the selected period', function () {
 
 it('exports dashboard reports to csv', function () {
     $library = Library::factory()->create(['name' => 'Eksporto biblioteka', 'code' => 'EXP']);
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $book = Book::factory()->create(['title' => 'CSV knyga']);
     BookCopy::factory()->create([
         'library_id' => $library->id,
+        'branch_id' => $branch->id,
         'book_id' => $book->id,
         'status' => BookCopy::STATUS_AVAILABLE,
     ]);
@@ -288,10 +293,12 @@ it('exports dashboard reports to csv', function () {
 
 it('exports dashboard reports to excel format', function () {
     $library = Library::factory()->create(['name' => 'Excel biblioteka', 'code' => 'XLS']);
-    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $staff = staffInBranch($library, $branch);
     $book = Book::factory()->create(['title' => 'Excel knyga']);
     BookCopy::factory()->create([
         'library_id' => $library->id,
+        'branch_id' => $branch->id,
         'book_id' => $book->id,
         'status' => BookCopy::STATUS_AVAILABLE,
     ]);
@@ -303,6 +310,3 @@ it('exports dashboard reports to excel format', function () {
     $response->assertSee('Bibliotekos ataskaita');
     $response->assertSee('Suvestinė');
 });
-
-
-

@@ -3,10 +3,8 @@
 namespace App\Livewire\Dashboard;
 
 use App\Models\BookCopy;
-use App\Models\Loan;
 use App\Queries\Reports\GetDashboardReportDataQuery;
 use App\Support\Reports\ResolveDashboardFilters;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Url;
@@ -23,6 +21,9 @@ class Overview extends Component
     #[Url(as: 'date_to', history: true)]
     public ?string $dateTo = null;
 
+    #[Url(as: 'branch_id', history: true)]
+    public ?string $branchId = null;
+
     /**
      * @var array<string, mixed>
      */
@@ -31,8 +32,11 @@ class Overview extends Component
     public function mount(array $filters = []): void
     {
         $this->period = (string) ($filters['period'] ?? 'this_month');
-        $this->dateFrom = $filters['date_from']?->format('Y-m-d');
-        $this->dateTo = $filters['date_to']?->format('Y-m-d');
+        $this->dateFrom = ($filters['date_from'] ?? null)?->format('Y-m-d');
+        $this->dateTo = ($filters['date_to'] ?? null)?->format('Y-m-d');
+        $this->branchId = isset($filters['branch_id']) && $filters['branch_id']
+            ? (string) $filters['branch_id']
+            : null;
     }
 
     public function updatedPeriod(string $value): void
@@ -65,6 +69,7 @@ class Overview extends Component
             'period' => ['required', Rule::in(['all', 'today', '7_days', '30_days', 'this_week', 'this_month', 'last_month', 'this_quarter', 'this_year', 'custom'])],
             'dateFrom' => ['nullable', 'date', 'required_if:period,custom'],
             'dateTo' => ['nullable', 'date', 'required_if:period,custom', 'after_or_equal:dateFrom'],
+            'branchId' => ['nullable', 'integer', 'min:1'],
         ];
     }
 
@@ -73,9 +78,12 @@ class Overview extends Component
         $actor = Auth::user();
         abort_if(! $actor, 403);
 
-        $filters = $resolveDashboardFilters->handle($this->period, $this->dateFrom, $this->dateTo);
+        $filters = $resolveDashboardFilters->handle($this->period, $this->dateFrom, $this->dateTo) + [
+            'branch_id' => $this->branchId,
+        ];
         $report = $query->handle($actor, $filters);
         $previousFilters = $resolveDashboardFilters->previous($filters);
+        $previousFilters = $previousFilters ? $previousFilters + ['branch_id' => $filters['branch_id']] : null;
         $previousReport = $previousFilters ? $query->handle($actor, $previousFilters) : null;
 
         $timeline = collect($report['activityTimeline']);
@@ -84,14 +92,18 @@ class Overview extends Component
         $alerts = $this->alertItems($report);
         $quickActions = $this->quickActions($actor->effectiveRole($actor->activeLibraryId()) ?? '');
         $copiesBreakdown = $this->copiesBreakdown($report);
+        $timelineHasActivity = $timeline->contains(fn ($row) => (int) $row->issued_loans_count > 0
+            || (int) $row->returned_loans_count > 0
+            || (int) $row->reservations_count > 0);
 
         $this->chartPayload = [
             'timeline' => [
                 'categories' => $timeline->pluck('label')->values()->all(),
+                'has_activity' => $timelineHasActivity,
                 'series' => [
-                    ['name' => 'Išduota', 'data' => $timeline->pluck('issued_loans_count')->values()->all()],
-                    ['name' => 'Grąžinta', 'data' => $timeline->pluck('returned_loans_count')->values()->all()],
-                    ['name' => 'Rezervuota', 'data' => $timeline->pluck('reservations_count')->values()->all()],
+                    ['name' => 'Išduota', 'data' => $timeline->pluck('issued_loans_count')->map(fn ($count) => (int) $count)->values()->all()],
+                    ['name' => 'Grąžinta', 'data' => $timeline->pluck('returned_loans_count')->map(fn ($count) => (int) $count)->values()->all()],
+                    ['name' => 'Rezervuota', 'data' => $timeline->pluck('reservations_count')->map(fn ($count) => (int) $count)->values()->all()],
                 ],
             ],
             'copies' => [
@@ -111,6 +123,7 @@ class Overview extends Component
             'timeline' => $timeline,
             'exportQuery' => $this->exportQuery(),
             'chartPayload' => $this->chartPayload,
+            'dashboardScope' => $report['dashboardScope'],
         ]);
     }
 
@@ -121,9 +134,7 @@ class Overview extends Component
      */
     protected function summaryCards(array $report, ?array $previousReport): array
     {
-        $todayIssued = $this->todayIssuedCount();
-
-        return [
+        $cards = [
             $this->card(
                 'Knygų kopijos',
                 (int) $report['summary']['book_copies_count'],
@@ -149,14 +160,6 @@ class Overview extends Component
                 $previousReport['summary']['active_reservations_count'] ?? null,
             ),
             $this->card(
-                'Aktyvūs nariai',
-                (int) $report['summary']['active_members_count'],
-                'Šiuo metu',
-                'users',
-                'text-violet-600 bg-violet-50 dark:bg-violet-500/10 dark:text-violet-300',
-                $previousReport['summary']['active_members_count'] ?? null,
-            ),
-            $this->card(
                 'Vėluojančios knygos',
                 (int) $report['summary']['overdue_loans_count'],
                 'Reikalauja dėmesio',
@@ -166,13 +169,28 @@ class Overview extends Component
             ),
             [
                 'label' => 'Šiandien išduota',
-                'value' => $todayIssued,
+                'value' => (int) $report['summary']['today_issued_count'],
                 'caption' => 'Knygos',
                 'icon' => 'layout-grid',
                 'icon_classes' => 'text-cyan-600 bg-cyan-50 dark:bg-cyan-500/10 dark:text-cyan-300',
                 'delta' => null,
             ],
         ];
+
+        if (! $report['dashboardScope']->isBranch()) {
+            array_splice($cards, 3, 0, [
+                $this->card(
+                    'Aktyvūs nariai',
+                    (int) $report['summary']['active_members_count'],
+                    'Šiuo metu',
+                    'users',
+                    'text-violet-600 bg-violet-50 dark:bg-violet-500/10 dark:text-violet-300',
+                    $previousReport['summary']['active_members_count'] ?? null,
+                ),
+            ]);
+        }
+
+        return $cards;
     }
 
     /**
@@ -205,13 +223,7 @@ class Overview extends Component
      */
     protected function snapshotItems(array $report, array $filters): array
     {
-        return [
-            [
-                'label' => 'Nauji nariai',
-                'value' => $this->newMembersCount($filters),
-                'caption' => $filters['period_label'],
-                'accent' => 'emerald',
-            ],
+        $items = [
             [
                 'label' => 'Naujos kopijos',
                 'value' => (int) $report['summary']['book_copies_count'],
@@ -220,7 +232,7 @@ class Overview extends Component
             ],
             [
                 'label' => 'Šiandien grąžinta',
-                'value' => $this->todayReturnedCount(),
+                'value' => (int) $report['summary']['today_returned_count'],
                 'caption' => 'Knygos',
                 'accent' => 'teal',
             ],
@@ -231,6 +243,17 @@ class Overview extends Component
                 'accent' => 'amber',
             ],
         ];
+
+        if (! $report['dashboardScope']->isBranch()) {
+            array_unshift($items, [
+                'label' => 'Nauji nariai',
+                'value' => (int) $report['summary']['new_members_count'],
+                'caption' => $filters['period_label'],
+                'accent' => 'emerald',
+            ]);
+        }
+
+        return $items;
     }
 
     /**
@@ -241,23 +264,23 @@ class Overview extends Component
     {
         return [
             [
-                'title' => $report['summary']['overdue_loans_count'] . ' knygų vėluoja',
+                'title' => $report['summary']['overdue_loans_count'].' knygų vėluoja',
                 'description' => 'Patikrink išduotas knygas ir susisiek su nariais.',
                 'route' => route('loans.index'),
                 'link' => 'Peržiūrėti sąrašą',
                 'tone' => 'warning',
             ],
             [
-                'title' => $report['summary']['active_reservations_count'] . ' rezervacijos laukia',
+                'title' => $report['summary']['active_reservations_count'].' rezervacijos laukia',
                 'description' => 'Pažiūrėk, ar eilėje esantiems nariams jau galima pasiūlyti kopiją.',
                 'route' => route('reservations.index'),
                 'link' => 'Peržiūrėti rezervacijas',
                 'tone' => 'info',
             ],
             [
-                'title' => $report['summary']['damaged_book_copies_count'] . ' sugadintos kopijos',
-                'description' => 'Peržiūrėk būkles ir nuspręsk, ką reikia tvarkyti ar nurašyti.',
-                'route' => route('manage.book-copies.index', ['condition_status' => BookCopy::CONDITION_DAMAGED]),
+                'title' => $report['summary']['maintenance_book_copies_count'].' tvarkomos kopijos',
+                'description' => 'Peržiūrėk gyvavimo ciklą ir nuspręsk, ką reikia grąžinti į apyvartą ar nurašyti.',
+                'route' => route('manage.book-copies.index', ['status' => BookCopy::STATUS_MAINTENANCE]),
                 'link' => 'Peržiūrėti',
                 'tone' => 'warning',
             ],
@@ -334,58 +357,7 @@ class Overview extends Component
             'period' => $this->period,
             'date_from' => $this->period === 'custom' ? $this->dateFrom : null,
             'date_to' => $this->period === 'custom' ? $this->dateTo : null,
+            'branch_id' => filled($this->branchId) ? $this->branchId : null,
         ], fn ($value) => filled($value));
     }
-
-    protected function todayIssuedCount(): int
-    {
-        $actor = Auth::user();
-
-        return Loan::query()
-            ->when(! $actor?->isSuperAdmin(), fn ($query) => $query->where('library_id', $actor?->activeLibraryId()))
-            ->when($actor?->role === \App\Models\User::ROLE_STAFF, function ($query) use ($actor) {
-                $branchId = $actor->assignedBranchId($actor->activeLibraryId());
-
-                $query->whereHas('bookCopy', fn ($copyQuery) => $branchId
-                    ? $copyQuery->where('branch_id', $branchId)
-                    : $copyQuery->whereRaw('1 = 0'));
-            })
-            ->whereBetween('borrowed_at', [now()->startOfDay(), now()->endOfDay()])
-            ->count();
-    }
-
-    protected function todayReturnedCount(): int
-    {
-        $actor = Auth::user();
-
-        return Loan::query()
-            ->when(! $actor?->isSuperAdmin(), fn ($query) => $query->where('library_id', $actor?->activeLibraryId()))
-            ->when($actor?->role === \App\Models\User::ROLE_STAFF, function ($query) use ($actor) {
-                $branchId = $actor->assignedBranchId($actor->activeLibraryId());
-
-                $query->whereHas('bookCopy', fn ($copyQuery) => $branchId
-                    ? $copyQuery->where('branch_id', $branchId)
-                    : $copyQuery->whereRaw('1 = 0'));
-            })
-            ->whereNotNull('returned_at')
-            ->whereBetween('returned_at', [now()->startOfDay(), now()->endOfDay()])
-            ->count();
-    }
-
-    protected function newMembersCount(array $filters): int
-    {
-        $actor = Auth::user();
-
-        return \App\Models\User::query()
-            ->where('role', 'narys')
-            ->when(! $actor?->isSuperAdmin(), fn ($query) => $query->whereHas('libraryMemberships', fn ($membershipQuery) => $membershipQuery
-                ->where('library_id', $actor?->activeLibraryId())
-                ->where('is_active', true)))
-            ->when($filters['date_from'] && $filters['date_to'], fn ($query) => $query->whereBetween('created_at', [$filters['date_from'], $filters['date_to']]))
-            ->count();
-    }
 }
-
-
-
-

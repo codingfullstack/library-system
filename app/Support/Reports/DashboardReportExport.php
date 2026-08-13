@@ -2,10 +2,8 @@
 
 namespace App\Support\Reports;
 
-use App\Models\User;
 use Illuminate\Http\Response;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class DashboardReportExport
@@ -20,6 +18,7 @@ class DashboardReportExport
                 'title' => 'Suvestinė',
                 'headers' => ['Rodiklis', 'Reikšmė'],
                 'rows' => [
+                    ['Apimtis', $report['scopeLabel']],
                     ['Knygų kopijos', $report['summary']['book_copies_count']],
                     ['Laisvi kopijos', $report['summary']['available_book_copies_count']],
                     ['Aktyviai išduotos knygos', $report['summary']['active_loans_count']],
@@ -28,15 +27,14 @@ class DashboardReportExport
                     ['Įvykdytos rezervacijos', $report['summary']['fulfilled_reservations_count']],
                     ['Vėluojančios išduotos knygos', $report['summary']['overdue_loans_count']],
                     ['Prarasti kopijos', $report['summary']['lost_book_copies_count']],
-                    ['Sugadinti kopijos', $report['summary']['damaged_book_copies_count']],
                     ['Tvarkomi kopijos', $report['summary']['maintenance_book_copies_count']],
                     ['Nurašyti kopijos', $report['summary']['withdrawn_book_copies_count']],
-                    ['Aktyvūs nariai', $report['summary']['active_members_count']],
+                    ['Aktyvūs nariai', $report['summary']['active_members_count'] ?? 'Netaikoma filialo apimciai'],
                 ],
             ],
             [
                 'title' => 'Bibliotekų palyginimas',
-                'headers' => ['Biblioteka', 'Egz.', 'Laisvi', 'Aktyviai išduotos', 'Visi išdavimai', 'Aktyvios rezervacijos', 'Visos rezervacijos', 'Aktyvūs nariai', 'Vėluojančios', 'Prarasti', 'Sugadinti', 'Tvarkomi', 'Nurašyti'],
+                'headers' => ['Biblioteka', 'Egz.', 'Laisvi', 'Aktyviai išduotos', 'Visi išdavimai', 'Aktyvios rezervacijos', 'Visos rezervacijos', 'Aktyvūs nariai', 'Vėluojančios', 'Prarasti', 'Tvarkomi', 'Nurašyti'],
                 'rows' => collect($report['libraryComparison'])->map(fn ($library) => [
                     $library->name,
                     $library->book_copies_count,
@@ -45,10 +43,9 @@ class DashboardReportExport
                     $library->loans_count,
                     $library->active_reservations_count,
                     $library->reservations_count,
-                    $library->active_members_count,
+                    $library->active_members_count ?: ($report['dashboardScope']->isBranch() ? 'Netaikoma' : 0),
                     $library->overdue_loans_count,
                     $library->lost_book_copies_count,
-                    $library->damaged_book_copies_count,
                     $library->maintenance_book_copies_count,
                     $library->withdrawn_book_copies_count,
                 ])->all(),
@@ -137,7 +134,7 @@ class DashboardReportExport
             ],
             [
                 'title' => 'Kopijos pagal filialus',
-                'headers' => ['Biblioteka', 'Filialas', 'Egz.', 'Laisvi', 'Išduoti', 'Aktyvios rezervacijos', 'Prarasti', 'Sugadinti', 'Tvarkomi', 'Nurašyti'],
+                'headers' => ['Biblioteka', 'Filialas', 'Egz.', 'Laisvi', 'Išduoti', 'Aktyvios rezervacijos', 'Prarasti', 'Tvarkomi', 'Nurašyti'],
                 'rows' => collect($report['copiesByBranch'])->map(fn ($branch) => [
                     $branch->library?->name,
                     $branch->name,
@@ -146,7 +143,6 @@ class DashboardReportExport
                     $branch->loaned_book_copies_count,
                     $branch->active_reservations_count,
                     $branch->lost_book_copies_count,
-                    $branch->damaged_book_copies_count,
                     $branch->maintenance_book_copies_count,
                     $branch->withdrawn_book_copies_count,
                 ])->all(),
@@ -154,11 +150,9 @@ class DashboardReportExport
         ];
     }
 
-    public function filename(User $user, array $filters, string $format): string
+    public function filename(array $report, array $filters, string $format): string
     {
-        $scope = $user->isSuperAdmin()
-            ? 'visos-bibliotekos'
-            : Str::slug((string) ($user->library?->code ?: $user->library?->name ?: 'biblioteka'));
+        $scope = Str::slug((string) $report['dashboardScope']->filenameScope());
 
         $period = Str::slug((string) Arr::get($filters, 'period_label', 'visas-laikotarpis'));
 
@@ -191,7 +185,7 @@ class DashboardReportExport
 
         return response($content, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
@@ -206,14 +200,6 @@ class DashboardReportExport
                 'report' => $report,
             ])
             ->header('Content-Type', 'application/vnd.ms-excel; charset=UTF-8')
-            ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+            ->header('Content-Disposition', 'attachment; filename="'.$filename.'"');
     }
 }
-
-
-
-
-
-
-
-
