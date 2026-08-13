@@ -357,13 +357,21 @@ class ReservationConcurrencyProcessTest extends TestCase
         $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
         $staff = User::factory()->staff()->create(['library_id' => $library->id]);
         $member = User::factory()->member()->create(['library_id' => $library->id]);
+        $borrower = User::factory()->member()->create(['library_id' => $library->id]);
 
-        BookCopy::factory()->create([
+        $copy = BookCopy::factory()->create([
             'library_id' => $library->id,
             'book_id' => $book->id,
             'branch_id' => $branch->id,
             'location_id' => $location->id,
             'status' => BookCopy::STATUS_LOANED,
+        ]);
+        Loan::factory()->create([
+            'library_id' => $library->id,
+            'book_copy_id' => $copy->id,
+            'user_id' => $borrower->id,
+            'status' => Loan::STATUS_ACTIVE,
+            'returned_at' => null,
         ]);
 
         $first = $this->createReservationProcess($staff->id, $member->id, $book->id);
@@ -651,13 +659,21 @@ class ReservationConcurrencyProcessTest extends TestCase
         $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
         $staff = User::factory()->staff()->create(['library_id' => $library->id]);
         $member = User::factory()->member()->create(['library_id' => $library->id]);
+        $queueABorrower = User::factory()->member()->create(['library_id' => $library->id]);
 
-        BookCopy::factory()->create([
+        $queueACopy = BookCopy::factory()->create([
             'library_id' => $library->id,
             'book_id' => $queueABook->id,
             'branch_id' => $branch->id,
             'location_id' => $location->id,
             'status' => BookCopy::STATUS_LOANED,
+        ]);
+        Loan::factory()->create([
+            'library_id' => $library->id,
+            'book_copy_id' => $queueACopy->id,
+            'user_id' => $queueABorrower->id,
+            'status' => Loan::STATUS_ACTIVE,
+            'returned_at' => null,
         ]);
 
         $queueBCopy = BookCopy::factory()->create([

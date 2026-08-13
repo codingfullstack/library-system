@@ -57,6 +57,7 @@ function pendingReservationForHistory(array $fixture, array $overrides = []): Re
         'reserved_at' => now()->subHour(),
         'ready_at' => now()->subMinutes(30),
         'expires_at' => now()->addDay(),
+        'report_branch_id' => $overrides['pickup_branch_id'] ?? null,
         'fulfilled_at' => null,
         'cancelled_at' => null,
     ], $overrides));
@@ -129,6 +130,14 @@ it('allows admin to issue an available copy from the active library', function (
 it('shows a validation error instead of crashing when no available copy exists', function () {
     $fixture = reservationHistoryFixture();
     $copy = copyForHistory($fixture, $fixture['ownBranch'], $fixture['ownLocation'], BookCopy::STATUS_LOANED);
+    Loan::factory()->create([
+        'library_id' => $fixture['library']->id,
+        'book_copy_id' => $copy->id,
+        'user_id' => $fixture['member']->id,
+        'status' => Loan::STATUS_ACTIVE,
+        'returned_at' => null,
+    ]);
+    $loansBeforeIssue = Loan::query()->count();
     pendingReservationForHistory($fixture, [
         'pickup_branch_id' => $fixture['ownBranch']->id,
         'assigned_book_copy_id' => $copy->id,
@@ -140,5 +149,5 @@ it('shows a validation error instead of crashing when no available copy exists',
         ->assertNoRedirect()
         ->assertHasErrors(['reservation']);
 
-    expect(Loan::query()->count())->toBe(0);
+    expect(Loan::query()->count())->toBe($loansBeforeIssue);
 });

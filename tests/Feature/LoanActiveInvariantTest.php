@@ -48,7 +48,7 @@ it('creates a normal loan through the borrow action', function () {
     ]);
 
     expect($result['loan'])->toBeInstanceOf(Loan::class)
-        ->and($copy->fresh()->status)->toBe(BookCopy::STATUS_LOANED)
+        ->and($copy->fresh()->status)->toBe(BookCopy::STATUS_IN_CIRCULATION)
         ->and($copy->fresh()->activeLoan()->count())->toBe(1);
 });
 

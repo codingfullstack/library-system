@@ -30,7 +30,7 @@ class AuditLegacyReadyReservationsCommand extends Command
             ->orderBy('id')
             ->get();
 
-        $report = $rows->map(fn (Reservation $reservation) => $this->classify($reservation))->values();
+        $report = $rows->map(fn (Reservation $reservation) => $this->classify($reservation, $hasAssignedCopyColumn))->values();
         $applied = [];
         $applyError = null;
 
@@ -74,9 +74,9 @@ class AuditLegacyReadyReservationsCommand extends Command
     /**
      * @return array<string, mixed>
      */
-    private function classify(Reservation $reservation): array
+    private function classify(Reservation $reservation, bool $hasAssignedCopyColumn): array
     {
-        $candidateIds = $this->candidateCopyQuery($reservation)
+        $candidateIds = $this->candidateCopyQuery($reservation, $hasAssignedCopyColumn)
             ->pluck('id')
             ->map(fn ($id): int => (int) $id)
             ->all();
@@ -107,7 +107,7 @@ class AuditLegacyReadyReservationsCommand extends Command
                 return;
             }
 
-            $candidateIds = $this->candidateCopyQuery($reservation)
+            $candidateIds = $this->candidateCopyQuery($reservation, Schema::hasColumn('reservations', 'assigned_book_copy_id'))
                 ->lockForUpdate()
                 ->pluck('id')
                 ->map(fn ($id): int => (int) $id)
@@ -126,22 +126,29 @@ class AuditLegacyReadyReservationsCommand extends Command
                 ->where('book_id', $bookId)
                 ->firstOrFail();
 
-            $reservation->update([
+            $attributes = [
                 'assigned_book_copy_id' => $copy->id,
                 'pickup_branch_id' => $reservation->pickup_branch_id ?: $copy->branch_id,
-            ]);
+            ];
+
+            if (Schema::hasColumn('reservations', 'report_branch_id')) {
+                $attributes['report_branch_id'] = $reservation->pickup_branch_id ?: $copy->branch_id;
+            }
+
+            $reservation->update($attributes);
 
             $applied[] = $reservation->id;
         });
     }
 
-    private function candidateCopyQuery(Reservation $reservation): Builder
+    private function candidateCopyQuery(Reservation $reservation, bool $hasAssignedCopyColumn): Builder
     {
         $candidateQuery = BookCopy::query()
             ->withoutGlobalScope('library')
             ->where('library_id', $reservation->library_id)
             ->where('book_id', $reservation->book_id)
-            ->where('status', BookCopy::STATUS_AVAILABLE);
+            ->inCirculation()
+            ->when($hasAssignedCopyColumn, fn (Builder $query) => $query->whereDoesntHave('activeReadyReservation'));
 
         if ($reservation->pickup_branch_id) {
             $candidateQuery->where('branch_id', $reservation->pickup_branch_id);

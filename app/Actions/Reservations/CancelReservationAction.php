@@ -54,57 +54,58 @@ class CancelReservationAction
 
                 $queueService->lockQueueContext((int) $reservationContext->library_id, (int) $reservationContext->book_id);
 
-            $lockedReservation = Reservation::query()
-                ->with('pickupBranch:id,name')
-                ->whereKey($reservation->id)
-                ->lockForUpdate()
-                ->firstOrFail();
+                $lockedReservation = Reservation::query()
+                    ->with('pickupBranch:id,name')
+                    ->whereKey($reservation->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-            $wasReady = $lockedReservation->isReady();
-            $pickupBranchId = $lockedReservation->pickup_branch_id;
-            $pickupBranchName = $lockedReservation->pickupBranch?->name;
+                $wasReady = $lockedReservation->isReady();
+                $pickupBranchId = $lockedReservation->pickup_branch_id;
+                $pickupBranchName = $lockedReservation->pickupBranch?->name;
 
-            if (! $lockedReservation->isActive()) {
-                throw ValidationException::withMessages([
-                    'reservation' => 'Galima atÅ¡aukti tik aktyviÄ… rezervacijÄ….',
+                if (! $lockedReservation->isActive()) {
+                    throw ValidationException::withMessages([
+                        'reservation' => 'Galima atÅ¡aukti tik aktyviÄ… rezervacijÄ….',
+                    ]);
+                }
+
+                $queueService->activeReservationsQuery($lockedReservation->library_id, $lockedReservation->book_id)
+                    ->lockForUpdate()
+                    ->get(['id']);
+
+                $positionsBeforeCancellation = $queueService
+                    ->snapshotPositions($lockedReservation->library_id, $lockedReservation->book_id);
+
+                app(ReservationQueueDebugService::class)->logSnapshot('before_cancellation', $lockedReservation->library_id, $lockedReservation->book_id, [
+                    'triggering_reservation_id' => $lockedReservation->id,
+                    'old_positions' => $positionsBeforeCancellation,
                 ]);
-            }
 
-            $queueService->activeReservationsQuery($lockedReservation->library_id, $lockedReservation->book_id)
-                ->lockForUpdate()
-                ->get(['id']);
+                $lockedReservation->update([
+                    'status' => Reservation::STATUS_CANCELLED,
+                    'report_branch_id' => $wasReady ? $pickupBranchId : $lockedReservation->branch_id,
+                    'pickup_branch_id' => null,
+                    'assigned_book_copy_id' => null,
+                    'cancelled_at' => now(),
+                    'notes' => $normalizedReason !== ''
+                        ? trim(implode("\n\n", array_filter([$lockedReservation->notes, 'Atšaukimo priežastis: '.$normalizedReason])))
+                        : $lockedReservation->notes,
+                ]);
 
-            $positionsBeforeCancellation = $queueService
-                ->snapshotPositions($lockedReservation->library_id, $lockedReservation->book_id);
+                app(SyncReservationQueueAction::class)->handle($lockedReservation->library_id, $lockedReservation->book_id);
 
-            app(ReservationQueueDebugService::class)->logSnapshot('before_cancellation', $lockedReservation->library_id, $lockedReservation->book_id, [
-                'triggering_reservation_id' => $lockedReservation->id,
-                'old_positions' => $positionsBeforeCancellation,
-            ]);
+                DB::afterCommit(fn () => app(ReservationNotificationService::class)->notifyQueuePositionsChangedFromSnapshot(
+                    $lockedReservation->library_id,
+                    $lockedReservation->book_id,
+                    $positionsBeforeCancellation
+                ));
 
-            $lockedReservation->update([
-                'status' => Reservation::STATUS_CANCELLED,
-                'pickup_branch_id' => null,
-                'assigned_book_copy_id' => null,
-                'cancelled_at' => now(),
-                'notes' => $normalizedReason !== ''
-                    ? trim(implode("\n\n", array_filter([$lockedReservation->notes, 'Atšaukimo priežastis: '.$normalizedReason])))
-                    : $lockedReservation->notes,
-            ]);
-
-            app(SyncReservationQueueAction::class)->handle($lockedReservation->library_id, $lockedReservation->book_id);
-
-            DB::afterCommit(fn () => app(ReservationNotificationService::class)->notifyQueuePositionsChangedFromSnapshot(
-                $lockedReservation->library_id,
-                $lockedReservation->book_id,
-                $positionsBeforeCancellation
-            ));
-
-            app(ReservationQueueDebugService::class)->logSnapshot('after_cancellation', $lockedReservation->library_id, $lockedReservation->book_id, [
-                'triggering_reservation_id' => $lockedReservation->id,
-                'old_positions' => $positionsBeforeCancellation,
-                'new_positions' => $queueService->getPositionsForBook($lockedReservation->library_id, $lockedReservation->book_id),
-            ]);
+                app(ReservationQueueDebugService::class)->logSnapshot('after_cancellation', $lockedReservation->library_id, $lockedReservation->book_id, [
+                    'triggering_reservation_id' => $lockedReservation->id,
+                    'old_positions' => $positionsBeforeCancellation,
+                    'new_positions' => $queueService->getPositionsForBook($lockedReservation->library_id, $lockedReservation->book_id),
+                ]);
 
                 return $lockedReservation->fresh();
             });
@@ -165,5 +166,4 @@ class CancelReservationAction
 
         return $reservation->fresh();
     }
-
 }

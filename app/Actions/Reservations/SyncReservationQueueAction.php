@@ -109,12 +109,20 @@ class SyncReservationQueueAction
             $readyAttributes = [
                 'status' => Reservation::STATUS_READY,
                 'pickup_branch_id' => (int) $copy->branch_id,
+                'report_branch_id' => (int) $copy->branch_id,
                 'assigned_book_copy_id' => (int) $copy->id,
                 'ready_at' => now(),
                 'expires_at' => now()->addDays(self::DEFAULT_WINDOW_DAYS),
             ];
 
             try {
+                $this->assertReadyAssignmentInvariant($reservation, $copy, $readyAttributes);
+                if ((int) $readyAttributes['report_branch_id'] !== (int) $readyAttributes['pickup_branch_id']) {
+                    throw ValidationException::withMessages([
+                        'reservation' => ['Rezervacijos ataskaitinis filialas turi sutapti su atsiėmimo filialu.'],
+                    ]);
+                }
+
                 $reservation->update($readyAttributes);
             } catch (QueryException $exception) {
                 if (! $this->isActiveReadyCopyUniqueConstraintViolation($exception)) {
@@ -137,6 +145,34 @@ class SyncReservationQueueAction
                 'triggering_copy_id' => $copy->id,
                 'triggering_branch_id' => (int) $copy->branch_id,
                 'global_position' => $this->queueService->getQueuePosition($reservation),
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $readyAttributes
+     */
+    private function assertReadyAssignmentInvariant(Reservation $reservation, BookCopy $copy, array $readyAttributes): void
+    {
+        $assignedCopyId = $readyAttributes['assigned_book_copy_id'] ?? null;
+        $pickupBranchId = $readyAttributes['pickup_branch_id'] ?? null;
+        $reportBranchId = $readyAttributes['report_branch_id'] ?? null;
+
+        if ($assignedCopyId === null || $pickupBranchId === null || $reportBranchId === null) {
+            throw ValidationException::withMessages([
+                'reservation' => ['Paruostai rezervacijai privaloma priskirti kopija, atsiemimo filiala ir ataskaitini filiala.'],
+            ]);
+        }
+
+        if ((int) $assignedCopyId !== (int) $copy->id || (int) $copy->library_id !== (int) $reservation->library_id) {
+            throw ValidationException::withMessages([
+                'reservation' => ['Rezervacijai priskiriama kopija turi priklausyti tai paciai bibliotekai.'],
+            ]);
+        }
+
+        if ((int) $copy->branch_id !== (int) $pickupBranchId || (int) $pickupBranchId !== (int) $reportBranchId) {
+            throw ValidationException::withMessages([
+                'reservation' => ['Rezervacijos ataskaitinis filialas turi sutapti su atsiemimo filialu ir kopijos filialu.'],
             ]);
         }
     }

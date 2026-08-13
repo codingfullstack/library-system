@@ -87,7 +87,7 @@ test('staff can not bypass branch transfer rules through api lifecycle endpoint'
     $fresh = $fixture['copy']->fresh();
 
     expect($fresh->branch_id)->toBe($fixture['ownBranch']->id)
-        ->and($fresh->status)->toBe(BookCopy::STATUS_MAINTENANCE);
+        ->and($fresh->lifecycle_status)->toBe(BookCopy::STATUS_MAINTENANCE);
 });
 
 test('staff can not bypass branch transfer rules through livewire form', function () {

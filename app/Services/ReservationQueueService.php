@@ -141,8 +141,7 @@ class ReservationQueueService
             ->where('library_id', $libraryId)
             ->where('book_id', $bookId)
             ->when($scope === Reservation::SCOPE_BRANCH, fn (Builder $query) => $query->where('branch_id', $branchId))
-            ->where('status', BookCopy::STATUS_AVAILABLE)
-            ->whereDoesntHave('activeReadyReservation');
+            ->operationallyAvailable();
     }
 
     public function activeLoanDueAt(int $libraryId, int $bookId, string $scope = Reservation::SCOPE_LIBRARY, ?int $branchId = null): ?string

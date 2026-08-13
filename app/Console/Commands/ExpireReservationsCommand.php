@@ -38,62 +38,63 @@ class ExpireReservationsCommand extends Command
                                 ->whereKey($reservationStub->id)
                                 ->first();
 
-                        if (! $reservationContext) {
-                            return null;
-                        }
+                            if (! $reservationContext) {
+                                return null;
+                            }
 
-                        app(ReservationQueueService::class)->lockQueueContext(
-                            (int) $reservationContext->library_id,
-                            (int) $reservationContext->book_id
-                        );
+                            app(ReservationQueueService::class)->lockQueueContext(
+                                (int) $reservationContext->library_id,
+                                (int) $reservationContext->book_id
+                            );
 
-                        $reservation = Reservation::query()
-                            ->with(['book:id,title', 'pickupBranch:id,name', 'user:id,name,email'])
-                            ->whereKey($reservationStub->id)
-                            ->where('status', Reservation::STATUS_READY)
-                            ->where('expires_at', '<=', now())
-                            ->lockForUpdate()
-                            ->first();
+                            $reservation = Reservation::query()
+                                ->with(['book:id,title', 'pickupBranch:id,name', 'user:id,name,email'])
+                                ->whereKey($reservationStub->id)
+                                ->where('status', Reservation::STATUS_READY)
+                                ->where('expires_at', '<=', now())
+                                ->lockForUpdate()
+                                ->first();
 
-                        if (! $reservation) {
-                            return null;
-                        }
+                            if (! $reservation) {
+                                return null;
+                            }
 
-                        $pickupBranchId = $reservation->pickup_branch_id;
-                        $pickupBranchName = $reservation->pickupBranch?->name;
+                            $pickupBranchId = $reservation->pickup_branch_id;
+                            $pickupBranchName = $reservation->pickupBranch?->name;
 
-                        $expireAttributes = [
-                            'status' => Reservation::STATUS_EXPIRED,
-                            'pickup_branch_id' => null,
-                            'assigned_book_copy_id' => null,
-                        ];
+                            $expireAttributes = [
+                                'status' => Reservation::STATUS_EXPIRED,
+                                'report_branch_id' => $pickupBranchId,
+                                'pickup_branch_id' => null,
+                                'assigned_book_copy_id' => null,
+                            ];
 
-                        $reservation->update($expireAttributes);
+                            $reservation->update($expireAttributes);
 
-                        $expiredCount++;
+                            $expiredCount++;
 
-                        if ($reservation->user) {
-                            DB::afterCommit(fn () => app(CreateUserNotificationAction::class)->handle(
-                                $reservation->user,
-                                null,
-                                NotificationType::RESERVATION_EXPIRED,
-                                null,
-                                NotificationMessageBuilder::reservationExpired($reservation, $pickupBranchName),
-                                NotificationMetadataBuilder::reservation($reservation, [
-                                    'pickup_branch_id' => $pickupBranchId,
-                                    'pickup_branch_name' => $pickupBranchName,
-                                    'expires_at' => $reservation->expires_at?->toDateTimeString(),
-                                ]),
-                                Reservation::class,
-                                $reservation->id
-                            ));
-                        }
+                            if ($reservation->user) {
+                                DB::afterCommit(fn () => app(CreateUserNotificationAction::class)->handle(
+                                    $reservation->user,
+                                    null,
+                                    NotificationType::RESERVATION_EXPIRED,
+                                    null,
+                                    NotificationMessageBuilder::reservationExpired($reservation, $pickupBranchName),
+                                    NotificationMetadataBuilder::reservation($reservation, [
+                                        'pickup_branch_id' => $pickupBranchId,
+                                        'pickup_branch_name' => $pickupBranchName,
+                                        'expires_at' => $reservation->expires_at?->toDateTimeString(),
+                                    ]),
+                                    Reservation::class,
+                                    $reservation->id
+                                ));
+                            }
 
-                        return [
-                            'library_id' => (int) $reservation->library_id,
-                            'book_id' => (int) $reservation->book_id,
-                        ];
-                    });
+                            return [
+                                'library_id' => (int) $reservation->library_id,
+                                'book_id' => (int) $reservation->book_id,
+                            ];
+                        });
 
                         if ($bookToSync !== null) {
                             app(SyncReservationQueueAction::class)->handle($bookToSync['library_id'], $bookToSync['book_id']);
