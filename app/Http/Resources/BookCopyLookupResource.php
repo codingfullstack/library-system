@@ -17,7 +17,12 @@ class BookCopyLookupResource extends JsonResource
             'library_id' => $this->library_id,
             'inventory_code' => $this->inventory_code,
             'qr_code' => $this->qr_code,
-            'status' => $this->status,
+            'status' => $this->operationalStatus(),
+            'status_label' => $this->statusLabel(),
+            'operational_status' => $this->operationalStatus(),
+            'operational_label' => $this->operationalStatusLabel(),
+            'lifecycle_status' => $this->lifecycleStatus(),
+            'lifecycle_label' => $this->lifecycleStatusLabel(),
             'book' => $this->book ? [
                 'id' => $this->book->id,
                 'title' => $this->book->title,

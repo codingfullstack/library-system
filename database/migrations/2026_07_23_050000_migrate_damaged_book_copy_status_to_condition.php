@@ -28,7 +28,7 @@ return new class extends Migration
                         ->whereNull('loans.returned_at')
                         ->whereIn('loans.status', Loan::ACTIVE_STATUSES);
                 })
-                ->update(['status' => BookCopy::STATUS_LOANED]);
+                ->update(['status' => BookCopy::LEGACY_STATUS_LOANED]);
 
             DB::table('book_copies')
                 ->where('status', BookCopy::LEGACY_STATUS_DAMAGED)
@@ -50,7 +50,7 @@ return new class extends Migration
         if (DB::getDriverName() === 'mysql') {
             $enumValues = collect([
                 BookCopy::STATUS_AVAILABLE,
-                BookCopy::STATUS_LOANED,
+                BookCopy::LEGACY_STATUS_LOANED,
                 BookCopy::STATUS_LOST,
                 BookCopy::STATUS_MAINTENANCE,
                 BookCopy::STATUS_WITHDRAWN,

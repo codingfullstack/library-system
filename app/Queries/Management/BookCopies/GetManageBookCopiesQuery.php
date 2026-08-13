@@ -34,7 +34,7 @@ class GetManageBookCopiesQuery
                         ->orWhereHas('location', fn (Builder $locationQuery) => $locationQuery->where('name', 'like', "%{$search}%"));
                 });
             })
-            ->when($status, fn (Builder $query) => $query->where('status', $status))
+            ->when($status, fn (Builder $query) => $query->where('lifecycle_status', $status))
             ->when($conditionStatus, fn (Builder $query) => $query->where('condition_status', $conditionStatus))
             ->when($branchId, fn (Builder $query) => $query->where('branch_id', $branchId))
             ->latest('updated_at')
@@ -48,9 +48,10 @@ class GetManageBookCopiesQuery
         $query = $this->baseQuery($user);
 
         $total = (clone $query)->count();
-        $available = (clone $query)->where('status', BookCopy::STATUS_AVAILABLE)->count();
-        $loaned = (clone $query)->where('status', BookCopy::STATUS_LOANED)->count();
-        $unavailable = (clone $query)->whereIn('status', [
+        $available = (clone $query)->operationallyAvailable()->count();
+        $loaned = (clone $query)->whereHas('activeLoan')->count();
+        $unavailable = (clone $query)->whereIn('lifecycle_status', [
+            BookCopy::STATUS_PREPARING,
             BookCopy::STATUS_LOST,
             BookCopy::STATUS_MAINTENANCE,
             BookCopy::STATUS_WITHDRAWN,

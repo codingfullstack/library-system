@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Actions\Reservations\SyncReservationQueueAction;
 use App\Models\AuditLog;
 use App\Models\Author;
 use App\Models\Book;
@@ -135,6 +136,62 @@ class DemoDataSeeder extends Seeder
 
         if ($foreignBranchStaff > 0) {
             throw new InvalidArgumentException('Demo seed left staff assigned to branches from another library: '.$foreignBranchStaff);
+        }
+
+        $incompleteReadyReservations = Reservation::query()
+            ->where('status', Reservation::STATUS_READY)
+            ->where(function ($query): void {
+                $query->whereNull('assigned_book_copy_id')
+                    ->orWhereNull('pickup_branch_id')
+                    ->orWhereNull('ready_at')
+                    ->orWhereNull('expires_at');
+            })
+            ->count();
+
+        if ($incompleteReadyReservations > 0) {
+            throw new InvalidArgumentException('Demo seed left READY reservations without required fields: '.$incompleteReadyReservations);
+        }
+
+        $readyReservationCopyMismatches = Reservation::query()
+            ->join('book_copies', 'book_copies.id', '=', 'reservations.assigned_book_copy_id')
+            ->where('reservations.status', Reservation::STATUS_READY)
+            ->where(function ($query): void {
+                $query->whereColumn('book_copies.library_id', '<>', 'reservations.library_id')
+                    ->orWhereColumn('book_copies.book_id', '<>', 'reservations.book_id')
+                    ->orWhere(function ($branchQuery): void {
+                        $branchQuery
+                            ->where('reservations.scope', Reservation::SCOPE_BRANCH)
+                            ->whereColumn('book_copies.branch_id', '<>', 'reservations.branch_id');
+                    })
+                    ->orWhere('book_copies.lifecycle_status', '<>', BookCopy::STATUS_IN_CIRCULATION);
+            })
+            ->count();
+
+        if ($readyReservationCopyMismatches > 0) {
+            throw new InvalidArgumentException('Demo seed left READY reservations assigned to invalid copies: '.$readyReservationCopyMismatches);
+        }
+
+        $duplicateReadyCopyAssignments = Reservation::query()
+            ->select('assigned_book_copy_id', DB::raw('count(*) as aggregate'))
+            ->where('status', Reservation::STATUS_READY)
+            ->whereNotNull('assigned_book_copy_id')
+            ->groupBy('assigned_book_copy_id')
+            ->having('aggregate', '>', 1)
+            ->count();
+
+        if ($duplicateReadyCopyAssignments > 0) {
+            throw new InvalidArgumentException('Demo seed assigned one copy to multiple READY reservations: '.$duplicateReadyCopyAssignments);
+        }
+
+        $readyCopiesWithActiveLoans = Reservation::query()
+            ->join('loans', 'loans.book_copy_id', '=', 'reservations.assigned_book_copy_id')
+            ->where('reservations.status', Reservation::STATUS_READY)
+            ->whereNull('loans.returned_at')
+            ->whereIn('loans.status', Loan::ACTIVE_STATUSES)
+            ->count();
+
+        if ($readyCopiesWithActiveLoans > 0) {
+            throw new InvalidArgumentException('Demo seed assigned actively loaned copies to READY reservations: '.$readyCopiesWithActiveLoans);
         }
     }
     private function coreSeedLibrariesBranchesCatalogAndBaseScenarios(): void
@@ -275,6 +332,11 @@ class DemoDataSeeder extends Seeder
                 $this->coreSeedNotificationCatalogForEglePetrauskaite($eglePetrauskaite, $staffX, $libraryX, $books);
             }
         });
+
+        Library::query()
+            ->whereIn('code', ['LIB-X', 'LIB-Y'])
+            ->get(['id'])
+            ->each(fn (Library $library) => $this->syncActiveReservationQueuesForLibrary($library));
     }
 
     /**
@@ -761,8 +823,8 @@ class DemoDataSeeder extends Seeder
                     BookCopy::STATUS_AVAILABLE,
                     BookCopy::STATUS_AVAILABLE,
                     BookCopy::STATUS_AVAILABLE,
-                    BookCopy::STATUS_LOANED,
-                    BookCopy::STATUS_LOANED,
+                    BookCopy::STATUS_IN_CIRCULATION,
+                    BookCopy::STATUS_IN_CIRCULATION,
                     BookCopy::STATUS_MAINTENANCE,
                     BookCopy::STATUS_LOST,
                     BookCopy::STATUS_WITHDRAWN,
@@ -770,7 +832,7 @@ class DemoDataSeeder extends Seeder
                 $targetStatus = $statuses[($sequence - 1) % count($statuses)];
 
                 $condition = match ($targetStatus) {
-                    BookCopy::STATUS_MAINTENANCE => [BookCopy::CONDITION_WORN, BookCopy::CONDITION_DAMAGED][$sequence % 2],
+                BookCopy::STATUS_MAINTENANCE => BookCopy::CONDITION_WORN,
                     BookCopy::STATUS_LOST => [BookCopy::CONDITION_GOOD, BookCopy::CONDITION_WORN][$sequence % 2],
                     default => [BookCopy::CONDITION_NEW, BookCopy::CONDITION_GOOD, BookCopy::CONDITION_GOOD, BookCopy::CONDITION_WORN][$sequence % 4],
                 };
@@ -785,6 +847,7 @@ class DemoDataSeeder extends Seeder
                     'qr_code' => sprintf('QR-%s-%03d', $this->demoCopyCodePrefix($library, $branch), $currentInventory),
                     'barcode' => '978'.str_pad((string) (1000000000 + $library->id * 10000 + $currentInventory), 10, '0', STR_PAD_LEFT),
                     'status' => BookCopy::STATUS_AVAILABLE,
+                    'lifecycle_status' => BookCopy::STATUS_AVAILABLE,
                     'condition_status' => $condition,
                     'acquired_at' => Carbon::parse('2024-01-01')->subDays($currentInventory * 3)->format('Y-m-d'),
                     'notes' => $this->coreCopyNotesForStatus($targetStatus),
@@ -793,17 +856,14 @@ class DemoDataSeeder extends Seeder
                 $copies->push($copy);
                 $this->coreRecordCopyHistory($copy, $employees->first(), 'created', BookCopy::STATUS_AVAILABLE, 'Kopija trauktas  bibliotekos fond.');
 
-                if ($targetStatus === BookCopy::STATUS_LOANED) {
-                    $this->coreSeedLoanForCopy($copy, $members[($currentInventory - 1) % $members->count()], $employees[($currentInventory - 1) % $employees->count()], false, $currentInventory);
-
-                    continue;
-                }
-
                 if ($targetStatus === BookCopy::STATUS_AVAILABLE) {
                     continue;
                 }
 
-                $copy->update(['status' => $targetStatus]);
+                $copy->update([
+                    'status' => $targetStatus,
+                    'lifecycle_status' => $targetStatus,
+                ]);
 
                 [$reasonCode, $notes] = match ($targetStatus) {
                     BookCopy::STATUS_MAINTENANCE => ['sent_to_maintenance', 'Kopija laikinai perduotas tvarkymui.'],
@@ -816,7 +876,7 @@ class DemoDataSeeder extends Seeder
             }
         }
 
-        $availableCopies = $copies->filter(fn (BookCopy $copy) => $copy->status === BookCopy::STATUS_AVAILABLE)->values();
+        $availableCopies = $copies->filter(fn (BookCopy $copy) => $copy->lifecycleStatus() === BookCopy::STATUS_IN_CIRCULATION)->values();
 
         foreach ($availableCopies->sortBy('inventory_code')->take(min(20, $availableCopies->count())) as $index => $copy) {
             $this->coreSeedLoanForCopy($copy, $members[$index % $members->count()], $employees[$index % $employees->count()], true, $index + 100);
@@ -850,13 +910,10 @@ class DemoDataSeeder extends Seeder
                 : 'Skaitytojas iuo metu naudojasi ia kopija.',
         ]);
 
-        $copy->update(['status' => BookCopy::STATUS_LOANED]);
-        $this->coreRecordCopyHistory($copy, $employee, 'issued', BookCopy::STATUS_LOANED, 'Kopija išduota skaitytojui.');
-
-        if ($returned) {
-            $copy->update(['status' => BookCopy::STATUS_AVAILABLE]);
-            $this->coreRecordCopyHistory($copy, $employee, 'grąžinta', BookCopy::STATUS_AVAILABLE, 'Kopija grąžinta laiku ir vėl prieinama fonde.');
-        }
+        $copy->update([
+            'status' => BookCopy::STATUS_IN_CIRCULATION,
+            'lifecycle_status' => BookCopy::STATUS_IN_CIRCULATION,
+        ]);
     }
 
     /**
@@ -1035,7 +1092,7 @@ class DemoDataSeeder extends Seeder
                         : sprintf('Atnaujinta kopijos %s informacija.', $copy->inventory_code),
                     'metadata' => [
                         'inventory_code' => $copy->inventory_code,
-                        'target_status_label' => BookCopy::statusLabels()[$copy->status] ?? $copy->status,
+                        'target_status_label' => $copy->lifecycleStatusLabel(),
                     ],
                 ], $createdAt);
             }
@@ -1211,7 +1268,6 @@ class DemoDataSeeder extends Seeder
                 'Kopija tvarkinga ir prieinama skaitytojams.',
                 'Pastaruoju metu danai iekoma prie informacijos stalo.',
             ][strlen($status) % 3],
-            BookCopy::STATUS_LOANED => 'Kopija šiuo metu išduota skaitytojui.',
             BookCopy::STATUS_MAINTENANCE => 'Laukiama smulkaus taisymo arba perklijavimo.',
             BookCopy::STATUS_LOST => 'Nepavyko rasti per paskutin inventorizacij.',
             BookCopy::STATUS_WITHDRAWN => 'Kopija nebepriklauso aktyviam bibliotekos fondui.',
@@ -1440,11 +1496,11 @@ class DemoDataSeeder extends Seeder
             $littlePrince = Book::query()->where('isbn', '9786090141564')->firstOrFail();
 
             $copies = collect([
-                $this->kaltCreateCopy($library, $hp1, $mainBranch, $fantasyLocation, 'KAL-HP1-001', 'QR-KAL-HP1-001', '9786090141601', BookCopy::STATUS_LOANED, BookCopy::CONDITION_GOOD, '2023-09-01', 'Dažnai skolinama knyga.'),
+                $this->kaltCreateCopy($library, $hp1, $mainBranch, $fantasyLocation, 'KAL-HP1-001', 'QR-KAL-HP1-001', '9786090141601', BookCopy::STATUS_IN_CIRCULATION, BookCopy::CONDITION_GOOD, '2023-09-01', 'Dažnai skolinama knyga.'),
                 $this->kaltCreateCopy($library, $hp1, $mainBranch, $fantasyLocation, 'KAL-HP1-002', 'QR-KAL-HP1-002', '9786090141602', BookCopy::STATUS_AVAILABLE, BookCopy::CONDITION_GOOD, '2023-09-01', null),
-                $this->kaltCreateCopy($library, $witcher, $mainBranch, $fantasyLocation, 'KAL-RAG-001', 'QR-KAL-RAG-001', '9786090404251', BookCopy::STATUS_MAINTENANCE, BookCopy::CONDITION_DAMAGED, '2024-01-15', 'Lūžta nugarėlė, išsiųsta tvarkymui.'),
+                $this->kaltCreateCopy($library, $witcher, $mainBranch, $fantasyLocation, 'KAL-RAG-001', 'QR-KAL-RAG-001', '9786090404251', BookCopy::STATUS_MAINTENANCE, BookCopy::CONDITION_WORN, '2024-01-15', 'Lūžta nugarėlė, išsiųsta tvarkymui.'),
                 $this->kaltCreateCopy($library, $witcher, $mainBranch, $fantasyLocation, 'KAL-RAG-002', 'QR-KAL-RAG-002', '9786090404252', BookCopy::STATUS_AVAILABLE, BookCopy::CONDITION_GOOD, '2024-01-15', null),
-                $this->kaltCreateCopy($library, $altoriu, $mainBranch, $classicLocation, 'KAL-ALT-001', 'QR-KAL-ALT-001', '9799955000351', BookCopy::STATUS_AVAILABLE, BookCopy::CONDITION_DAMAGED, '2021-11-20', 'Apiplyšęs viršelis.'),
+                $this->kaltCreateCopy($library, $altoriu, $mainBranch, $classicLocation, 'KAL-ALT-001', 'QR-KAL-ALT-001', '9799955000351', BookCopy::STATUS_AVAILABLE, BookCopy::CONDITION_WORN, '2021-11-20', 'Apiplyšęs viršelis.'),
                 $this->kaltCreateCopy($library, $altoriu, $mainBranch, $classicLocation, 'KAL-ALT-002', 'QR-KAL-ALT-002', '9799955000352', BookCopy::STATUS_AVAILABLE, BookCopy::CONDITION_WORN, '2019-03-14', 'Senesnis kopija.'),
                 $this->kaltCreateCopy($library, $dievuMiskas, $mainBranch, $classicLocation, 'KAL-DM-001', 'QR-KAL-DM-001', 'KAL-PRV-001', BookCopy::STATUS_LOST, BookCopy::CONDITION_GOOD, '2020-10-01', 'Nerastas po inventorizacijos.'),
                 $this->kaltCreateCopy($library, $faultInOurStars, $childrenBranch, $childrenLocation, 'KAL-YA-001', 'QR-KAL-YA-001', '9786094799711', BookCopy::STATUS_WITHDRAWN, BookCopy::CONDITION_WORN, '2018-04-04', 'Per daug susidėvėjęs, nurašytas.'),
@@ -1515,11 +1571,11 @@ class DemoDataSeeder extends Seeder
             ]);
 
             $this->kaltRecordHistory($copies[0], $staffA, null, BookCopy::STATUS_AVAILABLE, 'created', 'Kopija sukurta sistemoje.', CarbonImmutable::parse('2025-05-12 09:00:00'));
-            $this->kaltRecordHistory($copies[0], $staffA, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_LOANED, 'issued', 'Kopija šiandien išduota skaitytojui.', $now->subHours(2));
+            $this->kaltRecordHistory($copies[0], $staffA, BookCopy::STATUS_IN_CIRCULATION, BookCopy::STATUS_IN_CIRCULATION, 'issued', 'Kopija šiandien išduota skaitytojui.', $now->subHours(2));
             $this->kaltRecordHistory($copies[2], $staffB, null, BookCopy::STATUS_AVAILABLE, 'created', 'Kopija sukurta sistemoje.', CarbonImmutable::parse('2025-08-14 10:00:00'));
             $this->kaltRecordHistory($copies[2], $staffB, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_MAINTENANCE, 'sent_to_maintenance', 'Išsiųstas tvarkyti dėl pažeidimų.', $now->subDays(11));
             $this->kaltRecordHistory($copies[4], $staffA, null, BookCopy::STATUS_AVAILABLE, 'created', 'Kopija sukurta sistemoje.', CarbonImmutable::parse('2025-07-03 14:00:00'));
-            $this->kaltRecordHistory($copies[4], $staffA, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_AVAILABLE, 'marked_damaged', 'Apžiūros metu pažymėta fizinė būklė: sugadinta.', $now->subMonths(2)->subDays(4));
+            $this->kaltRecordHistory($copies[4], $staffA, BookCopy::STATUS_IN_CIRCULATION, BookCopy::STATUS_MAINTENANCE, 'sent_to_maintenance', 'Apžiūros metu kopija nukreipta tvarkymui.', $now->subMonths(2)->subDays(4));
             $this->kaltRecordHistory($copies[6], $admin, null, BookCopy::STATUS_AVAILABLE, 'created', 'Kopija sukurta sistemoje.', CarbonImmutable::parse('2025-06-06 11:00:00'));
             $this->kaltRecordHistory($copies[6], $admin, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_LOST, 'marked_lost', 'Inventorizacijos metu kopija nerasta.', $now->subMonths(5));
             $this->kaltRecordHistory($copies[7], $admin, null, BookCopy::STATUS_AVAILABLE, 'created', 'Kopija sukurta sistemoje.', CarbonImmutable::parse('2025-05-28 12:30:00'));
@@ -1576,6 +1632,12 @@ class DemoDataSeeder extends Seeder
                 ],
             ]);
         });
+
+        $library = Library::query()->where('code', 'KALT-ASTU-001')->first();
+
+        if ($library) {
+            $this->syncActiveReservationQueuesForLibrary($library);
+        }
     }
 
     private function kaltCreateCopy(
@@ -1600,6 +1662,7 @@ class DemoDataSeeder extends Seeder
             'qr_code' => $qrCode,
             'barcode' => $barcode,
             'status' => $status,
+            'lifecycle_status' => $status,
             'condition_status' => $condition,
             'acquired_at' => $acquiredAt,
             'notes' => $notes,
@@ -1669,11 +1732,12 @@ class DemoDataSeeder extends Seeder
                 'notes' => 'Istorinis demonstracinis išdavimas testavimui.',
             ]);
 
-            $this->kaltRecordHistory($copy, $employee, BookCopy::STATUS_AVAILABLE, BookCopy::STATUS_LOANED, 'issued', 'Istorinis išdavimas demonstraciniams duomenims.', $borrowedAt);
-            $this->kaltRecordHistory($copy, $employee, BookCopy::STATUS_LOANED, BookCopy::STATUS_AVAILABLE, 'grąžinta', 'Istorinis grąžinimas demonstraciniams duomenims.', $returnedAt);
+            $this->kaltRecordHistory($copy, $employee, BookCopy::STATUS_IN_CIRCULATION, BookCopy::STATUS_IN_CIRCULATION, 'issued', 'Istorinis išdavimas demonstraciniams duomenims.', $borrowedAt);
+            $this->kaltRecordHistory($copy, $employee, BookCopy::STATUS_IN_CIRCULATION, BookCopy::STATUS_IN_CIRCULATION, 'grąžinta', 'Istorinis grąžinimas demonstraciniams duomenims.', $returnedAt);
 
             $copy->forceFill([
                 'status' => BookCopy::STATUS_AVAILABLE,
+                'lifecycle_status' => BookCopy::STATUS_IN_CIRCULATION,
                 'updated_at' => $returnedAt,
             ])->saveQuietly();
         }
@@ -1774,6 +1838,7 @@ class DemoDataSeeder extends Seeder
         if (! $this->presentationDatasetCompleted($library)) {
             $this->presentationEnsureLoans($library, $copies, $members, $staff);
             $this->presentationEnsureReservations($library, $books, $branches, $members);
+            $this->syncActiveReservationQueuesForLibrary($library);
             $this->presentationEnsureScanLogs($library, $copies, $staff);
             $this->presentationEnsureAuditLogs($library, $books, $copies, $members, $staff);
             $this->presentationEnsureNotifications($library, $books, $members, $staff);
@@ -2176,6 +2241,7 @@ class DemoDataSeeder extends Seeder
                 'qr_code' => 'QR-'.$this->demoCopyCodePrefix($library, $branch).'-'.str_pad((string) $i, 6, '0', STR_PAD_LEFT),
                 'barcode' => $this->demoCopyCodePrefix($library, $branch).'-BC-'.str_pad((string) $i, 6, '0', STR_PAD_LEFT),
                 'status' => $status,
+                'lifecycle_status' => $status,
                 'condition_status' => BookCopy::conditionValues()[$i % count(BookCopy::conditionValues())],
                 'acquired_at' => $createdAt->toDateString(),
                 'notes' => $this->presentationCopyNotes($status),
@@ -2207,7 +2273,7 @@ class DemoDataSeeder extends Seeder
                 'book_copy_id' => $copy->id,
                 'changed_by' => $staff[$index % $staff->count()]->id,
                 'from_status' => null,
-                'to_status' => $copy->status,
+                'to_status' => $copy->lifecycleStatus(),
                 'reason_code' => 'presentation_seed',
                 'reason_notes' => 'Kopija sukurta demonstraciniam pristatymui.',
                 'changed_at' => $copy->created_at ?? now()->subMonths(12),
@@ -2237,7 +2303,19 @@ class DemoDataSeeder extends Seeder
         $activeMissing = max(0, self::PRESENTATION_TARGET_ACTIVE_LOANS - $currentActive);
         $overdueMissing = max(0, self::PRESENTATION_TARGET_OVERDUE_LOANS - $currentOverdue);
         $reservedCopyIds = Loan::query()->where('library_id', $library->id)->whereNull('returned_at')->pluck('book_copy_id')->all();
-        $availableCopies = $copies->whereNotIn('id', $reservedCopyIds)->values();
+        $readyAssignedCopyIds = Reservation::query()
+            ->where('library_id', $library->id)
+            ->where('status', Reservation::STATUS_READY)
+            ->whereNull('fulfilled_at')
+            ->whereNull('cancelled_at')
+            ->whereNotNull('assigned_book_copy_id')
+            ->pluck('assigned_book_copy_id')
+            ->all();
+        $availableCopies = $copies
+            ->where('lifecycle_status', BookCopy::STATUS_IN_CIRCULATION)
+            ->whereNotIn('id', $reservedCopyIds)
+            ->whereNotIn('id', $readyAssignedCopyIds)
+            ->values();
 
         $this->presentationInsertCurrentLoans($library, $availableCopies->splice(0, $activeMissing), $members, $staff, Loan::STATUS_ACTIVE);
         $this->presentationInsertCurrentLoans($library, $availableCopies->splice(0, $overdueMissing), $members, $staff, Loan::STATUS_OVERDUE);
@@ -2325,7 +2403,9 @@ class DemoDataSeeder extends Seeder
         }
 
         if ($copyIds !== []) {
-            BookCopy::query()->whereIn('id', $copyIds)->update(['status' => BookCopy::STATUS_LOANED, 'updated_at' => now()]);
+            BookCopy::query()->whereIn('id', $copyIds)->update([
+                'updated_at' => now(),
+            ]);
         }
     }
 
@@ -2379,6 +2459,23 @@ class DemoDataSeeder extends Seeder
         if ($rows !== []) {
             DB::table('reservations')->insert($rows);
         }
+    }
+
+    private function syncActiveReservationQueuesForLibrary(Library $library): void
+    {
+        Reservation::query()
+            ->select(['library_id', 'book_id'])
+            ->where('library_id', $library->id)
+            ->active()
+            ->distinct()
+            ->orderBy('book_id')
+            ->get()
+            ->each(function (Reservation $reservation): void {
+                app(SyncReservationQueueAction::class)->handle(
+                    (int) $reservation->library_id,
+                    (int) $reservation->book_id
+                );
+            });
     }
 
     /**
@@ -2562,7 +2659,6 @@ class DemoDataSeeder extends Seeder
             $i % 33 === 0 => BookCopy::STATUS_MAINTENANCE,
             $i % 25 === 0 => BookCopy::STATUS_AVAILABLE,
             $i % 20 === 0 => BookCopy::STATUS_WITHDRAWN,
-            $i % 7 === 0 => BookCopy::STATUS_LOANED,
             default => BookCopy::STATUS_AVAILABLE,
         };
     }
@@ -2581,7 +2677,6 @@ class DemoDataSeeder extends Seeder
     {
         return match ($status) {
             BookCopy::STATUS_AVAILABLE => 'Kopija prieinama greitam isdavimui.',
-            BookCopy::STATUS_LOANED => 'Kopija siuo metu naudojama skaitytojo.',
             BookCopy::STATUS_LOST => 'Pazymeta kaip prarasta inventorizacijos metu.',
             BookCopy::STATUS_MAINTENANCE => 'Tvarkoma arba paruosiama grizimui i fonda.',
             BookCopy::STATUS_WITHDRAWN => 'Nenaudojama aktyviame fonde.',

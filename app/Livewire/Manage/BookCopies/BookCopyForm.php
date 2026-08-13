@@ -67,7 +67,7 @@ class BookCopyForm extends Component
             $this->locationId = $bookCopy->location_id;
             $this->inventoryCode = (string) $bookCopy->inventory_code;
             $this->barcode = (string) ($bookCopy->barcode ?? '');
-            $this->status = (string) ($bookCopy->status ?: BookCopy::STATUS_AVAILABLE);
+            $this->status = (string) ($bookCopy->lifecycleStatus() ?: BookCopy::STATUS_AVAILABLE);
             $this->conditionStatus = (string) ($bookCopy->condition_status ?: BookCopy::CONDITION_GOOD);
             $this->acquiredAt = $bookCopy->acquired_at?->format('Y-m-d') ?? '';
             $this->notes = (string) ($bookCopy->notes ?? '');
@@ -154,7 +154,7 @@ class BookCopyForm extends Component
 
         $bookCopyId = $this->bookCopy?->id;
 
-        $validated = $this->validate([
+        $rules = [
             'selectedLibraryId' => [
                 Rule::requiredIf(fn () => $actor->isSuperAdmin() && ! $this->bookCopy),
                 'nullable',
@@ -187,11 +187,21 @@ class BookCopyForm extends Component
                     ->where(fn ($query) => $query->where('library_id', $libraryId))
                     ->ignore($bookCopyId),
             ],
-            'status' => ['required', Rule::in(array_keys($this->isEditing ? $this->statusOptions() : $this->creatableStatusOptions()))],
-            'conditionStatus' => ['required', Rule::in(array_keys($this->conditionOptions()))],
+            'conditionStatus' => [
+                'required',
+                Rule::in($this->allowedConditionValuesForGeneralForm()),
+            ],
             'acquiredAt' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
-        ], [], [
+        ];
+
+        if (! $this->isEditing) {
+            $rules['status'] = ['required', Rule::in(array_keys($this->creatableStatusOptions()))];
+        }
+
+        $validated = $this->validate($rules, [
+            'conditionStatus.in' => BookCopy::damagedConditionGeneralEditMessage(),
+        ], [
             'selectedLibraryId' => 'biblioteka',
             'branchId' => 'filialas',
             'locationId' => 'vieta',
@@ -235,6 +245,7 @@ class BookCopyForm extends Component
 
         $payload['qr_code'] = $this->generateQrCode((int) $libraryId);
         $payload['status'] = $validated['status'];
+        $payload['lifecycle_status'] = $validated['status'];
 
         $copy = BookCopy::create($payload);
 
@@ -333,16 +344,25 @@ class BookCopyForm extends Component
     private function creatableStatusOptions(): array
     {
         return [
-            BookCopy::STATUS_AVAILABLE => 'Laisva',
+            BookCopy::STATUS_PREPARING => 'Ruošiama',
+            BookCopy::STATUS_IN_CIRCULATION => 'Apyvartoje',
             BookCopy::STATUS_MAINTENANCE => 'Tvarkoma',
             BookCopy::STATUS_LOST => 'Prarasta',
-            BookCopy::STATUS_WITHDRAWN => 'Nurašytas fondas',
+            BookCopy::STATUS_WITHDRAWN => 'Nurašyta',
         ];
     }
 
     private function conditionOptions(): array
     {
-        return BookCopy::conditionLabels();
+        return BookCopy::generalEditableConditionLabels();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function allowedConditionValuesForGeneralForm(): array
+    {
+        return BookCopy::generalEditableConditionValues();
     }
 
     private function generateQrCode(int $libraryId): string

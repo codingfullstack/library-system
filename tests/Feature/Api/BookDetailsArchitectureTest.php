@@ -177,6 +177,7 @@ it('serializes a prepared book copy resource without database queries', function
             'activeLoan.user:id,name,email,membership_number',
             'activeLoan.issuer:id,name,email',
             'activeLoan.receiver:id,name,email',
+            'activeReadyReservation:id,library_id,book_id,user_id,assigned_book_copy_id,status,scope,branch_id,pickup_branch_id,report_branch_id,reserved_at,ready_at,expires_at,fulfilled_at,cancelled_at',
         ])
         ->firstOrFail();
 

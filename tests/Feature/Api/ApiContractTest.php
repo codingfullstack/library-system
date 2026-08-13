@@ -188,6 +188,8 @@ it('keeps documented enum values aligned with model status enums', function () {
         ->and(apiContractSchema('Loan')['properties']['status']['enum'])
         ->toEqual(array_values(array_keys(Loan::statusLabels())))
         ->and(apiContractSchema('BookCopy')['properties']['status']['enum'])
+        ->toEqual(array_values(array_keys(BookCopy::operationalStatusLabels())))
+        ->and(apiContractSchema('BookCopy')['properties']['lifecycle_status']['enum'])
         ->toEqual(array_values(array_keys(BookCopy::statusLabels())));
 });
 

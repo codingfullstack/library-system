@@ -223,7 +223,7 @@ class BorrowBookCopyForm extends Component
         $actor = Auth::user();
 
         return $actor
-            && $this->bookCopy->status === BookCopy::STATUS_AVAILABLE
+            && $this->bookCopy->isInCirculation()
             && $this->bookCopy->activeLoan === null
             && Gate::allows('borrow', $this->bookCopy);
     }
@@ -248,9 +248,9 @@ class BorrowBookCopyForm extends Component
             return 'Negalima išduoti: kopija šiuo metu jau išduota.';
         }
 
-        if ($this->bookCopy->status !== BookCopy::STATUS_AVAILABLE) {
+        if (! $this->bookCopy->isInCirculation()) {
             return match ($this->bookCopy->status) {
-                BookCopy::STATUS_LOANED => 'Negalima išduoti: kopija šiuo metu jau išduota.',
+                BookCopy::STATUS_PREPARING => 'Negalima išduoti: kopija dar ruošiama.',
                 BookCopy::STATUS_LOST => 'Negalima išduoti: kopija pažymėta kaip prarasta.',
                 BookCopy::STATUS_MAINTENANCE => 'Negalima išduoti: kopija šiuo metu tvarkoma.',
                 BookCopy::STATUS_WITHDRAWN => 'Negalima išduoti: kopija nurašyta iš fondo.',

@@ -31,8 +31,12 @@ class BookCopyDetailsResource extends JsonResource
             'inventory_code' => $this->inventory_code,
             'qr_code' => $this->qr_code,
             'barcode' => $this->barcode,
-            'status' => $this->status,
+            'status' => $this->operationalStatus(),
             'status_label' => $this->statusLabel(),
+            'operational_status' => $this->operationalStatus(),
+            'operational_label' => $this->operationalStatusLabel(),
+            'lifecycle_status' => $this->lifecycleStatus(),
+            'lifecycle_label' => $this->lifecycleStatusLabel(),
             'condition_status' => $this->condition_status,
             'condition_label' => $this->conditionLabel(),
             'acquired_at' => $this->acquired_at,
@@ -98,8 +102,8 @@ class BookCopyDetailsResource extends JsonResource
             'current_reservation' => $currentReservation
                 ? (new ReservationResource($currentReservation))->resolve()
                 : null,
-            'can_borrow' => $this->status === 'laisva' && $this->canManageCopy && $this->activeLoan === null,
-            'can_return' => $this->status === 'išduota' && $this->canManageCopy,
+            'can_borrow' => $this->isInCirculation() && $this->canManageCopy && $this->activeLoan === null,
+            'can_return' => $this->canManageCopy && $this->activeLoan !== null,
             'can_manage' => $this->canManageCopy,
             'available_lifecycle_transitions' => method_exists($this->resource, 'availableLifecycleTransitions')
                 ? $this->availableLifecycleTransitions()
@@ -107,7 +111,7 @@ class BookCopyDetailsResource extends JsonResource
             'lifecycle_transition_labels' => method_exists($this->resource, 'availableLifecycleTransitions')
                 ? collect($this->availableLifecycleTransitions())
                     ->mapWithKeys(fn ($transition) => [
-                        $transition => BookCopy::lifecycleTargetLabels()[$transition] ?? $transition,
+                        $transition => $this->lifecycleTransitionLabel($transition),
                     ])
                     ->all()
                 : [],

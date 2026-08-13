@@ -73,9 +73,16 @@ class ManageBookCopyRequest extends FormRequest
                 'nullable',
                 Rule::in(array_keys(BookCopy::statusLabels())),
             ],
-            'condition_status' => ['required', Rule::in(BookCopy::conditionValues())],
+            'condition_status' => ['required', Rule::in($this->allowedConditionValuesForGeneralForm())],
             'acquired_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'condition_status.in' => BookCopy::damagedConditionGeneralEditMessage(),
         ];
     }
 
@@ -135,6 +142,14 @@ class ManageBookCopyRequest extends FormRequest
         $bookCopy = $this->currentBookCopy();
 
         return $bookCopy?->getKey();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function allowedConditionValuesForGeneralForm(): array
+    {
+        return BookCopy::generalEditableConditionValues();
     }
 
     private function libraryId(): int

@@ -49,7 +49,7 @@ it('filters books by author category publisher and availability', function () {
         'book_id' => $matchingBook->id,
         'branch_id' => $branch->id,
         'location_id' => $location->id,
-        'status' => 'laisva',
+        'status' => BookCopy::STATUS_IN_CIRCULATION,
     ]);
 
     BookCopy::factory()->create([
@@ -57,7 +57,7 @@ it('filters books by author category publisher and availability', function () {
         'book_id' => $otherBook->id,
         'branch_id' => $branch->id,
         'location_id' => $location->id,
-        'status' => 'išduota',
+        'status' => BookCopy::STATUS_MAINTENANCE,
     ]);
 
     $response = $this->actingAs($user)->get(route('books.index', [
@@ -126,7 +126,7 @@ it('filters book copies on the book page by status branch and location', functio
         'branch_id' => $matchingBranch->id,
         'location_id' => $matchingLocation->id,
         'inventory_code' => 'INV-MATCH-001',
-        'status' => 'laisva',
+        'status' => BookCopy::STATUS_IN_CIRCULATION,
     ]);
 
     BookCopy::factory()->create([
@@ -135,7 +135,7 @@ it('filters book copies on the book page by status branch and location', functio
         'branch_id' => $otherBranch->id,
         'location_id' => $otherLocation->id,
         'inventory_code' => 'INV-OTHER-001',
-        'status' => 'išduota',
+        'status' => BookCopy::STATUS_MAINTENANCE,
     ]);
 
     $response = $this->actingAs($user)->get(route('books.show', [
@@ -252,7 +252,7 @@ it('filters book copies on the book page by lifecycle group', function () {
         'location_id' => $location->id,
         'inventory_code' => 'INV-LOANED-DAMAGED',
         'status' => BookCopy::STATUS_LOANED,
-        'condition_status' => BookCopy::CONDITION_DAMAGED,
+        'condition_status' => BookCopy::CONDITION_WORN,
     ]);
 
     BookCopy::factory()->create([
@@ -262,7 +262,7 @@ it('filters book copies on the book page by lifecycle group', function () {
         'location_id' => $location->id,
         'inventory_code' => 'INV-LOST',
         'status' => BookCopy::STATUS_LOST,
-        'condition_status' => BookCopy::CONDITION_DAMAGED,
+        'condition_status' => BookCopy::CONDITION_WORN,
     ]);
 
     BookCopy::factory()->create([
@@ -294,7 +294,7 @@ it('filters book copies on the book page by lifecycle group', function () {
     ]));
 
     $issuesResponse->assertOk();
-    $issuesResponse->assertSee('INV-LOANED-DAMAGED');
+    $issuesResponse->assertDontSee('INV-LOANED-DAMAGED');
     $issuesResponse->assertSee('INV-MAINTENANCE');
     $issuesResponse->assertSee('INV-LOST');
     $issuesResponse->assertDontSee('INV-ACTIVE-GOOD');

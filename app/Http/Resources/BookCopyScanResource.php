@@ -24,9 +24,11 @@ class BookCopyScanResource extends JsonResource
                 'title' => $this->book->title,
                 'isbn' => $this->book->isbn,
             ] : null,
-            'status' => $this->status,
-            'can_borrow' => $this->status === 'laisva' && $this->canManageCopy && $this->activeLoan === null,
-            'can_return' => $this->status === 'išduota' && $this->canManageCopy,
+            'status' => $this->operationalStatus(),
+            'operational_status' => $this->operationalStatus(),
+            'lifecycle_status' => $this->lifecycleStatus(),
+            'can_borrow' => $this->isInCirculation() && $this->canManageCopy && $this->activeLoan === null,
+            'can_return' => $this->canManageCopy && $this->activeLoan !== null,
         ];
     }
 }

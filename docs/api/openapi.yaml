@@ -323,15 +323,19 @@ components:
             book_copies: { type: array, items: { $ref: "#/components/schemas/BookCopy" } }
     BookCopy:
       type: object
-      required: [id, library_id, inventory_code, qr_code, barcode, status, status_label, condition_status, condition_label, notes, status_history, book, branch, location, active_loan, current_reservation, can_borrow, can_return, can_manage, available_lifecycle_transitions, lifecycle_transition_labels]
+      required: [id, library_id, inventory_code, qr_code, barcode, status, status_label, operational_status, operational_label, lifecycle_status, lifecycle_label, condition_status, condition_label, notes, status_history, book, branch, location, active_loan, current_reservation, can_borrow, can_return, can_manage, available_lifecycle_transitions, lifecycle_transition_labels]
       properties:
         id: { type: integer }
         library_id: { type: integer }
         inventory_code: { type: string }
         qr_code: { type: string, nullable: true }
         barcode: { type: string, nullable: true }
-        status: { type: string, enum: [laisva, išduota, prarasta, tvarkoma, nurašyta] }
+        status: { type: string, enum: [laisva, paskolinta, rezervuota, ruošiama, prarasta, tvarkoma, nurašyta] }
         status_label: { type: string }
+        operational_status: { type: string, enum: [laisva, paskolinta, rezervuota, ruošiama, prarasta, tvarkoma, nurašyta] }
+        operational_label: { type: string }
+        lifecycle_status: { type: string, enum: [ruošiama, apyvartoje, prarasta, tvarkoma, nurašyta], nullable: true }
+        lifecycle_label: { type: string }
         condition_status: { type: string, nullable: true }
         condition_label: { type: string, nullable: true }
         notes: { type: string, nullable: true }
