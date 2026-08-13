@@ -20,14 +20,14 @@ abstract class TestCase extends BaseTestCase
             return;
         }
 
-        $path = dirname(__DIR__).DIRECTORY_SEPARATOR.'storage'
-            .DIRECTORY_SEPARATOR.'framework'
+        $path = sys_get_temp_dir().DIRECTORY_SEPARATOR.'library-system'
             .DIRECTORY_SEPARATOR.'testing'
             .DIRECTORY_SEPARATOR.'views'
+            .DIRECTORY_SEPARATOR.md5(dirname(__DIR__))
             .DIRECTORY_SEPARATOR.getmypid();
 
-        if (! is_dir($path)) {
-            mkdir($path, 0777, true);
+        if (! is_dir($path) && ! @mkdir($path, 0777, true) && ! is_dir($path)) {
+            throw new \RuntimeException("Unable to create isolated compiled views directory [{$path}].");
         }
 
         $_SERVER['VIEW_COMPILED_PATH'] = $path;
