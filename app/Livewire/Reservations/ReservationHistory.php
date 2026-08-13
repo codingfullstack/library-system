@@ -77,7 +77,8 @@ class ReservationHistory extends Component
             abort(403);
         }
 
-        $bookCopy = $this->firstAvailableCopy();
+        $reservation = $this->issueableReservation();
+        $bookCopy = $this->issueableCopyFor($reservation);
 
         if (! $bookCopy) {
             $this->addError('reservation', 'Nėra laisvos kopijos, kurią galėtumėte išduoti.');
@@ -87,7 +88,9 @@ class ReservationHistory extends Component
 
         Gate::authorize('borrow', $bookCopy);
 
-        $reservation = $this->currentReservation($bookCopy);
+        $reservation = $reservation?->isReady()
+            ? $reservation
+            : $this->currentReservation($bookCopy);
 
         if (! $reservation) {
             $this->addError('reservation', 'Nėra rezervacijos, kurią būtų galima išduoti šiai kopijai.');
@@ -103,7 +106,7 @@ class ReservationHistory extends Component
                 'notes' => 'Išduota pagal rezervaciją.',
             ]);
         } catch (ValidationException $exception) {
-            $this->addError('reservation', $exception->errors()['book_copy'][0] ?? $exception->errors()['user_id'][0] ?? 'Nepavyko išduoti rezervacijos.');
+            $this->addError('reservation', $exception->errors()['reservation'][0] ?? $exception->errors()['book_copy'][0] ?? $exception->errors()['user_id'][0] ?? 'Nepavyko išduoti rezervacijos.');
 
             return null;
         }
@@ -116,9 +119,11 @@ class ReservationHistory extends Component
     public function render()
     {
         $reservations = $this->reservations();
-        $borrowableCopy = $this->firstAvailableCopy();
-        $currentReservationId = $this->currentReservation($borrowableCopy)?->id
-            ?? $reservations->getCollection()->first(fn (Reservation $reservation) => $reservation->isPending())?->id;
+        $issueableReservation = $this->issueableReservation();
+        $borrowableCopy = $this->issueableCopyFor($issueableReservation);
+        $currentReservationId = $borrowableCopy
+            ? ($this->currentReservation($borrowableCopy)?->id ?? $issueableReservation?->id)
+            : $issueableReservation?->id;
         $canManage = $this->canManage();
         $canIssueCurrent = $borrowableCopy !== null && $currentReservationId !== null && $canManage;
 
@@ -131,6 +136,52 @@ class ReservationHistory extends Component
                 ? $this->unavailableIssueMessage()
                 : null,
         ]);
+    }
+
+    private function issueableReservation(): ?Reservation
+    {
+        $actor = Auth::user();
+
+        if (! $actor) {
+            return null;
+        }
+
+        return Reservation::query()
+            ->where('book_id', $this->bookId)
+            ->when(! $actor->isSuperAdmin(), function ($query) use ($actor) {
+                $query->where('library_id', $actor->activeLibraryId());
+            })
+            ->when($actor->role === User::ROLE_STAFF, function ($query) use ($actor) {
+                $this->scopeReservationsToStaffBranch($query, $actor);
+            })
+            ->with('user:id,name,email,membership_number')
+            ->whereIn('status', [Reservation::STATUS_READY, Reservation::STATUS_WAITING])
+            ->whereNull('fulfilled_at')
+            ->whereNull('cancelled_at')
+            ->orderByRaw('case when status = ? then 0 else 1 end', [Reservation::STATUS_READY])
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->first();
+    }
+
+    private function issueableCopyFor(?Reservation $reservation): ?BookCopy
+    {
+        if ($reservation?->isReady()) {
+            if (! $reservation->assigned_book_copy_id) {
+                return null;
+            }
+
+            $copy = BookCopy::query()
+                ->withoutGlobalScope('library')
+                ->whereKey($reservation->assigned_book_copy_id)
+                ->where('library_id', $reservation->library_id)
+                ->where('book_id', $this->bookId)
+                ->first();
+
+            return $copy && Gate::allows('borrow', $copy) ? $copy : null;
+        }
+
+        return $this->firstAvailableCopy();
     }
 
     private function reservations(): LengthAwarePaginator
@@ -275,7 +326,7 @@ class ReservationHistory extends Component
         return BookCopy::query()
             ->where('book_id', $this->bookId)
             ->where('library_id', $activeLibraryId)
-            ->where('status', BookCopy::STATUS_AVAILABLE)
+            ->operationallyAvailable()
             ->when($actor->role === User::ROLE_STAFF, function ($query) use ($actor, $activeLibraryId) {
                 $branchId = $actor->assignedBranchId($activeLibraryId);
 

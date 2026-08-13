@@ -9,6 +9,23 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 
 class LoanFactory extends Factory
 {
+    public function configure(): static
+    {
+        return $this->afterMaking(function ($loan): void {
+            $copy = $loan->book_copy_id
+                ? BookCopy::query()->find($loan->book_copy_id)
+                : null;
+
+            if ($copy && $loan->issued_branch_id === null) {
+                $loan->issued_branch_id = $copy->branch_id;
+            }
+
+            if ($copy && $loan->returned_at !== null && $loan->returned_branch_id === null) {
+                $loan->returned_branch_id = $copy->branch_id;
+            }
+        });
+    }
+
     public function definition(): array
     {
         $borrowedAt = fake()->dateTimeBetween('-60 days', '-1 day');
@@ -20,7 +37,9 @@ class LoanFactory extends Factory
             'book_copy_id' => BookCopy::factory(),
             'user_id' => User::factory(),
             'issued_by' => null,
+            'issued_branch_id' => null,
             'received_by' => null,
+            'returned_branch_id' => null,
             'borrowed_at' => $borrowedAt,
             'due_at' => $dueAt,
             'returned_at' => $returned ? fake()->dateTimeBetween($borrowedAt, 'now') : null,
@@ -30,4 +49,3 @@ class LoanFactory extends Factory
         ];
     }
 }
-

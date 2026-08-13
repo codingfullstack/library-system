@@ -94,17 +94,18 @@ class GetLibraryBooksQuery
                 'bookCopies as available_copies_count' => function ($copyQuery) use ($libraryIds, $branchId) {
                     $this->applyCopyVisibility($copyQuery, $libraryIds, $branchId);
 
-                    $copyQuery->where('status', BookCopy::STATUS_AVAILABLE);
+                    $copyQuery->operationallyAvailable();
                 },
                 'bookCopies as loaned_copies_count' => function ($copyQuery) use ($libraryIds, $branchId) {
                     $this->applyCopyVisibility($copyQuery, $libraryIds, $branchId);
 
-                    $copyQuery->where('status', BookCopy::STATUS_LOANED);
+                    $copyQuery->whereHas('activeLoan');
                 },
                 'bookCopies as unavailable_copies_count' => function ($copyQuery) use ($libraryIds, $branchId) {
                     $this->applyCopyVisibility($copyQuery, $libraryIds, $branchId);
 
-                    $copyQuery->whereIn('status', [
+                    $copyQuery->whereIn('lifecycle_status', [
+                        BookCopy::STATUS_PREPARING,
                         BookCopy::STATUS_LOST,
                         BookCopy::STATUS_MAINTENANCE,
                         BookCopy::STATUS_WITHDRAWN,
@@ -188,7 +189,7 @@ class GetLibraryBooksQuery
             $query->whereHas('bookCopies', function ($copyQuery) use ($libraryIds, $branchId) {
                 $this->applyCopyVisibility($copyQuery, $libraryIds, $branchId);
 
-                $copyQuery->where('status', BookCopy::STATUS_AVAILABLE);
+                $copyQuery->operationallyAvailable();
             });
         }
 
@@ -200,7 +201,7 @@ class GetLibraryBooksQuery
                 ->whereDoesntHave('bookCopies', function ($copyQuery) use ($libraryIds, $branchId) {
                     $this->applyCopyVisibility($copyQuery, $libraryIds, $branchId);
 
-                    $copyQuery->where('status', BookCopy::STATUS_AVAILABLE);
+                    $copyQuery->operationallyAvailable();
                 });
         }
 

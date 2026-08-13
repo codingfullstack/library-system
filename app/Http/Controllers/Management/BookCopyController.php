@@ -59,6 +59,7 @@ class BookCopyController extends Controller
             'qr_code' => $this->generateQrCode($libraryId),
             'barcode' => $request->validated('barcode'),
             'status' => $request->validated('status'),
+            'lifecycle_status' => $request->validated('status'),
             'condition_status' => $request->validated('condition_status'),
             'acquired_at' => $request->validated('acquired_at'),
             'notes' => $request->validated('notes'),
@@ -241,33 +242,22 @@ class BookCopyController extends Controller
             return back()->with('error', 'Negalima keisti kopijos gyvavimo ciklo, kol ji yra aktyviai išduota.');
         }
 
-        $targetAction = $request->validated('target_status');
-        $targetStatus = $targetAction === BookCopy::LIFECYCLE_MARK_CONDITION_DAMAGED
-            ? $bookCopy->status
-            : $targetAction;
+        $targetStatus = $request->validated('target_status');
 
-        $reasonCode = match ($targetAction) {
+        $reasonCode = match ($targetStatus) {
             BookCopy::STATUS_LOST => 'marked_lost',
-            BookCopy::LIFECYCLE_MARK_CONDITION_DAMAGED => 'marked_damaged',
             BookCopy::STATUS_MAINTENANCE => 'sent_to_maintenance',
-            BookCopy::STATUS_AVAILABLE => 'restored_to_active',
+            BookCopy::STATUS_IN_CIRCULATION => 'restored_to_circulation',
             BookCopy::STATUS_WITHDRAWN => 'nurašyta',
             default => 'status_adjusted',
         };
-
-        $attributes = [];
-
-        if (in_array($targetAction, [BookCopy::LIFECYCLE_MARK_CONDITION_DAMAGED, BookCopy::STATUS_MAINTENANCE], true)) {
-            $attributes['condition_status'] = BookCopy::CONDITION_DAMAGED;
-        }
 
         $changeBookCopyStatusAction->handle(
             $bookCopy,
             $targetStatus,
             $request->user(),
             $reasonCode,
-            $request->validated('reason_notes'),
-            $attributes
+            $request->validated('reason_notes')
         );
 
         return redirect()

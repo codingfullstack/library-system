@@ -3,10 +3,10 @@
 namespace App\Actions\Loans;
 
 use App\Actions\AuditLogs\RecordAuditLogAction;
-use App\Actions\BookCopies\ChangeBookCopyStatusAction;
 use App\Actions\Notifications\CreateUserNotificationAction;
 use App\Actions\Reservations\SyncReservationQueueAction;
 use App\Models\BookCopy;
+use App\Models\Loan;
 use App\Models\User;
 use App\Services\ReservationQueueDebugService;
 use App\Services\ReservationQueueService;
@@ -86,6 +86,7 @@ class ReturnBookCopyAction
             'status' => 'grąžinta',
             'returned_at' => now(),
             'received_by' => $authUser->id,
+            'returned_branch_id' => $bookCopy->branch_id,
         ]);
 
         if ($activeLoan->user) {
@@ -99,17 +100,10 @@ class ReturnBookCopyAction
                     'loan_id' => $activeLoan->id,
                     'returned_at' => $activeLoan->returned_at?->toDateTimeString(),
                 ]),
-                \App\Models\Loan::class,
+                Loan::class,
                 $activeLoan->id
             ));
         }
-
-        app(ChangeBookCopyStatusAction::class)->handle(
-            $bookCopy,
-            BookCopy::STATUS_AVAILABLE,
-            $authUser,
-            'grąžinta'
-        );
 
         app(SyncReservationQueueAction::class)->handle($bookCopy->library_id, $bookCopy->book_id);
 
@@ -136,6 +130,7 @@ class ReturnBookCopyAction
                 'target_member_id' => $activeLoan->user_id,
                 'target_member_name' => $activeLoan->user?->name,
                 'received_by_id' => $authUser->id,
+                'returned_branch_id' => $bookCopy->branch_id,
             ],
             $bookCopy->library_id
         );
@@ -145,10 +140,3 @@ class ReturnBookCopyAction
         ];
     }
 }
-
-
-
-
-
-
-

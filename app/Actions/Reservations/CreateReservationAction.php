@@ -89,6 +89,7 @@ class CreateReservationAction
                     'scope' => $scope,
                     'branch_id' => $branchId,
                     'pickup_branch_id' => null,
+                    'report_branch_id' => $scope === Reservation::SCOPE_BRANCH ? $branchId : null,
                     'status' => Reservation::STATUS_WAITING,
                     'reserved_at' => now(),
                     'ready_at' => null,

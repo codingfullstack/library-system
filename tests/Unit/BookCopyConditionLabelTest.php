@@ -7,7 +7,6 @@ it('has one canonical label for each book copy condition', function () {
         BookCopy::CONDITION_NEW => 'Nauja',
         BookCopy::CONDITION_GOOD => 'Gera',
         BookCopy::CONDITION_WORN => 'Padėvėta',
-        BookCopy::CONDITION_DAMAGED => 'Sugadinta',
     ]);
 
     foreach (BookCopy::conditionLabels() as $condition => $label) {
@@ -17,10 +16,10 @@ it('has one canonical label for each book copy condition', function () {
 
 it('uses the same canonical condition label on model instances', function () {
     $copy = new BookCopy([
-        'condition_status' => BookCopy::CONDITION_DAMAGED,
+        'condition_status' => BookCopy::CONDITION_WORN,
     ]);
 
     expect($copy->conditionLabel())
-        ->toBe(BookCopy::conditionLabelFor(BookCopy::CONDITION_DAMAGED))
-        ->toBe('Sugadinta');
+        ->toBe(BookCopy::conditionLabelFor(BookCopy::CONDITION_WORN))
+        ->toBe('Padėvėta');
 });

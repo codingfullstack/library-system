@@ -8,6 +8,7 @@ use App\Models\LibraryMembership;
 use App\Models\Loan;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Services\ReservationQueueService;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DemoDataSeeder;
 use Database\Seeders\Support\DemoAccessActorSynchronizer;
@@ -30,6 +31,60 @@ function demoSeedCounts(): array
         'loans' => Loan::query()->count(),
         'reservations' => Reservation::query()->count(),
     ];
+}
+
+function demoServiceableWaitingReservationsCount(): int
+{
+    $queueService = app(ReservationQueueService::class);
+    $count = 0;
+
+    Reservation::query()
+        ->select(['library_id', 'book_id'])
+        ->active()
+        ->distinct()
+        ->get()
+        ->each(function (Reservation $context) use ($queueService, &$count): void {
+            $activeReservations = $queueService
+                ->activeReservationsQuery((int) $context->library_id, (int) $context->book_id)
+                ->get();
+            $availableCopies = $queueService
+                ->availableCopiesQuery((int) $context->library_id, (int) $context->book_id)
+                ->whereNotNull('branch_id')
+                ->orderBy('branch_id')
+                ->orderBy('id')
+                ->get();
+            $servedReservationIds = [];
+
+            foreach ($availableCopies as $copy) {
+                $reservation = $activeReservations->first(function (Reservation $reservation) use ($queueService, $copy, $servedReservationIds): bool {
+                    if (isset($servedReservationIds[(int) $reservation->id])) {
+                        return false;
+                    }
+
+                    if (! $queueService->canBeServedByBranch($reservation, (int) $copy->branch_id)) {
+                        return false;
+                    }
+
+                    return $reservation->status === Reservation::STATUS_WAITING
+                        || (
+                            $reservation->status === Reservation::STATUS_READY
+                            && (int) $reservation->assigned_book_copy_id === (int) $copy->id
+                        );
+                });
+
+                if (! $reservation) {
+                    continue;
+                }
+
+                $servedReservationIds[(int) $reservation->id] = true;
+
+                if ($reservation->status === Reservation::STATUS_WAITING) {
+                    $count++;
+                }
+            }
+        });
+
+    return $count;
 }
 
 it('database seeder delegates to the single demo data chain', function () {
@@ -335,18 +390,67 @@ it('full demo seed is idempotent and restores the membership change actor', func
 it('full demo seed preserves loan reservation and membership invariants', function () {
     $this->seed(DatabaseSeeder::class);
 
+    $activeLoans = Loan::query()
+        ->whereIn('loans.status', Loan::ACTIVE_STATUSES)
+        ->whereNull('loans.returned_at');
+
     $duplicateActiveMemberships = LibraryMembership::query()
         ->select('user_id', 'library_id', DB::raw('count(*) as aggregate'))
         ->where('is_active', true)
         ->groupBy('user_id', 'library_id')
         ->having('aggregate', '>', 1)
         ->count();
-    $duplicateActiveLoans = Loan::query()
+    $duplicateActiveLoans = (clone $activeLoans)
         ->select('book_copy_id', DB::raw('count(*) as aggregate'))
-        ->whereIn('status', [Loan::STATUS_ACTIVE, Loan::STATUS_OVERDUE])
-        ->whereNull('returned_at')
         ->groupBy('book_copy_id')
         ->having('aggregate', '>', 1)
+        ->count();
+    $legacyLoanedLifecycleCopies = BookCopy::query()
+        ->where('status', BookCopy::LEGACY_STATUS_LOANED)
+        ->count();
+    $activeLoansWithWrongCopyStatus = (clone $activeLoans)
+        ->join('book_copies', 'book_copies.id', '=', 'loans.book_copy_id')
+        ->where('book_copies.status', '<>', BookCopy::STATUS_IN_CIRCULATION)
+        ->count();
+    $activeLoansWithReturnedAt = Loan::query()
+        ->whereIn('status', Loan::ACTIVE_STATUSES)
+        ->whereNotNull('returned_at')
+        ->count();
+    $returnedLoansWithoutReturnedAt = Loan::query()
+        ->where('status', Loan::STATUS_RETURNED)
+        ->whereNull('returned_at')
+        ->count();
+    $activeLoansWithoutActiveBorrowerMembership = (clone $activeLoans)
+        ->join('users', 'users.id', '=', 'loans.user_id')
+        ->leftJoin('library_memberships', function ($join): void {
+            $join->on('library_memberships.user_id', '=', 'loans.user_id')
+                ->on('library_memberships.library_id', '=', 'loans.library_id')
+                ->where('library_memberships.is_active', true);
+        })
+        ->where(function ($query): void {
+            $query->where('users.is_active', false)
+                ->orWhereNull('library_memberships.id');
+        })
+        ->count();
+    $loansWithInvalidChronology = Loan::query()
+        ->where(function ($query): void {
+            $query->whereColumn('borrowed_at', '>', 'due_at')
+                ->orWhere(function ($returnedQuery): void {
+                    $returnedQuery
+                        ->whereNotNull('returned_at')
+                        ->whereColumn('returned_at', '<', 'borrowed_at');
+                });
+        })
+        ->count();
+    $overdueLoansWithFutureDueAt = Loan::query()
+        ->where('status', Loan::STATUS_OVERDUE)
+        ->whereNull('returned_at')
+        ->where('due_at', '>=', now())
+        ->count();
+    $activeLoansWithPastDueAt = Loan::query()
+        ->where('status', Loan::STATUS_ACTIVE)
+        ->whereNull('returned_at')
+        ->where('due_at', '<', now())
         ->count();
     $duplicateReadyReservations = Reservation::query()
         ->select('assigned_book_copy_id', DB::raw('count(*) as aggregate'))
@@ -364,11 +468,75 @@ it('full demo seed preserves loan reservation and membership invariants', functi
                 ->orWhereNull('expires_at');
         })
         ->count();
+    $readyReservationCopyMismatches = Reservation::query()
+        ->join('book_copies', 'book_copies.id', '=', 'reservations.assigned_book_copy_id')
+        ->where('reservations.status', Reservation::STATUS_READY)
+        ->where(function ($query): void {
+            $query->whereColumn('book_copies.library_id', '<>', 'reservations.library_id')
+                ->orWhereColumn('book_copies.book_id', '<>', 'reservations.book_id')
+                ->orWhere(function ($branchQuery): void {
+                    $branchQuery
+                        ->where('reservations.scope', Reservation::SCOPE_BRANCH)
+                        ->whereColumn('book_copies.branch_id', '<>', 'reservations.branch_id');
+                })
+                ->orWhere('book_copies.status', '<>', BookCopy::STATUS_AVAILABLE);
+        })
+        ->count();
+    $readyCopiesWithActiveLoans = Reservation::query()
+        ->join('loans', 'loans.book_copy_id', '=', 'reservations.assigned_book_copy_id')
+        ->where('reservations.status', Reservation::STATUS_READY)
+        ->whereNull('loans.returned_at')
+        ->whereIn('loans.status', Loan::ACTIVE_STATUSES)
+        ->count();
+    $readyReservationsWithInvalidDates = Reservation::query()
+        ->where('status', Reservation::STATUS_READY)
+        ->whereColumn('ready_at', '>=', 'expires_at')
+        ->count();
+    $waitingReservationsWithReadyFields = Reservation::query()
+        ->where('status', Reservation::STATUS_WAITING)
+        ->where(function ($query): void {
+            $query->whereNotNull('assigned_book_copy_id')
+                ->orWhereNotNull('pickup_branch_id')
+                ->orWhereNotNull('ready_at');
+        })
+        ->count();
+    $activeReservationsWithoutActiveMember = Reservation::query()
+        ->active()
+        ->join('users', 'users.id', '=', 'reservations.user_id')
+        ->leftJoin('library_memberships', function ($join): void {
+            $join->on('library_memberships.user_id', '=', 'reservations.user_id')
+                ->on('library_memberships.library_id', '=', 'reservations.library_id')
+                ->where('library_memberships.is_active', true);
+        })
+        ->where(function ($query): void {
+            $query->where('users.is_active', false)
+                ->orWhereNull('library_memberships.id');
+        })
+        ->count();
+    $serviceableWaitingReservations = demoServiceableWaitingReservationsCount();
 
     expect($duplicateActiveMemberships)->toBe(0)
         ->and($duplicateActiveLoans)->toBe(0)
+        ->and($legacyLoanedLifecycleCopies)->toBe(0)
+        ->and($activeLoansWithWrongCopyStatus)->toBe(0)
+        ->and($activeLoansWithReturnedAt)->toBe(0)
+        ->and($returnedLoansWithoutReturnedAt)->toBe(0)
+        ->and($activeLoansWithoutActiveBorrowerMembership)->toBe(0)
+        ->and($loansWithInvalidChronology)->toBe(0)
+        ->and($overdueLoansWithFutureDueAt)->toBe(0)
+        ->and($activeLoansWithPastDueAt)->toBe(0)
         ->and($duplicateReadyReservations)->toBe(0)
-        ->and($incompleteReadyReservations)->toBe(0);
+        ->and($incompleteReadyReservations)->toBe(0)
+        ->and($readyReservationCopyMismatches)->toBe(0)
+        ->and($readyCopiesWithActiveLoans)->toBe(0)
+        ->and($readyReservationsWithInvalidDates)->toBe(0)
+        ->and($waitingReservationsWithReadyFields)->toBe(0)
+        ->and($activeReservationsWithoutActiveMember)->toBe(0)
+        ->and($serviceableWaitingReservations)->toBe(0)
+        ->and(BookCopy::query()->where('status', BookCopy::STATUS_IN_CIRCULATION)->exists())->toBeTrue()
+        ->and(Loan::query()->active()->exists())->toBeTrue()
+        ->and(Loan::query()->where('status', Loan::STATUS_OVERDUE)->whereNull('returned_at')->exists())->toBeTrue()
+        ->and(Loan::query()->where('status', Loan::STATUS_RETURNED)->whereNotNull('returned_at')->exists())->toBeTrue();
 });
 
 it('rejects a missing demo staff branch code with a clear error', function () {

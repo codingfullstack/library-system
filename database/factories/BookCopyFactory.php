@@ -61,6 +61,16 @@ class BookCopyFactory extends Factory
             'branch_id' => $branch->id,
         ]);
 
+        $lifecycleStatus = fake()->randomElement([
+            BookCopy::STATUS_AVAILABLE,
+            BookCopy::STATUS_AVAILABLE,
+            BookCopy::STATUS_AVAILABLE,
+            BookCopy::STATUS_PREPARING,
+            BookCopy::STATUS_AVAILABLE,
+            BookCopy::STATUS_MAINTENANCE,
+            BookCopy::STATUS_LOST,
+        ]);
+
         return [
             'library_id' => $library->id,
             'book_id' => Book::factory(),
@@ -69,26 +79,15 @@ class BookCopyFactory extends Factory
             'inventory_code' => strtoupper(fake()->unique()->bothify('INV-######')),
             'qr_code' => strtoupper(fake()->unique()->bothify('QR-########')),
             'barcode' => fake()->boolean(50) ? fake()->unique()->numerify('###########') : null,
-            'status' => fake()->randomElement([
-                BookCopy::STATUS_AVAILABLE,
-                BookCopy::STATUS_AVAILABLE,
-                BookCopy::STATUS_AVAILABLE,
-                BookCopy::STATUS_AVAILABLE,
-                BookCopy::STATUS_LOANED,
-                BookCopy::STATUS_MAINTENANCE,
-                BookCopy::STATUS_LOST,
-            ]),
+            'status' => $lifecycleStatus,
             'condition_status' => fake()->randomElement([
                 BookCopy::CONDITION_NEW,
                 BookCopy::CONDITION_GOOD,
                 BookCopy::CONDITION_GOOD,
                 BookCopy::CONDITION_WORN,
-                BookCopy::CONDITION_DAMAGED,
             ]),
             'acquired_at' => fake()->date(),
             'notes' => fake()->optional()->sentence(),
         ];
     }
 }
-
-

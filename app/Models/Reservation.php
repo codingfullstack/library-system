@@ -46,6 +46,7 @@ class Reservation extends Model
         'scope',
         'branch_id',
         'pickup_branch_id',
+        'report_branch_id',
         'assigned_book_copy_id',
         'status',
         'reserved_at',
@@ -87,6 +88,11 @@ class Reservation extends Model
     public function pickupBranch(): BelongsTo
     {
         return $this->belongsTo(Branch::class, 'pickup_branch_id');
+    }
+
+    public function reportBranch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class, 'report_branch_id');
     }
 
     public function assignedBookCopy(): BelongsTo

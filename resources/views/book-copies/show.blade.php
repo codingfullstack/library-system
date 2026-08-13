@@ -6,14 +6,17 @@
     @php
         $statusLabels = \App\Models\BookCopy::statusLabels();
         $lifecycleLabels = \App\Models\BookCopy::lifecycleTargetLabels();
-        $status = $copy->status ?: 'unknown';
+        $status = $copy->operationalStatus();
+        $lifecycleStatus = $copy->lifecycleStatus();
+        $hasValidLifecycleStatus = $copy->hasValidLifecycleStatus();
 
         $copyMeta = [
             ['icon' => 'identification', 'label' => 'ID', 'value' => $copy->id],
-            ['icon' => 'bookmark', 'label' => 'Būsena', 'badge' => true, 'value' => $statusLabels[$status] ?? $status],
+            ['icon' => 'bookmark', 'label' => 'Būsena', 'badge' => true, 'value' => $copy->operationalStatusLabel()],
             ['icon' => 'book-open', 'label' => 'Kopija', 'value' => $copy->inventory_code ?: '-'],
             ['icon' => 'tag', 'label' => 'Brūkšninis kodas', 'value' => $copy->barcode ?: '-'],
-            ['icon' => 'shield-check', 'label' => 'Būklė', 'value' => $copy->conditionLabel()],
+            ['icon' => 'shield-check', 'label' => 'Fizinė būklė', 'value' => $copy->conditionLabel()],
+            ['icon' => 'arrow-path', 'label' => 'Gyvavimo ciklas', 'badge' => true, 'badgeStatus' => $lifecycleStatus ?: 'unknown', 'value' => $copy->lifecycleStatusLabel()],
             ['icon' => 'building-library', 'label' => 'Filialas', 'value' => $copy->branch->name ?? '-'],
             ['icon' => 'map-pin', 'label' => 'Vieta', 'value' => $copy->location ? collect([$copy->location->name, $copy->location->room, $copy->location->shelf])->filter()->join(' / ') : '-'],
             ['icon' => 'calendar-days', 'label' => 'Įsigyta', 'value' => $copy->acquired_at?->format('Y-m-d') ?: '-'],
@@ -103,7 +106,7 @@
                                                 <div class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ $item['label'] }}</div>
                                                 @if(! empty($item['badge']))
                                                     <div class="mt-2">
-                                                        <x-ui.status-badge :status="$status" :label="$item['value']" />
+                                                        <x-ui.status-badge :status="$item['badgeStatus'] ?? $status" :label="$item['value']" />
                                                     </div>
                                                 @else
                                                     <div class="mt-1 break-words text-sm font-medium text-zinc-950 dark:text-white">{{ $item['value'] }}</div>
@@ -130,11 +133,15 @@
                             <section class="overflow-hidden rounded-[28px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                                 <div class="border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
                                     <h2 class="text-lg font-semibold text-zinc-950 dark:text-white">Gyvenimo ciklas</h2>
-                                    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Valdyk paruošimą, sugadinimą, tvarkymą, atkūrimą ir nurašymą su priežastįmi.</p>
+                                    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Valdyk paruošimą, tvarkymą, atkūrimą, praradimą ir nurašymą su priežastimi.</p>
                                 </div>
 
                                 <div class="p-5">
-                                    @if($copy->activeLoan)
+                                    @if(! $hasValidLifecycleStatus)
+                                        <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
+                                            Kopija neturi galiojančios gyvavimo ciklo būsenos. Paleiskite duomenų migraciją ir patikrinkite `book_copies.lifecycle_status`.
+                                        </div>
+                                    @elseif($copy->activeLoan)
                                         <div class="flex flex-col gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-950/30">
                                             <div class="flex items-start justify-between gap-4">
                                                 <div>
@@ -160,15 +167,8 @@
                                                     <label class="cursor-pointer rounded-2xl border border-zinc-200/80 bg-zinc-50/70 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
                                                         <input type="radio" name="target_status" value="{{ $targetStatus }}" class="sr-only peer" @checked(old('target_status') === $targetStatus)>
                                                         <div class="rounded-xl border border-transparent peer-checked:border-teal-500 peer-checked:bg-teal-50 p-1 dark:peer-checked:border-teal-400 dark:peer-checked:bg-teal-950/30">
-                                                            <div class="text-sm font-semibold text-zinc-950 dark:text-white">{{ $lifecycleLabels[$targetStatus] ?? ($statusLabels[$targetStatus] ?? $targetStatus) }}</div>
-                                                            @if($targetStatus === \App\Models\BookCopy::LIFECYCLE_MARK_CONDITION_DAMAGED)
-                                                                <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Fizinė būklė taps: {{ \App\Models\BookCopy::conditionLabels()[\App\Models\BookCopy::CONDITION_DAMAGED] }}</div>
-                                                            @elseif($targetStatus === \App\Models\BookCopy::STATUS_MAINTENANCE)
-                                                                <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Fizinė būklė taps: {{ \App\Models\BookCopy::conditionLabels()[\App\Models\BookCopy::CONDITION_DAMAGED] }}</div>
-                                                                <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Gyvenimo ciklo būsena taps: {{ $statusLabels[$targetStatus] ?? $targetStatus }}</div>
-                                                            @else
-                                                                <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Gyvenimo ciklo būsena taps: {{ $statusLabels[$targetStatus] ?? $targetStatus }}</div>
-                                                            @endif
+                                                            <div class="text-sm font-semibold text-zinc-950 dark:text-white">{{ $copy->lifecycleTransitionLabel($targetStatus) }}</div>
+                                                            <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Gyvenimo ciklo būsena taps: {{ $statusLabels[$targetStatus] ?? $targetStatus }}</div>
                                                         </div>
                                                     </label>
                                                 @endforeach
@@ -309,10 +309,6 @@
         </div>
     </x-ui.page>
 </x-layouts::app>
-
-
-
-
 
 
 

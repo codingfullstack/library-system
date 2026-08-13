@@ -81,7 +81,7 @@ it('lets staff see other branch copies without active loan identity details', fu
         ->assertOk()
         ->assertJsonFragment([
             'id' => $otherCopy->id,
-            'status' => BookCopy::STATUS_LOANED,
+            'status' => 'paskolinta',
         ])
         ->assertJsonPath('book_copies.0.branch.id', $otherBranch->id)
         ->assertJsonPath('book_copies.0.active_loan', null)
@@ -117,7 +117,7 @@ it('shows branch restriction hover titles for disabled copy actions', function (
         ->get(route('books.show', $book))
         ->assertOk()
         ->assertSee('Negalima išduoti: kopija priklauso kitam filialui.', false)
-        ->assertDontSee('Negalima priimti grąžinimo: kopija priklauso kitam filialui.', false);
+        ->assertSee('Negalima priimti grąžinimo: kopija priklauso kitam filialui.', false);
 });
 
 it('shows status reason hover title when copy can not be borrowed', function () {

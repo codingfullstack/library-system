@@ -18,7 +18,9 @@ class DashboardSummaryController extends Controller
         }
 
         return response()->json([
-            'summary' => $getDashboardReportDataQuery->summary($user),
+            'summary' => $getDashboardReportDataQuery->summary($user, [
+                'branch_id' => $request->query('branch_id'),
+            ]),
         ]);
     }
 }

@@ -29,7 +29,9 @@ class Loan extends Model
         'book_copy_id',
         'user_id',
         'issued_by',
+        'issued_branch_id',
         'received_by',
+        'returned_branch_id',
         'borrowed_at',
         'due_at',
         'returned_at',
@@ -72,9 +74,19 @@ class Loan extends Model
         return $this->belongsTo(User::class, 'issued_by');
     }
 
+    public function issuedBranch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class, 'issued_branch_id');
+    }
+
     public function receiver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'received_by');
+    }
+
+    public function returnedBranch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class, 'returned_branch_id');
     }
 
     public function scopeActive($query)

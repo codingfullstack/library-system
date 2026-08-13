@@ -117,7 +117,7 @@ it('scopes dashboard summary to the active library for administrators', function
         ->getJson('/api/auth/dashboard/summary')
         ->assertOk()
         ->assertJsonPath('summary.book_copies_count', 7)
-        ->assertJsonPath('summary.available_book_copies_count', 6)
+        ->assertJsonPath('summary.available_book_copies_count', 4)
         ->assertJsonPath('summary.active_loans_count', 2)
         ->assertJsonPath('summary.active_reservations_count', 3)
         ->assertJsonPath('summary.overdue_loans_count', 1);
@@ -126,7 +126,7 @@ it('scopes dashboard summary to the active library for administrators', function
         ->getJson('/api/auth/dashboard/summary')
         ->assertOk()
         ->assertJsonPath('summary.book_copies_count', 5)
-        ->assertJsonPath('summary.available_book_copies_count', 5)
+        ->assertJsonPath('summary.available_book_copies_count', 4)
         ->assertJsonPath('summary.active_loans_count', 1)
         ->assertJsonPath('summary.active_reservations_count', 1);
 });
@@ -138,17 +138,17 @@ it('scopes dashboard summary to the staff assigned branch', function () {
         ->getJson('/api/auth/dashboard/summary')
         ->assertOk()
         ->assertJsonPath('summary.book_copies_count', 3)
-        ->assertJsonPath('summary.available_book_copies_count', 2)
+        ->assertJsonPath('summary.available_book_copies_count', 1)
         ->assertJsonPath('summary.active_loans_count', 1)
-        ->assertJsonPath('summary.active_reservations_count', 2);
+        ->assertJsonPath('summary.active_reservations_count', 1);
 
     $this->actingAs(staffInBranch($libraryX, $branchX2))
         ->getJson('/api/auth/dashboard/summary')
         ->assertOk()
         ->assertJsonPath('summary.book_copies_count', 4)
-        ->assertJsonPath('summary.available_book_copies_count', 4)
+        ->assertJsonPath('summary.available_book_copies_count', 3)
         ->assertJsonPath('summary.active_loans_count', 1)
-        ->assertJsonPath('summary.active_reservations_count', 2);
+        ->assertJsonPath('summary.active_reservations_count', 1);
 });
 
 it('does not widen staff without an active branch to the whole library', function () {
@@ -158,10 +158,7 @@ it('does not widen staff without an active branch to the whole library', functio
 
     $this->actingAs($staff->refresh())
         ->getJson('/api/auth/dashboard/summary')
-        ->assertOk()
-        ->assertJsonPath('summary.book_copies_count', 0)
-        ->assertJsonPath('summary.active_loans_count', 0)
-        ->assertJsonPath('summary.active_reservations_count', 0);
+        ->assertForbidden();
 });
 
 it('rejects inactive membership and unauthenticated dashboard summary requests', function () {

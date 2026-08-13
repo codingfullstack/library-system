@@ -99,33 +99,22 @@ class BookCopyController extends Controller
             ], 422);
         }
 
-        $targetAction = $request->validated('target_status');
-        $targetStatus = $targetAction === BookCopy::LIFECYCLE_MARK_CONDITION_DAMAGED
-            ? $bookCopy->status
-            : $targetAction;
+        $targetStatus = $request->validated('target_status');
 
-        $reasonCode = match ($targetAction) {
+        $reasonCode = match ($targetStatus) {
             BookCopy::STATUS_LOST => 'marked_lost',
-            BookCopy::LIFECYCLE_MARK_CONDITION_DAMAGED => 'marked_damaged',
             BookCopy::STATUS_MAINTENANCE => 'sent_to_maintenance',
-            BookCopy::STATUS_AVAILABLE => 'restored_to_active',
+            BookCopy::STATUS_IN_CIRCULATION => 'restored_to_circulation',
             BookCopy::STATUS_WITHDRAWN => 'nurašyta',
             default => 'status_adjusted',
         };
-
-        $attributes = [];
-
-        if (in_array($targetAction, [BookCopy::LIFECYCLE_MARK_CONDITION_DAMAGED, BookCopy::STATUS_MAINTENANCE], true)) {
-            $attributes['condition_status'] = BookCopy::CONDITION_DAMAGED;
-        }
 
         $copy = $changeBookCopyStatusAction->handle(
             $bookCopy,
             $targetStatus,
             $request->user(),
             $reasonCode,
-            $request->validated('reason_notes'),
-            $attributes
+            $request->validated('reason_notes')
         );
 
         return response()->json([

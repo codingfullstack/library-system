@@ -78,7 +78,7 @@
                             <div>
                                 <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Neprieinami</div>
                                 <div class="mt-1 text-3xl font-bold text-zinc-950 dark:text-white">{{ $summary['unavailable'] }}</div>
-                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Sugadinti, prarasti, tvarkomi</div>
+                                <div class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Ruošiami, prarasti, tvarkomi, nurašyti</div>
                             </div>
                         </div>
                     </section>
@@ -162,8 +162,8 @@
                                     @foreach($bookCopies as $copy)
                                         @php
                                             $statusClasses = match ($copy->status) {
-                                                \App\Models\BookCopy::STATUS_AVAILABLE => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
-                                                \App\Models\BookCopy::STATUS_LOANED => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
+                                                \App\Models\BookCopy::STATUS_IN_CIRCULATION => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
+                                                \App\Models\BookCopy::STATUS_PREPARING => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
                                                 \App\Models\BookCopy::STATUS_LOST => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300',
                                                 \App\Models\BookCopy::STATUS_MAINTENANCE => 'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300',
                                                 default => 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300',
@@ -242,5 +242,3 @@
         </div>
     </x-ui.page>
 </x-layouts::app>
-
-

@@ -58,7 +58,7 @@ it('hides other branch active loan sensitive fields in book details api', functi
         ->assertOk()
         ->assertJsonFragment([
             'id' => $copy->id,
-            'status' => BookCopy::STATUS_LOANED,
+            'status' => 'paskolinta',
         ])
         ->assertJsonPath('book_copies.0.active_loan', null)
         ->assertJsonMissing(['user_id' => $member->id])
@@ -144,5 +144,5 @@ it('keeps other branch reader data out of reservation exports and dashboard memb
     $this->actingAs($staff)
         ->getJson('/api/auth/dashboard/summary')
         ->assertOk()
-        ->assertJsonPath('summary.active_members_count', 0);
+        ->assertJsonPath('summary.active_members_count', null);
 });

@@ -22,6 +22,23 @@
                                     <span>{{ $filters['period_label'] }}</span>
                                 </div>
 
+                                @if($dashboardScope->canSelectBranch)
+                                    <label class="sr-only" for="dashboard-branch">Rodoma apimtis</label>
+                                    <div class="xl:w-[240px]">
+                                        <select id="dashboard-branch" wire:model.live="branchId" class="app-input h-11 rounded-2xl border-zinc-200 bg-white shadow-none dark:border-zinc-700 dark:bg-zinc-900">
+                                            <option value="">Visa biblioteka</option>
+                                            @foreach($dashboardScope->branchOptions as $branch)
+                                                <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                @elseif($dashboardScope->isBranch())
+                                    <div class="inline-flex h-11 items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                                        <flux:icon.building-library class="size-4 text-zinc-500" />
+                                        <span>Filialas: {{ $dashboardScope->branchName }}</span>
+                                    </div>
+                                @endif
+
                                 <div class="xl:w-[220px]">
                                     <select id="dashboard-period" wire:model.live="period" class="app-input h-11 rounded-2xl border-zinc-200 bg-white shadow-none dark:border-zinc-700 dark:bg-zinc-900">
                                         <option value="all">Visas laikotarpis</option>
@@ -106,7 +123,13 @@
                             </div>
 
                             <div class="px-4 py-4">
-                                <div wire:ignore id="dashboard-activity-chart" class="dashboard-chart-surface min-h-[320px]"></div>
+                                @if($chartPayload['timeline']['has_activity'] ?? false)
+                                    <div wire:ignore id="dashboard-activity-chart" class="dashboard-chart-surface min-h-[320px]"></div>
+                                @else
+                                    <div id="dashboard-activity-empty" class="flex min-h-[320px] items-center justify-center rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 px-6 text-center text-sm font-medium text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-400">
+                                        Pasirinktu laikotarpiu šiame filiale nebuvo išdavimų, grąžinimų ar rezervacijų.
+                                    </div>
+                                @endif
                             </div>
                         </section>
 
@@ -493,7 +516,9 @@
                             return false;
                         }
 
-                        const activityRendered = renderOrUpdate('activity', '#dashboard-activity-chart', {
+                        const hasActivity = Boolean(payload.timeline?.has_activity);
+                        const activityRendered = hasActivity
+                            ? renderOrUpdate('activity', '#dashboard-activity-chart', {
                             chart: {
                                 type: 'line',
                                 height: 320,
@@ -551,7 +576,8 @@
                                 shared: true,
                                 theme: isTamsi() ? 'dark' : 'light',
                             },
-                        });
+                        })
+                            : (destroyChart('activity'), true);
 
                         const copiesRendered = renderOrUpdate('copies', '#dashboard-copies-chart', {
                             chart: {
@@ -664,9 +690,6 @@
         @endpush
     @endonce
 </x-ui.page>
-
-
-
 
 
 

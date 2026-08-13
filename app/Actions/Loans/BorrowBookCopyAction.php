@@ -3,7 +3,6 @@
 namespace App\Actions\Loans;
 
 use App\Actions\AuditLogs\RecordAuditLogAction;
-use App\Actions\BookCopies\ChangeBookCopyStatusAction;
 use App\Actions\Notifications\CreateUserNotificationAction;
 use App\Actions\Reservations\SyncReservationQueueAction;
 use App\Models\BookCopy;
@@ -74,9 +73,9 @@ class BorrowBookCopyAction
             ]);
         }
 
-        if ($bookCopy->status !== BookCopy::STATUS_AVAILABLE) {
+        if (! $bookCopy->isInCirculation()) {
             throw ValidationException::withMessages([
-                'book_copy' => ['Sios kopijos isduoti negalima.'],
+                'book_copy' => ['Šios kopijos išduoti negalima, nes ji nėra apyvartoje.'],
             ]);
         }
 
@@ -147,9 +146,12 @@ class BorrowBookCopyAction
                 ]);
             }
 
+            $this->assertReadyReservationMatchesCopy($reservation, $bookCopy);
+
             if ($reservation->expires_at !== null && $reservation->expires_at->lte(now())) {
                 $reservation->update([
                     'status' => Reservation::STATUS_EXPIRED,
+                    'report_branch_id' => $reservation->pickup_branch_id,
                     'pickup_branch_id' => null,
                     'assigned_book_copy_id' => null,
                 ]);
@@ -166,6 +168,7 @@ class BorrowBookCopyAction
                 'book_copy_id' => $bookCopy->id,
                 'user_id' => $member->id,
                 'issued_by' => $authUser->id,
+                'issued_branch_id' => $bookCopy->branch_id,
                 'borrowed_at' => now()->toDateString(),
                 'due_at' => $dueAt,
                 'status' => Loan::STATUS_ACTIVE,
@@ -194,6 +197,7 @@ class BorrowBookCopyAction
 
             $reservation->update([
                 'status' => Reservation::STATUS_FULFILLED,
+                'report_branch_id' => $reservation->pickup_branch_id,
                 'assigned_book_copy_id' => (int) $bookCopy->id,
                 'fulfilled_at' => now(),
             ]);
@@ -251,14 +255,6 @@ class BorrowBookCopyAction
             ]);
         }
 
-        app(ChangeBookCopyStatusAction::class)->handle(
-            $bookCopy,
-            BookCopy::STATUS_LOANED,
-            $authUser,
-            'issued',
-            $validated['notes'] ?? null
-        );
-
         app(SyncReservationQueueAction::class)->handle($bookCopy->library_id, $bookCopy->book_id);
 
         app(RecordAuditLogAction::class)->handle(
@@ -279,6 +275,7 @@ class BorrowBookCopyAction
                 'target_member_id' => $member->id,
                 'target_member_name' => $member->name,
                 'issued_by_id' => $authUser->id,
+                'issued_branch_id' => $bookCopy->branch_id,
                 'due_at' => $dueAt,
             ],
             $bookCopy->library_id
@@ -288,6 +285,19 @@ class BorrowBookCopyAction
             'message' => 'Kopija sekmingai isduota.',
             'loan' => $loan,
         ];
+    }
+
+    private function assertReadyReservationMatchesCopy(Reservation $reservation, BookCopy $bookCopy): void
+    {
+        if (
+            (int) $reservation->assigned_book_copy_id !== (int) $bookCopy->id
+            || (int) $reservation->pickup_branch_id !== (int) $bookCopy->branch_id
+            || (int) $reservation->report_branch_id !== (int) $reservation->pickup_branch_id
+        ) {
+            throw ValidationException::withMessages([
+                'reservation' => ['Paruoštos rezervacijos kopija, atsiėmimo filialas ir ataskaitinis filialas nesutampa.'],
+            ]);
+        }
     }
 
     private function isActiveLoanUniqueConstraintViolation(QueryException $exception): bool

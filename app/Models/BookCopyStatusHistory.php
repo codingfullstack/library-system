@@ -44,7 +44,7 @@ class BookCopyStatusHistory extends Model
             'issued' => 'Kopija išduota',
             'grąžinta' => 'Kopija grąžinta',
             'marked_lost' => 'Pažymėtas kaip prarastas',
-            'marked_damaged' => 'Pažymėtas kaip sugadintas',
+            'marked_damaged' => 'Nebenaudojamas būklės įrašas',
             'sent_to_maintenance' => 'Išsiųstas tvarkymui',
             'restored_to_active' => 'Grąžintas į aktyvų fondą',
             'nurašyta' => 'Nurašyta',

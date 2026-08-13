@@ -21,18 +21,25 @@ return new class extends Migration
             $table->string('barcode')->nullable();
 
             $table->enum('status', [
-                'laisva',
-                'išduota',
+                'ruošiama',
+                'apyvartoje',
                 'prarasta',
                 'tvarkoma',
                 'nurašyta',
-            ])->default('laisva');
+            ])->default('apyvartoje');
+
+            $table->enum('lifecycle_status', [
+                'ruošiama',
+                'apyvartoje',
+                'prarasta',
+                'tvarkoma',
+                'nurašyta',
+            ])->default('apyvartoje');
 
             $table->enum('condition_status', [
                 'nauja',
                 'gera',
                 'padėvėta',
-                'sugadinta',
             ])->default('gera');
 
             $table->date('acquired_at')->nullable();
@@ -42,8 +49,10 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index('status');
+            $table->index('lifecycle_status');
             $table->index('condition_status');
             $table->index(['library_id', 'status']);
+            $table->index(['library_id', 'lifecycle_status']);
             $table->index(['library_id', 'book_id']);
             $table->index(['branch_id', 'status']);
 
@@ -58,5 +67,3 @@ return new class extends Migration
         Schema::dropIfExists('book_copies');
     }
 };
-
-

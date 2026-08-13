@@ -13,6 +13,8 @@ class BookCopyBranchTransferService
 {
     public const STAFF_TRANSFER_MESSAGE = 'Kopijos filialo keisti negalite.';
 
+    public const READY_RESERVATION_TRANSFER_MESSAGE = 'Kopijos negalima perkelti, kol ji priskirta paruoštai rezervacijai.';
+
     public const CROSS_LIBRARY_MESSAGE = 'Kopijos negalima perkelti į kitos bibliotekos filialą.';
 
     public function libraryIdForCreate(User $actor, int|string|null $requestedLibraryId = null): int
@@ -69,6 +71,16 @@ class BookCopyBranchTransferService
         if ($bookCopy && (int) $bookCopy->library_id !== (int) $branch->library_id) {
             throw ValidationException::withMessages([
                 $field => self::CROSS_LIBRARY_MESSAGE,
+            ]);
+        }
+
+        if (
+            $bookCopy
+            && (int) $bookCopy->branch_id !== (int) $branch->id
+            && $bookCopy->activeReadyReservation()->exists()
+        ) {
+            throw ValidationException::withMessages([
+                $field => self::READY_RESERVATION_TRANSFER_MESSAGE,
             ]);
         }
 

@@ -111,7 +111,7 @@ it('records an audit log when a book is updated', function () {
     ]);
 });
 
-it('records an audit log when a book is issued and when copy status changes', function () {
+it('records an audit log when a book is issued', function () {
     $library = Library::factory()->create(['name' => 'Testine biblioteka']);
     $member = User::factory()->member()->create([
         'library_id' => $library->id,
@@ -144,7 +144,7 @@ it('records an audit log when a book is issued and when copy status changes', fu
         'library_id' => $library->id,
     ]);
 
-    $this->assertDatabaseHas('audit_logs', [
+    $this->assertDatabaseMissing('audit_logs', [
         'action' => 'book_copy_status_changed',
         'user_id' => $staff->id,
         'library_id' => $library->id,

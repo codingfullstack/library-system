@@ -20,6 +20,7 @@ class DashboardReportRequest extends FormRequest
             'period' => ['nullable', Rule::in(['all', 'today', '7_days', '30_days', 'this_week', 'this_month', 'last_month', 'this_quarter', 'this_year', 'custom'])],
             'date_from' => ['nullable', 'date', 'required_if:period,custom'],
             'date_to' => ['nullable', 'date', 'required_if:period,custom', 'after_or_equal:date_from'],
+            'branch_id' => ['nullable', 'integer', 'min:1'],
         ];
     }
 
@@ -28,7 +29,8 @@ class DashboardReportRequest extends FormRequest
      *     period: string,
      *     date_from: ?CarbonImmutable,
      *     date_to: ?CarbonImmutable,
-     *     period_label: string
+     *     period_label: string,
+     *     branch_id: ?int
      * }
      */
     public function reportFilters(): array
@@ -37,14 +39,8 @@ class DashboardReportRequest extends FormRequest
             (string) ($this->validated('period') ?: 'all'),
             $this->validated('date_from'),
             $this->validated('date_to'),
-        );
+        ) + [
+            'branch_id' => $this->validated('branch_id'),
+        ];
     }
 }
-
-
-
-
-
-
-
-

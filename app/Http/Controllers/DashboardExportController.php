@@ -20,18 +20,10 @@ class DashboardExportController extends Controller
         $filters = $request->reportFilters();
         $report = $getDashboardReportDataQuery->handle($request->user(), $filters);
         $sections = $dashboardReportExport->sections($report);
-        $filename = $dashboardReportExport->filename($request->user(), $filters, $format);
+        $filename = $dashboardReportExport->filename($report, $filters, $format);
 
         return $format === 'csv'
             ? $dashboardReportExport->csvResponse($sections, $filename)
             : $dashboardReportExport->xlsResponse($sections, $filename, $report);
     }
 }
-
-
-
-
-
-
-
-

@@ -75,6 +75,7 @@ class AuditLogChanges
             'inventory_code' => 'Inventoriaus kodas',
             'barcode' => 'Brūkšninis kodas',
             'status' => 'Statusas',
+            'lifecycle_status' => 'Gyvavimo ciklas',
             'condition_status' => 'Būklė',
             'acquired_at' => 'Įsigijimo data',
             'notes' => 'Pastabos',
@@ -101,7 +102,7 @@ class AuditLogChanges
         }
 
         return match ($field) {
-            'status' => BookCopy::statusLabels()[(string) $value] ?? self::stringify($value),
+            'status', 'lifecycle_status' => BookCopy::statusLabels()[(string) $value] ?? self::stringify($value),
             'is_active' => $value ? 'Aktyvus' : 'Neaktyvus',
             'is_public' => $value ? 'Vieša' : 'Nevieša',
             'role' => [

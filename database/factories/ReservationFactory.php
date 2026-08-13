@@ -17,6 +17,9 @@ class ReservationFactory extends Factory
         return $this->afterMaking(function (Reservation $reservation): void {
             if ($reservation->status === Reservation::STATUS_WAITING) {
                 $reservation->pickup_branch_id = null;
+                $reservation->report_branch_id = $reservation->scope === Reservation::SCOPE_BRANCH
+                    ? $reservation->branch_id
+                    : null;
                 $reservation->ready_at = null;
                 $reservation->expires_at = null;
                 $reservation->fulfilled_at = null;
@@ -48,6 +51,7 @@ class ReservationFactory extends Factory
 
                 $reservation->ready_at ??= $reservation->reserved_at ?: now();
                 $reservation->expires_at ??= now()->addDays(14);
+                $reservation->report_branch_id ??= $reservation->pickup_branch_id;
                 $reservation->fulfilled_at = null;
                 $reservation->cancelled_at = null;
 
@@ -55,6 +59,7 @@ class ReservationFactory extends Factory
             }
 
             if ($reservation->status === Reservation::STATUS_EXPIRED) {
+                $reservation->report_branch_id ??= $reservation->pickup_branch_id;
                 $reservation->pickup_branch_id = null;
                 $reservation->ready_at ??= $reservation->reserved_at ?: now()->subDay();
                 $reservation->expires_at ??= now()->subDay();
@@ -65,6 +70,7 @@ class ReservationFactory extends Factory
             }
 
             if ($reservation->status === Reservation::STATUS_FULFILLED) {
+                $reservation->report_branch_id ??= $reservation->pickup_branch_id;
                 $reservation->fulfilled_at ??= now();
                 $reservation->cancelled_at = null;
 
@@ -72,6 +78,8 @@ class ReservationFactory extends Factory
             }
 
             if ($reservation->status === Reservation::STATUS_CANCELLED) {
+                $reservation->report_branch_id ??= $reservation->pickup_branch_id
+                    ?: ($reservation->scope === Reservation::SCOPE_BRANCH ? $reservation->branch_id : null);
                 $reservation->pickup_branch_id = null;
                 $reservation->cancelled_at ??= now();
                 $reservation->fulfilled_at = null;
@@ -101,6 +109,7 @@ class ReservationFactory extends Factory
             'scope' => Reservation::SCOPE_LIBRARY,
             'branch_id' => null,
             'pickup_branch_id' => null,
+            'report_branch_id' => null,
             'assigned_book_copy_id' => null,
             'status' => $status,
             'reserved_at' => $reservedAt,
@@ -112,5 +121,3 @@ class ReservationFactory extends Factory
         ];
     }
 }
-
-

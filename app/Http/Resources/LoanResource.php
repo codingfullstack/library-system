@@ -30,7 +30,9 @@ class LoanResource extends JsonResource
             'book_copy' => $this->bookCopy ? [
                 'id' => $this->bookCopy->id,
                 'inventory_code' => $this->bookCopy->inventory_code,
-                'status' => $this->bookCopy->status,
+                'status' => $this->bookCopy->operationalStatus(),
+                'status_label' => $this->bookCopy->statusLabel(),
+                'lifecycle_status' => $this->bookCopy->lifecycleStatus(),
                 'book' => $this->bookCopy->book ? [
                     'id' => $this->bookCopy->book->id,
                     'title' => $this->bookCopy->book->title,
@@ -84,7 +86,6 @@ class LoanResource extends JsonResource
         ]);
     }
 }
-
 
 
 

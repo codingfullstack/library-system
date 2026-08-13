@@ -34,14 +34,16 @@ function reservationScopeFixture(): array
         'book_id' => $book->id,
         'branch_id' => $branchA->id,
         'location_id' => $locationA->id,
-        'status' => BookCopy::STATUS_LOANED,
+        'status' => BookCopy::STATUS_MAINTENANCE,
+        'lifecycle_status' => BookCopy::STATUS_MAINTENANCE,
     ]);
     $copyB = BookCopy::factory()->create([
         'library_id' => $library->id,
         'book_id' => $book->id,
         'branch_id' => $branchB->id,
         'location_id' => $locationB->id,
-        'status' => BookCopy::STATUS_LOANED,
+        'status' => BookCopy::STATUS_MAINTENANCE,
+        'lifecycle_status' => BookCopy::STATUS_MAINTENANCE,
     ]);
 
     $staff->activeLibraryMemberships()
@@ -156,7 +158,8 @@ it('shows library scoped reservations in branch filters by serviceable branch in
         'book_id' => $fixture['book']->id,
         'branch_id' => $branchC->id,
         'location_id' => $locationC->id,
-        'status' => BookCopy::STATUS_LOANED,
+        'status' => BookCopy::STATUS_MAINTENANCE,
+        'lifecycle_status' => BookCopy::STATUS_MAINTENANCE,
     ]);
 
     $branchAReservation = Reservation::factory()->create([
@@ -227,7 +230,8 @@ it('prevents staff from creating reservations in another library', function () {
         'book_id' => $otherBook->id,
         'branch_id' => $otherBranch->id,
         'location_id' => $otherLocation->id,
-        'status' => BookCopy::STATUS_LOANED,
+        'status' => BookCopy::STATUS_MAINTENANCE,
+        'lifecycle_status' => BookCopy::STATUS_MAINTENANCE,
     ]);
 
     expect(fn () => app(CreateReservationAction::class)->handle($fixture['staff'], [

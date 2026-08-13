@@ -84,21 +84,23 @@ class GetLibraryBookDetailsQuery
                     ->whereIn('library_id', $libraryIds))
                     ->when(! empty($copyLifecycle), function ($copyQuery) use ($copyLifecycle) {
                         match ($copyLifecycle) {
-                            'aktyvi' => $copyQuery->whereIn('status', ['laisva', 'išduota']),
+                            'aktyvi' => $copyQuery->where('lifecycle_status', BookCopy::STATUS_IN_CIRCULATION),
                             'issues' => $copyQuery->where(function ($issuesQuery) {
                                 $issuesQuery
-                                    ->whereIn('status', ['prarasta', 'tvarkoma'])
-                                    ->orWhere(function ($damagedQuery) {
-                                        $damagedQuery
-                                            ->where('condition_status', BookCopy::CONDITION_DAMAGED)
-                                            ->where('status', '<>', BookCopy::STATUS_WITHDRAWN);
-                                    });
+                                    ->whereIn('lifecycle_status', [BookCopy::STATUS_PREPARING, BookCopy::STATUS_LOST, BookCopy::STATUS_MAINTENANCE]);
                             }),
-                            'removed' => $copyQuery->where('status', 'nurašyta'),
+                            'removed' => $copyQuery->where('lifecycle_status', BookCopy::STATUS_WITHDRAWN),
                             default => null,
                         };
                     })
-                    ->when(! empty($copyStatus), fn ($copyQuery) => $copyQuery->where('status', $copyStatus))
+                    ->when(! empty($copyStatus), function ($copyQuery) use ($copyStatus) {
+                        match ($copyStatus) {
+                            'laisva' => $copyQuery->operationallyAvailable(),
+                            'paskolinta' => $copyQuery->whereHas('activeLoan'),
+                            'rezervuota' => $copyQuery->whereHas('activeReadyReservation'),
+                            default => $copyQuery->where('lifecycle_status', $copyStatus),
+                        };
+                    })
                     ->when($copySearch !== '', function ($copyQuery) use ($copySearch) {
                         $search = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $copySearch).'%';
 
@@ -122,7 +124,7 @@ class GetLibraryBookDetailsQuery
                         'library:id,name,code,address,city',
                         'location:id,name,room,shelf',
                         'statusHistories.user:id,name',
-                        'activeLoan' => function ($loanQuery) use ($user) {
+                        'activeLoan' => function ($loanQuery) {
                             $loanQuery->select([
                                 'id',
                                 'library_id',
@@ -133,17 +135,11 @@ class GetLibraryBookDetailsQuery
                                 'borrowed_at',
                                 'returned_at',
                             ])
-                                ->when($user?->effectiveRole($user->activeLibraryId()) === User::ROLE_STAFF, function ($staffLoanQuery) use ($user) {
-                                    $branchId = $user->assignedBranchId($user->activeLibraryId());
-
-                                    $staffLoanQuery->whereHas('bookCopy', fn ($copyQuery) => $branchId
-                                        ? $copyQuery->where('branch_id', $branchId)
-                                        : $copyQuery->whereRaw('1 = 0'));
-                                })
                                 ->with([
                                     'user:id,name,email,membership_number',
                                 ]);
                         },
+                        'activeReadyReservation:id,library_id,book_id,user_id,assigned_book_copy_id,status,scope,branch_id,pickup_branch_id,report_branch_id,reserved_at,ready_at,expires_at,fulfilled_at,cancelled_at',
                     ])
                     ->orderBy('inventory_code');
             },
@@ -167,7 +163,7 @@ class GetLibraryBookDetailsQuery
                     $q->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
                 }
 
-                $q->where('status', 'laisva');
+                $q->operationallyAvailable();
             },
             'reservations as current_user_active_reservations_count' => function ($q) use ($libraryIds, $user) {
                 if ($user?->effectiveRole($user->activeLibraryId()) !== User::ROLE_MEMBER) {

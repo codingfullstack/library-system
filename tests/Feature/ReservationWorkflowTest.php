@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\BookCopies\ChangeBookCopyStatusAction;
 use App\Actions\Loans\BorrowBookCopyAction;
 use App\Actions\Loans\ReturnBookCopyAction;
 use App\Actions\Reservations\CancelReservationAction;
@@ -10,7 +9,6 @@ use App\Livewire\Reservations\CancelReservationForm;
 use App\Models\AuditLog;
 use App\Models\Book;
 use App\Models\BookCopy;
-use App\Models\BookCopyStatusHistory;
 use App\Models\Branch;
 use App\Models\Library;
 use App\Models\Loan;
@@ -261,6 +259,235 @@ it('keeps fifo order when two available copies promote the first two waiting res
         ->and(app(ReservationQueueService::class)->queueSize($library->id, $book->id))->toBe(1);
 });
 
+it('promotes only the first fifo reservation when one copy can serve four reservations', function () {
+    $library = Library::factory()->create();
+    $book = Book::factory()->create(['title' => 'FIFO one copy']);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $members = User::factory()->count(4)->member()->create(['library_id' => $library->id]);
+    $copy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_AVAILABLE,
+    ]);
+
+    $reservations = collect(range(0, 3))->map(fn (int $index) => Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $members[$index]->id,
+        'scope' => Reservation::SCOPE_LIBRARY,
+        'branch_id' => null,
+        'status' => Reservation::STATUS_WAITING,
+        'reserved_at' => now()->subMinutes(40 - $index),
+        'created_at' => now()->subMinutes(40 - $index),
+        'ready_at' => null,
+        'expires_at' => null,
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]));
+
+    app(SyncReservationQueueAction::class)->handle($library->id, $book->id);
+
+    expect($reservations[0]->fresh()->status)->toBe(Reservation::STATUS_READY)
+        ->and($reservations[0]->fresh()->assigned_book_copy_id)->toBe($copy->id)
+        ->and($reservations[0]->fresh()->pickup_branch_id)->toBe($branch->id)
+        ->and($reservations[0]->fresh()->ready_at)->not->toBeNull()
+        ->and($reservations[0]->fresh()->expires_at)->not->toBeNull()
+        ->and($reservations[1]->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and($reservations[2]->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and($reservations[3]->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and(app(ReservationQueueService::class)->positionFor($reservations[1]->fresh()))->toBe(1)
+        ->and(app(ReservationQueueService::class)->positionFor($reservations[2]->fresh()))->toBe(2)
+        ->and(app(ReservationQueueService::class)->positionFor($reservations[3]->fresh()))->toBe(3);
+});
+
+it('promotes the first two fifo reservations to different copies when two copies can serve four reservations', function () {
+    $library = Library::factory()->create();
+    $book = Book::factory()->create(['title' => 'FIFO four reservations']);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $members = User::factory()->count(4)->member()->create(['library_id' => $library->id]);
+
+    BookCopy::factory()->count(2)->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_AVAILABLE,
+    ]);
+
+    $reservations = collect(range(0, 3))->map(fn (int $index) => Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $members[$index]->id,
+        'scope' => Reservation::SCOPE_LIBRARY,
+        'branch_id' => null,
+        'status' => Reservation::STATUS_WAITING,
+        'reserved_at' => now()->subMinutes(40 - $index),
+        'created_at' => now()->subMinutes(40 - $index),
+        'ready_at' => null,
+        'expires_at' => null,
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]));
+
+    app(SyncReservationQueueAction::class)->handle($library->id, $book->id);
+
+    expect($reservations[0]->fresh()->status)->toBe(Reservation::STATUS_READY)
+        ->and($reservations[1]->fresh()->status)->toBe(Reservation::STATUS_READY)
+        ->and($reservations[0]->fresh()->assigned_book_copy_id)->not->toBe($reservations[1]->fresh()->assigned_book_copy_id)
+        ->and($reservations[2]->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and($reservations[3]->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and(app(ReservationQueueService::class)->positionFor($reservations[2]->fresh()))->toBe(1)
+        ->and(app(ReservationQueueService::class)->positionFor($reservations[3]->fresh()))->toBe(2);
+});
+
+it('serves branch scoped reservations only with matching branch copies while library scoped reservations can use another branch', function () {
+    $library = Library::factory()->create();
+    $book = Book::factory()->create(['title' => 'Scope assignment']);
+    $branchA = Branch::factory()->create(['library_id' => $library->id]);
+    $branchB = Branch::factory()->create(['library_id' => $library->id]);
+    $locationB = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branchB->id]);
+    $members = User::factory()->count(2)->member()->create(['library_id' => $library->id]);
+    $copyB = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branchB->id,
+        'location_id' => $locationB->id,
+        'status' => BookCopy::STATUS_AVAILABLE,
+    ]);
+    $branchReservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $members[0]->id,
+        'scope' => Reservation::SCOPE_BRANCH,
+        'branch_id' => $branchA->id,
+        'status' => Reservation::STATUS_WAITING,
+        'reserved_at' => now()->subMinutes(2),
+        'created_at' => now()->subMinutes(2),
+        'ready_at' => null,
+        'expires_at' => null,
+    ]);
+    $libraryReservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $members[1]->id,
+        'scope' => Reservation::SCOPE_LIBRARY,
+        'branch_id' => null,
+        'status' => Reservation::STATUS_WAITING,
+        'reserved_at' => now()->subMinute(),
+        'created_at' => now()->subMinute(),
+        'ready_at' => null,
+        'expires_at' => null,
+    ]);
+
+    app(SyncReservationQueueAction::class)->handle($library->id, $book->id);
+
+    expect($branchReservation->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and($branchReservation->fresh()->assigned_book_copy_id)->toBeNull()
+        ->and($libraryReservation->fresh()->status)->toBe(Reservation::STATUS_READY)
+        ->and($libraryReservation->fresh()->assigned_book_copy_id)->toBe($copyB->id);
+});
+
+it('does not assign issued loaned lost withdrawn or already ready assigned copies to waiting reservations', function () {
+    $library = Library::factory()->create();
+    $book = Book::factory()->create(['title' => 'Ineligible copies']);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $members = User::factory()->count(3)->member()->create(['library_id' => $library->id]);
+    $staff = User::factory()->staff()->create(['library_id' => $library->id]);
+    $staff->libraryMemberships()->where('library_id', $library->id)->update(['branch_id' => $branch->id]);
+
+    $activeLoanCopy = BookCopy::factory()->create(['library_id' => $library->id, 'book_id' => $book->id, 'branch_id' => $branch->id, 'location_id' => $location->id, 'status' => BookCopy::STATUS_AVAILABLE]);
+    BookCopy::factory()->create(['library_id' => $library->id, 'book_id' => $book->id, 'branch_id' => $branch->id, 'location_id' => $location->id, 'status' => BookCopy::STATUS_LOST]);
+    BookCopy::factory()->create(['library_id' => $library->id, 'book_id' => $book->id, 'branch_id' => $branch->id, 'location_id' => $location->id, 'status' => BookCopy::STATUS_WITHDRAWN]);
+    $readyAssignedCopy = BookCopy::factory()->create(['library_id' => $library->id, 'book_id' => $book->id, 'branch_id' => $branch->id, 'location_id' => $location->id, 'status' => BookCopy::STATUS_AVAILABLE]);
+
+    Loan::factory()->create([
+        'library_id' => $library->id,
+        'book_copy_id' => $activeLoanCopy->id,
+        'user_id' => $members[0]->id,
+        'issued_by' => $staff->id,
+        'status' => Loan::STATUS_ACTIVE,
+        'returned_at' => null,
+    ]);
+    Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $members[1]->id,
+        'scope' => Reservation::SCOPE_LIBRARY,
+        'branch_id' => null,
+        'pickup_branch_id' => $branch->id,
+        'assigned_book_copy_id' => $readyAssignedCopy->id,
+        'status' => Reservation::STATUS_READY,
+        'ready_at' => now()->subMinute(),
+        'expires_at' => now()->addDays(14),
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+    $waiting = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $members[2]->id,
+        'scope' => Reservation::SCOPE_LIBRARY,
+        'branch_id' => null,
+        'status' => Reservation::STATUS_WAITING,
+        'reserved_at' => now(),
+        'ready_at' => null,
+        'expires_at' => null,
+    ]);
+
+    app(SyncReservationQueueAction::class)->handle($library->id, $book->id);
+
+    expect($waiting->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and($waiting->fresh()->assigned_book_copy_id)->toBeNull()
+        ->and(Reservation::query()->where('status', Reservation::STATUS_READY)->where('assigned_book_copy_id', $readyAssignedCopy->id)->count())->toBe(1);
+});
+
+it('blocks borrowing an available copy for another member when fifo reservation has priority', function () {
+    $library = Library::factory()->create();
+    $book = Book::factory()->create(['title' => 'Borrow FIFO guard']);
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $admin = User::factory()->admin()->create(['library_id' => $library->id]);
+    $reservedMember = User::factory()->member()->create(['library_id' => $library->id]);
+    $otherMember = User::factory()->member()->create(['library_id' => $library->id]);
+    $copy = BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_AVAILABLE,
+    ]);
+    $reservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $reservedMember->id,
+        'scope' => Reservation::SCOPE_LIBRARY,
+        'branch_id' => null,
+        'status' => Reservation::STATUS_WAITING,
+        'reserved_at' => now()->subMinute(),
+        'created_at' => now()->subMinute(),
+        'ready_at' => null,
+        'expires_at' => null,
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+
+    expect(fn () => app(BorrowBookCopyAction::class)->handle($admin, $copy, [
+        'user_id' => $otherMember->id,
+        'due_at' => now()->addDays(14)->toDateString(),
+        'no_due_date' => false,
+    ]))->toThrow(ValidationException::class, 'FIFO');
+
+    expect(Loan::query()->where('book_copy_id', $copy->id)->exists())->toBeFalse()
+        ->and($copy->fresh()->status)->toBe(BookCopy::STATUS_AVAILABLE)
+        ->and($reservation->fresh()->status)->toBe(Reservation::STATUS_WAITING)
+        ->and($reservation->fresh()->assigned_book_copy_id)->toBeNull();
+});
+
 it('keeps a ready reservation active when no copy is available after queue sync', function () {
     $library = Library::factory()->create();
     $member = User::factory()->member()->create(['library_id' => $library->id]);
@@ -273,7 +500,15 @@ it('keeps a ready reservation active when no copy is available after queue sync'
         'book_id' => $book->id,
         'branch_id' => $branch->id,
         'location_id' => $location->id,
-        'status' => BookCopy::STATUS_LOANED,
+        'status' => BookCopy::STATUS_IN_CIRCULATION,
+    ]);
+
+    Loan::factory()->create([
+        'library_id' => $library->id,
+        'book_copy_id' => $loanedCopy->id,
+        'user_id' => $member->id,
+        'status' => Loan::STATUS_ACTIVE,
+        'returned_at' => null,
     ]);
 
     $reservation = Reservation::factory()->create([
@@ -339,7 +574,7 @@ it('creates an overdue notification when a member is at least one day late', fun
         'book_id' => $book->id,
         'branch_id' => $branch->id,
         'location_id' => $location->id,
-        'status' => BookCopy::STATUS_LOANED,
+        'status' => BookCopy::STATUS_IN_CIRCULATION,
     ]);
 
     $loan = Loan::factory()->create([
@@ -374,7 +609,7 @@ it('does not duplicate the same overdue notification on later requests', functio
         'book_id' => $book->id,
         'branch_id' => $branch->id,
         'location_id' => $location->id,
-        'status' => BookCopy::STATUS_LOANED,
+        'status' => BookCopy::STATUS_IN_CIRCULATION,
     ]);
 
     $loan = Loan::factory()->create([
@@ -412,7 +647,7 @@ it('creates a reservation ready notification for the first waiting member', func
         'book_id' => $book->id,
         'branch_id' => $branch->id,
         'location_id' => $location->id,
-        'status' => BookCopy::STATUS_LOANED,
+        'status' => BookCopy::STATUS_IN_CIRCULATION,
     ]);
 
     $reservation = Reservation::factory()->create([
@@ -473,7 +708,7 @@ it('does not duplicate return side effects when the same copy is returned twice'
         'book_id' => $book->id,
         'branch_id' => $branch->id,
         'location_id' => $location->id,
-        'status' => BookCopy::STATUS_LOANED,
+        'status' => BookCopy::STATUS_IN_CIRCULATION,
     ]);
 
     $loan = Loan::factory()->create([
@@ -511,10 +746,8 @@ it('does not duplicate return side effects when the same copy is returned twice'
         ->where('auditable_id', $loan->id)
         ->count())->toBe(1);
 
-    expect(BookCopyStatusHistory::query()
-        ->where('book_copy_id', $bookCopy->id)
-        ->where('to_status', BookCopy::STATUS_AVAILABLE)
-        ->count())->toBe(1);
+    expect($bookCopy->fresh()->status)->toBe(BookCopy::STATUS_IN_CIRCULATION)
+        ->and($bookCopy->fresh()->activeLoan()->exists())->toBeFalse();
 });
 
 it('creates a reservation fulfilled notification when reserved book is issued to the same member', function () {
@@ -566,7 +799,7 @@ it('creates a reservation fulfilled notification when reserved book is issued to
         ->and($fulfilledNotification->data['metadata']['branch_name'])->toBe($branch->name);
 });
 
-it('rolls back issued loan and reservation fulfillment if copy status update fails', function () {
+it('fulfills ready reservation without changing copy lifecycle status', function () {
     $library = Library::factory()->create();
     $member = User::factory()->member()->create(['library_id' => $library->id]);
     $book = Book::factory()->create(['title' => 'Rollback rezervacija']);
@@ -586,6 +819,8 @@ it('rolls back issued loan and reservation fulfillment if copy status update fai
         'book_id' => $book->id,
         'user_id' => $member->id,
         'status' => Reservation::STATUS_READY,
+        'assigned_book_copy_id' => $bookCopy->id,
+        'pickup_branch_id' => $branch->id,
         'reserved_at' => now()->subHour(),
         'ready_at' => now()->subMinutes(30),
         'expires_at' => now()->addDays(3),
@@ -593,41 +828,31 @@ it('rolls back issued loan and reservation fulfillment if copy status update fai
         'cancelled_at' => null,
     ]);
 
-    app()->bind(ChangeBookCopyStatusAction::class, fn () => new class extends ChangeBookCopyStatusAction
-    {
-        public function handle(
-            BookCopy $bookCopy,
-            string $toStatus,
-            ?User $changedBy,
-            string $reasonCode,
-            ?string $reasonNotes = null,
-            array $attributes = []
-        ): BookCopy {
-            throw new RuntimeException('Status update failed.');
-        }
-    });
-
-    expect(fn () => app(BorrowBookCopyAction::class)->handle($staff, $bookCopy, [
+    $result = app(BorrowBookCopyAction::class)->handle($staff, $bookCopy, [
         'user_id' => $member->id,
         'due_at' => now()->addDays(14)->toDateString(),
         'no_due_date' => false,
         'notes' => 'Turi atsisukti.',
-    ]))->toThrow(RuntimeException::class);
+    ]);
+    $loan = $result['loan'];
 
-    $this->assertDatabaseMissing('loans', [
+    $this->assertDatabaseHas('loans', [
+        'id' => $loan->id,
         'book_copy_id' => $bookCopy->id,
         'user_id' => $member->id,
+        'returned_at' => null,
     ]);
 
     $this->assertDatabaseHas('reservations', [
         'id' => $reservation->id,
-        'status' => Reservation::STATUS_READY,
-        'fulfilled_at' => null,
+        'status' => Reservation::STATUS_FULFILLED,
     ]);
+
+    expect($reservation->fresh()->fulfilled_at)->not->toBeNull();
 
     $this->assertDatabaseHas('book_copies', [
         'id' => $bookCopy->id,
-        'status' => BookCopy::STATUS_AVAILABLE,
+        'status' => BookCopy::STATUS_IN_CIRCULATION,
     ]);
 });
 
@@ -669,7 +894,7 @@ it('allows issuing an available copy to the member who is first in reservation q
 
     $this->assertDatabaseHas('book_copies', [
         'id' => $bookCopy->id,
-        'status' => BookCopy::STATUS_LOANED,
+        'status' => BookCopy::STATUS_IN_CIRCULATION,
     ]);
 });
 
@@ -685,7 +910,7 @@ it('notifies the member with queue position and due date after a reservation is 
         'book_id' => $book->id,
         'branch_id' => $branch->id,
         'location_id' => $location->id,
-        'status' => BookCopy::STATUS_LOANED,
+        'status' => BookCopy::STATUS_MAINTENANCE,
     ]);
 
     Loan::factory()->create([
@@ -823,14 +1048,14 @@ it('does not move reservation queue notifications across library boundaries', fu
         'book_id' => $book->id,
         'branch_id' => $firstBranch->id,
         'location_id' => $firstLocation->id,
-        'status' => BookCopy::STATUS_LOANED,
+        'status' => BookCopy::STATUS_MAINTENANCE,
     ]);
     BookCopy::factory()->create([
         'library_id' => $secondLibrary->id,
         'book_id' => $book->id,
         'branch_id' => $secondBranch->id,
         'location_id' => $secondLocation->id,
-        'status' => BookCopy::STATUS_LOANED,
+        'status' => BookCopy::STATUS_MAINTENANCE,
     ]);
 
     $firstReservation = Reservation::factory()->create([
@@ -908,7 +1133,7 @@ it('does not create a second active loan when the same copy is borrowed twice', 
         ->where('book_copy_id', $bookCopy->id)
         ->whereNull('returned_at')
         ->count())->toBe(1)
-        ->and($bookCopy->fresh()->status)->toBe(BookCopy::STATUS_LOANED);
+        ->and($bookCopy->fresh()->status)->toBe(BookCopy::STATUS_IN_CIRCULATION);
 });
 
 it('uses the same global queue position in query api and queue change notifications', function () {
@@ -924,7 +1149,7 @@ it('uses the same global queue position in query api and queue change notificati
         'book_id' => $book->id,
         'branch_id' => $branch->id,
         'location_id' => $location->id,
-        'status' => BookCopy::STATUS_LOANED,
+        'status' => BookCopy::STATUS_MAINTENANCE,
     ]);
 
     $reservations = $members->values()->map(function (User $member, int $index) use ($library, $book, $branch) {
@@ -984,7 +1209,7 @@ it('prepares a later serviceable reservation when an earlier reservation cannot 
         'book_id' => $book->id,
         'branch_id' => $branchA->id,
         'location_id' => $locationA->id,
-        'status' => BookCopy::STATUS_LOANED,
+        'status' => BookCopy::STATUS_MAINTENANCE,
     ]);
     BookCopy::factory()->create([
         'library_id' => $library->id,
