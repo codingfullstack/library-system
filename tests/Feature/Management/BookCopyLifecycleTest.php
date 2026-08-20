@@ -1,5 +1,8 @@
 <?php
 
+use App\Actions\Loans\BorrowBookCopyAction;
+use App\Livewire\Manage\BookCopies\BookCopyForm;
+use App\Livewire\Manage\BookCopies\CreateBookCopyPage;
 use App\Models\Book;
 use App\Models\BookCopy;
 use App\Models\Branch;
@@ -9,9 +12,8 @@ use App\Models\Location;
 use App\Models\Reservation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Livewire\Manage\BookCopies\BookCopyForm;
-use App\Livewire\Manage\BookCopies\CreateBookCopyPage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -197,7 +199,7 @@ test('copy page uses lifecycle status for lifecycle actions when operational sta
         ->assertSee('Fizinė būklė')
         ->assertSee('Nauja')
         ->assertSee('Gyvavimo ciklas')
-        ->assertSee('Apyvartoje')
+        ->assertSee('Aktyvi')
         ->assertSee('Perduoti tvarkyti')
         ->assertSee('Pažymėti kaip prarastą')
         ->assertSee('Nurašyti')
@@ -449,12 +451,12 @@ test('maintenance and withdrawn copies can not be borrowed', function () {
         'lifecycle_status' => BookCopy::STATUS_MAINTENANCE,
     ]);
 
-    expect(fn () => app(\App\Actions\Loans\BorrowBookCopyAction::class)->handle($staff, $maintenanceCopy->fresh(), [
+    expect(fn () => app(BorrowBookCopyAction::class)->handle($staff, $maintenanceCopy->fresh(), [
         'user_id' => $member->id,
         'due_at' => now()->addDays(14)->toDateString(),
         'no_due_date' => false,
         'notes' => null,
-    ]))->toThrow(\Illuminate\Validation\ValidationException::class);
+    ]))->toThrow(ValidationException::class);
 
     $withdrawnCopy = BookCopy::factory()->create([
         'library_id' => $library->id,
@@ -467,12 +469,12 @@ test('maintenance and withdrawn copies can not be borrowed', function () {
         'lifecycle_status' => BookCopy::STATUS_WITHDRAWN,
     ]);
 
-    expect(fn () => app(\App\Actions\Loans\BorrowBookCopyAction::class)->handle($staff, $withdrawnCopy->fresh(), [
+    expect(fn () => app(BorrowBookCopyAction::class)->handle($staff, $withdrawnCopy->fresh(), [
         'user_id' => $member->id,
         'due_at' => now()->addDays(14)->toDateString(),
         'no_due_date' => false,
         'notes' => null,
-    ]))->toThrow(\Illuminate\Validation\ValidationException::class);
+    ]))->toThrow(ValidationException::class);
 });
 
 test('book copy lifecycle can not be changed while copy has active loan', function () {

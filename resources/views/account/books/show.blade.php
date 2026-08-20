@@ -1,35 +1,38 @@
 <x-layouts::app :title="$book->title">
     @php
         $visibleCopies = $book->bookCopies;
-        $availableCopies = $visibleCopies->where('status', 'laisva')->count();
-        $loanedCopies = $visibleCopies->whereIn('status', ['išduota', 'vėluoja'])->count();
-        $unavailableCopies = $visibleCopies->whereIn('status', ['prarasta', 'tvarkoma', 'nurašyta'])->count();
+        $availableCopies = (int) ($availability['available_copies_count'] ?? 0);
+        $waitingReservations = (int) ($availability['waiting_reservations_count'] ?? 0);
+        $readyReservations = (int) ($availability['ready_reservations_count'] ?? 0);
+        $canReserve = (bool) ($availability['can_reserve'] ?? false);
+        $hasWaitingQueue = (bool) ($availability['has_waiting_queue'] ?? false);
+        $availabilityLabel = $availability['availability_label'] ?? 'Neprieinama';
+        $availabilityStatus = $availability['availability_status'] ?? 'unavailable';
+        $statusMeta = $availabilityStatus === 'available'
+            ? [
+                'label' => $availabilityLabel,
+                'description' => 'Yra laisvų kopijų: '.$availableCopies,
+                'classes' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
+            ]
+            : [
+                'label' => $availabilityLabel,
+                'description' => $hasWaitingQueue ? 'Šiai knygai yra rezervacijų eilė.' : 'Šiuo metu laisvų kopijų nėra.',
+                'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300',
+            ];
         $copyLibraries = $visibleCopies
             ->groupBy('library_id')
-            ->map(function ($copies) {
+            ->map(function ($copies) use ($availabilityStatus, $availabilityLabel) {
                 $library = $copies->first()?->library;
-                $available = $copies->where('status', 'laisva')->count();
-                $loaned = $copies->whereIn('status', ['išduota', 'vėluoja'])->count();
 
                 return [
                     'name' => $library?->name ?? 'Biblioteka',
                     'address' => collect([$library?->address, $library?->city])->filter()->join(', '),
-                    'status' => $available > 0
-                        ? ['label' => 'Aktyvi', 'classes' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300']
-                        : ($loaned > 0
-                            ? ['label' => 'Išduota', 'classes' => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300']
-                            : ['label' => 'Neprieinama', 'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300']),
+                    'status' => $availabilityStatus === 'available'
+                        ? ['label' => $availabilityLabel, 'classes' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300']
+                        : ['label' => $availabilityLabel, 'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300'],
                 ];
             })
             ->values();
-
-        $statusMeta = $availableCopies > 0
-            ? ['label' => 'Aktyvi', 'description' => 'Knyga šiuo metu prieinama tavo bibliotekose.', 'classes' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300']
-            : ($loanedCopies > 0
-                ? ['label' => 'Išduota', 'description' => 'Šiuo metu knyga paimta skaitytojų.', 'classes' => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300']
-                : ($unavailableCopies === $visibleCopies->count() && $visibleCopies->isNotEmpty()
-                    ? ['label' => 'Neprieinama', 'description' => 'Knyga šiuo metu neprieinama.', 'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300']
-                    : ['label' => 'Neprieinama', 'description' => $currentReservation ? 'Šiai knygai yra rezervacijų eilė.' : 'Knyga šiuo metu neprieinama.', 'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300']));
     @endphp
 
     <x-ui.page class="max-w-none px-4 py-0 sm:px-6 lg:px-8">
@@ -200,7 +203,7 @@
                                     <livewire:reservations.cancel-reservation-form :reservation="$memberReservation" :key="'member-book-reservation-'.$memberReservation->id" />
                                 </div>
                             </section>
-                        @elseif($loanedCopies > 0)
+                        @elseif($canReserve)
                             <section class="overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                                 <div class="border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
                                     <h2 class="text-lg font-semibold text-zinc-950 dark:text-white">Rezervuoti</h2>
@@ -215,7 +218,7 @@
                                 <div class="p-5">
                                     <div class="flex items-start gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 dark:border-sky-900/40 dark:bg-sky-950/40 dark:text-sky-200">
                                         <flux:icon.information-circle class="mt-0.5 size-5 shrink-0" />
-                                        <span>Ši knyga šiuo metu prieinama tavo bibliotekose, rezervacija nereikalinga.</span>
+                                        <span>Yra laisvų kopijų: {{ $availableCopies }}. Rezervacija nereikalinga.</span>
                                     </div>
                                 </div>
                             </section>
@@ -223,7 +226,7 @@
                             <section class="overflow-hidden rounded-[24px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
                                 <div class="p-5">
                                     <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-200">
-                                        Ši knyga šiuo metu neprieinama.
+                                        Šiuo metu laisvų kopijų nėra.@if($hasWaitingQueue) Šiai knygai yra rezervacijų eilė.@endif
                                     </div>
                                 </div>
                             </section>
@@ -234,7 +237,6 @@
         </div>
     </x-ui.page>
 </x-layouts::app>
-
 
 
 

@@ -5,9 +5,14 @@ namespace App\Queries\Users;
 use App\Models\Loan;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Queries\Reservations\ReservationQueueMetadata;
 
 class GetMemberDashboardDataQuery
 {
+    public function __construct(private readonly ReservationQueueMetadata $queueMetadata)
+    {
+    }
+
     public function handle(User $user): array
     {
         $libraryId = $user->activeLibraryId();
@@ -22,11 +27,11 @@ class GetMemberDashboardDataQuery
             ->limit(5)
             ->get();
 
-        $activeReservations = Reservation::query()
+        $activeReservations = $this->queueMetadata->apply(Reservation::query())
             ->where('user_id', $user->id)
             ->when($libraryId, fn ($query) => $query->where('library_id', $libraryId))
             ->active()
-            ->with(['book:id,slug,title,subtitle,isbn', 'library:id,name', 'pickupBranch:id,name'])
+            ->with(['book:id,slug,title,subtitle,isbn', 'library:id,name', 'branch:id,name', 'pickupBranch:id,name'])
             ->latest('reserved_at')
             ->limit(5)
             ->get();

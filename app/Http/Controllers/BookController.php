@@ -11,6 +11,7 @@ use App\Queries\Management\AuditLogs\GetRecentAuditLogsForBookQuery;
 use App\Services\ReservationQueueDebugService;
 use App\Services\ReservationQueueService;
 use App\Services\SeoService;
+use App\Support\Books\BookAvailability;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -25,6 +26,7 @@ class BookController extends Controller
         GetBookIndexFiltersDataQuery $getBookIndexFiltersDataQuery,
     ): View {
         $actor = $request->user();
+        $isMember = $actor->effectiveRole($actor->activeLibraryId()) === 'narys';
         $filters = [
             'search' => $request->query('search'),
             'category_id' => $request->query('category_id'),
@@ -39,7 +41,7 @@ class BookController extends Controller
         ];
         $books = $getLibraryBooksQuery->handle($actor, $filters);
 
-        return view($actor->effectiveRole($actor->activeLibraryId()) === 'narys' ? 'account.books.index' : 'books.index', array_merge(
+        return view($isMember ? 'account.books.index' : 'books.index', array_merge(
             ['books' => $books],
             $getBookIndexFiltersDataQuery->handle($actor, $filters)
         ));
@@ -61,11 +63,13 @@ class BookController extends Controller
             'copy_status' => $request->query('copy_status'),
             'branch_id' => $request->query('branch_id'),
             'location_id' => $request->query('location_id'),
+            'active_library_only' => $actor->effectiveRole($actor->activeLibraryId()) === 'narys',
         ]);
 
         if ($actor->effectiveRole($actor->activeLibraryId()) === 'narys') {
-            $currentReservation = $book->reservations
-                ->filter(fn ($reservation) => $reservation->isActive())
+            $availability = app(BookAvailability::class)->forBook($book, $actor, $actor->activeLibraryId());
+            $waitingReservation = $book->reservations
+                ->filter(fn ($reservation) => $reservation->isPending())
                 ->sortBy([['created_at', 'asc'], ['id', 'asc']])
                 ->first();
 
@@ -74,8 +78,9 @@ class BookController extends Controller
 
             return view('account.books.show', [
                 'book' => $book,
+                'availability' => $availability,
                 'memberReservation' => $memberReservation,
-                'currentReservation' => $currentReservation,
+                'waitingReservation' => $waitingReservation,
                 'seo' => $this->bookSeo($book, $seoService),
             ]);
         }
@@ -107,7 +112,9 @@ class BookController extends Controller
                 'auditLogs' => $actor?->isSuperAdmin()
                     ? $getRecentAuditLogsForBookQuery->handle($book)
                     : collect(),
-                'reservationQueueDebug' => $reservationQueueDebugService->forBook($book, $actor),
+                'reservationQueueDebug' => config('app.debug') && app()->environment('local') && $actor?->isSuperAdmin()
+                    ? $reservationQueueDebugService->forBook($book, $actor)
+                    : null,
                 'seo' => $this->bookSeo($book, $seoService),
             ],
             $getBookCopyFiltersDataQuery->handle($request->user(), $book)

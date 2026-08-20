@@ -4,18 +4,15 @@
         $canEditBooks = $authUser?->isSuperAdmin();
 
         $visibleCopies = $book->bookCopies;
-        $availableCopies = $visibleCopies->where('status', 'laisva')->count();
-        $loanedCopies = $visibleCopies->where('status', 'išduota')->count();
-        $unavailableCopies = $visibleCopies->whereIn('status', ['prarasta', 'tvarkoma', 'nurašyta'])->count();
-        $hasActiveReservations = $book->reservations->contains(fn ($reservation) => $reservation->isActive());
-        $activeReservationsCount = $book->reservations->filter(fn ($reservation) => $reservation->isActive())->count();
-        $hasOnlyUnavailableCopies = $visibleCopies->isNotEmpty() && $unavailableCopies === $visibleCopies->count();
+        $availableCopies = (int) ($book->available_copies_count ?? 0);
+        $loanedCopies = (int) ($book->loaned_copies_count ?? $visibleCopies->filter(fn ($copy) => $copy->activeLoan !== null)->count());
+        $unavailableCopies = (int) ($book->unavailable_copies_count ?? $visibleCopies->filter(fn ($copy) => ! $copy->isInCirculation())->count());
+        $activeReservationsCount = (int) ($book->active_reservations_count ?? $book->reservations->filter(fn ($reservation) => $reservation->isActive())->count());
+        $readyReservationsCount = (int) ($book->ready_reservations_count ?? $book->reservations->filter(fn ($reservation) => $reservation->isReady())->count());
+        $waitingReservationsCount = (int) ($book->waiting_reservations_count ?? $book->reservations->filter(fn ($reservation) => $reservation->isPending())->count());
 
         [$availabilityLabel, $availabilityClasses] = match (true) {
-            $availableCopies > 0 => ['Aktyvi', 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'],
-            $loanedCopies > 0 => ['Išduota', 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'],
-            $hasOnlyUnavailableCopies => ['Neprieinama', 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300'],
-            $hasActiveReservations => ['Rezervuojama', 'bg-violet-100 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300'],
+            $availableCopies > 0 => ['Galima', 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'],
             default => ['Neprieinama', 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300'],
         };
 

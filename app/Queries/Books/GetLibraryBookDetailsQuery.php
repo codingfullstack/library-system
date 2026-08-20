@@ -23,7 +23,7 @@ class GetLibraryBookDetailsQuery
     {
         $user?->loadMissing('libraryMemberships');
 
-        $libraryIds = $this->visibleLibraryIds($user);
+        $libraryIds = $this->visibleLibraryIds($user, $filters);
 
         $hasVisibleCopies = $book->bookCopies()
             ->when(is_array($libraryIds), fn ($query) => $query
@@ -78,7 +78,7 @@ class GetLibraryBookDetailsQuery
                     ->orderBy('created_at')
                     ->orderBy('id');
             },
-            'bookCopies' => function ($q) use ($libraryIds, $copyStatus, $copyLifecycle, $copySearch, $branchId, $locationId, $user) {
+            'bookCopies' => function ($q) use ($libraryIds, $copyStatus, $copyLifecycle, $copySearch, $branchId, $locationId) {
                 $q->when(is_array($libraryIds), fn ($copyQuery) => $copyQuery
                     ->withoutGlobalScope('library')
                     ->whereIn('library_id', $libraryIds))
@@ -153,6 +153,11 @@ class GetLibraryBookDetailsQuery
         });
 
         $book->loadCount([
+            'bookCopies as total_copies_count' => function ($q) use ($libraryIds) {
+                if (is_array($libraryIds)) {
+                    $q->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
+                }
+            },
             'bookCopies as copies_count' => function ($q) use ($libraryIds) {
                 if (is_array($libraryIds)) {
                     $q->withoutGlobalScope('library')->whereIn('library_id', $libraryIds);
@@ -177,6 +182,36 @@ class GetLibraryBookDetailsQuery
                 }
 
                 $q->where('user_id', $user->id)->active();
+            },
+            'reservations as active_reservations_count' => function ($q) use ($libraryIds) {
+                if (is_array($libraryIds)) {
+                    $q->whereIn('library_id', $libraryIds);
+                }
+
+                $q->active();
+            },
+            'reservations as ready_reservations_count' => function ($q) use ($libraryIds) {
+                if (is_array($libraryIds)) {
+                    $q->whereIn('library_id', $libraryIds);
+                }
+
+                $q->where('status', Reservation::STATUS_READY)
+                    ->whereNull('fulfilled_at')
+                    ->whereNull('cancelled_at');
+            },
+            'reservations as waiting_reservations_count' => function ($q) use ($libraryIds) {
+                if (is_array($libraryIds)) {
+                    $q->whereIn('library_id', $libraryIds);
+                }
+
+                $q->pending();
+            },
+            'reservations as pending_reservations_count' => function ($q) use ($libraryIds) {
+                if (is_array($libraryIds)) {
+                    $q->whereIn('library_id', $libraryIds);
+                }
+
+                $q->pending();
             },
             'loans as current_user_active_loans_count' => function ($q) use ($libraryIds, $user) {
                 if ($user?->effectiveRole($user->activeLibraryId()) !== User::ROLE_MEMBER) {
@@ -206,7 +241,7 @@ class GetLibraryBookDetailsQuery
     /**
      * @return list<int>|null
      */
-    private function visibleLibraryIds(?User $user): ?array
+    private function visibleLibraryIds(?User $user, array $filters = []): ?array
     {
         if ($user === null) {
             return Library::query()
@@ -221,7 +256,7 @@ class GetLibraryBookDetailsQuery
             return null;
         }
 
-        if ($user->effectiveRole($user->activeLibraryId()) === 'narys') {
+        if ($user->effectiveRole($user->activeLibraryId()) === User::ROLE_MEMBER && ! ($filters['active_library_only'] ?? false)) {
             return $user->manageableLibraryIds();
         }
 

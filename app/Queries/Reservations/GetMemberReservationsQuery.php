@@ -7,10 +7,13 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 
 class GetMemberReservationsQuery
 {
+    public function __construct(private readonly ReservationQueueMetadata $queueMetadata)
+    {
+    }
+
     public function handle(User $user, array $filters = []): LengthAwarePaginator
     {
         $search = trim((string) ($filters['search'] ?? ''));
@@ -20,13 +23,7 @@ class GetMemberReservationsQuery
         $libraryId = $user->activeLibraryId();
         $reservationDateRange = $this->dateRange($reservationDate);
 
-        $queuePositionSubquery = $this->queuePositionSubquery();
-        $queueSizeSubquery = $this->queueSizeSubquery();
-
-        $query = Reservation::query()
-            ->select('reservations.*')
-            ->selectSub($queuePositionSubquery, 'queue_position')
-            ->selectSub($queueSizeSubquery, 'queue_size')
+        $query = $this->queueMetadata->apply(Reservation::query())
             ->where('user_id', $user->id)
             ->when($libraryId, fn ($builder) => $builder->where('library_id', $libraryId))
             ->with([
@@ -114,32 +111,4 @@ class GetMemberReservationsQuery
         return [$parsedDate->startOfDay(), $parsedDate->endOfDay()];
     }
 
-    private function queuePositionSubquery()
-    {
-        return DB::table('reservations as queue_reservations')
-            ->selectRaw('COUNT(*)')
-            ->whereColumn('queue_reservations.book_id', 'reservations.book_id')
-            ->whereColumn('queue_reservations.library_id', 'reservations.library_id')
-            ->where('queue_reservations.status', Reservation::STATUS_WAITING)
-            ->whereNull('queue_reservations.fulfilled_at')
-            ->whereNull('queue_reservations.cancelled_at')
-            ->where(function ($queueQuery) {
-                $queueQuery->whereColumn('queue_reservations.created_at', '<', 'reservations.created_at')
-                    ->orWhere(function ($sameTimeQuery) {
-                        $sameTimeQuery->whereColumn('queue_reservations.created_at', '=', 'reservations.created_at')
-                            ->whereColumn('queue_reservations.id', '<=', 'reservations.id');
-                    });
-            });
-    }
-
-    private function queueSizeSubquery()
-    {
-        return DB::table('reservations as queue_reservations')
-            ->selectRaw('COUNT(*)')
-            ->whereColumn('queue_reservations.book_id', 'reservations.book_id')
-            ->whereColumn('queue_reservations.library_id', 'reservations.library_id')
-            ->where('queue_reservations.status', Reservation::STATUS_WAITING)
-            ->whereNull('queue_reservations.fulfilled_at')
-            ->whereNull('queue_reservations.cancelled_at');
-    }
 }
