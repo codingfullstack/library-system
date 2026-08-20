@@ -17,10 +17,19 @@ if ([string]::IsNullOrWhiteSpace($CodexPath)) {
 
 if ([string]::IsNullOrWhiteSpace($BaseRef)) {
     $defaultBranch = Get-DefaultBranchName -Repo $repo
-    $BaseRef = "origin/$defaultBranch"
+    $currentBranch = Get-CurrentBranch -Repo $repo
+
+    if ($currentBranch -ne $defaultBranch) {
+        throw "Cannot choose default task base from branch '$currentBranch'. Repository default branch is '$defaultBranch'. Switch the coordination worktree to '$defaultBranch' or pass -BaseRef explicitly."
+    }
+
+    $baseSha = Get-HeadSha -Repo $repo
+    $BaseRef = $baseSha
+} else {
+    $baseSha = Resolve-CommitSha -Repo $repo -Ref $BaseRef
 }
 
-Invoke-Git -Repo $repo -Arguments @('rev-parse', '--verify', "$BaseRef^{commit}") | Out-Null
+$baseSha = Resolve-CommitSha -Repo $repo -Ref $BaseRef
 
 if (Test-BranchCheckedOutElsewhere -Repo $repo -BranchName $BranchName -AllowedPath $CodexPath) {
     throw "Branch '$BranchName' is already checked out in another worktree."
@@ -50,6 +59,14 @@ if ($branchExists) {
     Invoke-Git -Repo $repo -Arguments @('worktree', 'add', '-b', $BranchName, $CodexPath, $BaseRef) | Out-Null
 }
 
+$statePath = Write-WorkflowState -Repo $CodexPath -State @{
+    branch = $BranchName
+    base_ref = $BaseRef
+    base_sha = $baseSha
+}
+
 Write-Output "Codex workspace: $CodexPath"
 Write-Output "Branch: $BranchName"
 Write-Output "Base: $BaseRef"
+Write-Output "Base SHA: $baseSha"
+Write-Output "State: $statePath"

@@ -33,7 +33,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ai/ai-finish-task.ps
 ## Normal Flow
 
 1. Human starts from a clean human workspace.
-2. `ai-start-task` creates or verifies `../library-system-codex` on a task branch based on the default branch.
+2. `ai-start-task` creates or verifies `../library-system-codex` on a task branch. When `-BaseRef` is omitted, the coordination worktree must be clean and checked out on the repository default branch; the task branch is created from that local default-branch `HEAD`, not from `origin/main`.
 3. Codex implements, tests, and commits the feature branch.
 4. Codex writes test results to `.ai/runtime/TEST_RESULTS.md` in the Codex workspace.
 5. `ai-prepare-review` creates `.ai/runtime/HANDOFF.md`, computes the base and reviewed commit, and prepares `../library-system-claude-review` as detached HEAD at the reviewed commit.
@@ -53,6 +53,18 @@ The handoff must include:
 - `.ai/runtime/HANDOFF.md`
 
 Runtime handoff and review files are ignored by Git and must not be committed.
+
+## Task Base Selection
+
+Default task base is the clean local default-branch `HEAD`. This allows local, reviewed workflow commits to be used before they are pushed.
+
+`origin/main` is not used automatically as the task base. To start from any other commit or ref, pass `-BaseRef` explicitly:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ai/ai-start-task.ps1 -BranchName feature/my-task -BaseRef origin/main
+```
+
+`ai-start-task` writes `.ai/runtime/STATE.json` in the Codex worktree with `base_ref` and immutable `base_sha`.
 
 ## Git Ownership In Sandboxed Runs
 

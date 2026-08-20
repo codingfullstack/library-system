@@ -63,6 +63,16 @@ function Get-HeadSha {
     return [string] $sha[0]
 }
 
+function Resolve-CommitSha {
+    param(
+        [Parameter(Mandatory = $true)][string] $Repo,
+        [Parameter(Mandatory = $true)][string] $Ref
+    )
+
+    $sha = @(Invoke-Git -Repo $Repo -Arguments @('rev-parse', '--verify', "$Ref^{commit}"))
+    return [string] $sha[0]
+}
+
 function Assert-CleanGit {
     param([Parameter(Mandatory = $true)][string] $Repo)
 
@@ -149,4 +159,17 @@ function Ensure-RuntimeDirectory {
     $runtime = Join-Path $Repo '.ai/runtime'
     New-Item -ItemType Directory -Force -Path $runtime | Out-Null
     return $runtime
+}
+
+function Write-WorkflowState {
+    param(
+        [Parameter(Mandatory = $true)][string] $Repo,
+        [Parameter(Mandatory = $true)][hashtable] $State
+    )
+
+    $runtime = Ensure-RuntimeDirectory -Repo $Repo
+    $statePath = Join-Path $runtime 'STATE.json'
+    $State | ConvertTo-Json -Depth 5 | Set-Content -Path $statePath -Encoding UTF8
+
+    return $statePath
 }
