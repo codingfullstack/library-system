@@ -273,6 +273,19 @@ components:
         last_page: { type: integer }
         per_page: { type: integer }
         total: { type: integer }
+    BookPaginationMeta:
+      allOf:
+        - $ref: "#/components/schemas/PaginationMeta"
+        - type: object
+          required: [summary]
+          properties:
+            summary: { $ref: "#/components/schemas/BookListSummary" }
+    BookListSummary:
+      type: object
+      required: [total_copies, available_copies]
+      properties:
+        total_copies: { type: integer }
+        available_copies: { type: integer }
     AuthUser:
       type: object
       required: [id, library_id, library_name, branch_id, branch_name, name, email, role, global_role, phone, membership_number, is_active]
@@ -291,7 +304,7 @@ components:
         is_active: { type: boolean }
     Book:
       type: object
-      required: [id, slug, title, subtitle, isbn, description, cover_image, publication_year, language, page_count, copies_count, available_copies_count, is_available, can_reserve, display_status]
+      required: [id, slug, title, subtitle, isbn, description, cover_image, publication_year, language, page_count, total_copies_count, copies_count, available_copies_count, active_reservations_count, ready_reservations_count, waiting_reservations_count, is_available, can_reserve, cannot_reserve_reason, display_status, availability_status, availability_label, availability_reason, has_waiting_queue, has_reservation_queue, reservation_queue_size, current_user_reservation, current_user_queue_position]
       properties:
         id: { type: integer }
         slug: { type: string }
@@ -303,16 +316,40 @@ components:
         publication_year: { type: integer, nullable: true }
         language: { type: string, nullable: true }
         page_count: { type: integer, nullable: true }
+        total_copies_count: { type: integer }
         copies_count: { type: integer }
-        available_copies_count: { type: integer, nullable: true }
+        available_copies_count: { type: integer }
+        active_reservations_count: { type: integer }
+        ready_reservations_count: { type: integer }
+        waiting_reservations_count: { type: integer }
         is_available: { type: boolean }
         can_reserve: { type: boolean }
+        cannot_reserve_reason: { type: string, nullable: true }
         display_status: { type: string }
+        availability_status: { type: string, enum: [available, unavailable] }
+        availability_label: { type: string }
+        availability_reason: { type: string, nullable: true }
+        has_waiting_queue: { type: boolean }
+        has_reservation_queue: { type: boolean }
+        reservation_queue_size: { type: integer }
+        current_user_reservation:
+          type: object
+          nullable: true
+          required: [id, status, is_pending, is_ready, queue_position, pickup_branch_id, assigned_book_copy_id]
+          properties:
+            id: { type: integer }
+            status: { type: string }
+            is_pending: { type: boolean }
+            is_ready: { type: boolean }
+            queue_position: { type: integer, nullable: true }
+            pickup_branch_id: { type: integer, nullable: true }
+            assigned_book_copy_id: { type: integer, nullable: true }
+        current_user_queue_position: { type: integer, nullable: true }
     BookDetails:
       allOf:
         - $ref: "#/components/schemas/Book"
         - type: object
-          required: [edition, publisher, category, categories, authors, reservations, book_copies]
+          required: [edition, publisher, category, categories, authors, reservations, branch_availability, book_copies]
           properties:
             edition: { type: string, nullable: true }
             publisher: { $ref: "#/components/schemas/NamedEntityNullable" }
@@ -320,6 +357,16 @@ components:
             categories: { type: array, items: { $ref: "#/components/schemas/NamedEntity" } }
             authors: { type: array, items: { $ref: "#/components/schemas/NamedEntity" } }
             reservations: { type: array, items: { $ref: "#/components/schemas/Reservation" } }
+            branch_availability:
+              type: array
+              items:
+                type: object
+                required: [branch_id, branch_name, total_copies_count, available_copies_count]
+                properties:
+                  branch_id: { type: integer, nullable: true }
+                  branch_name: { type: string }
+                  total_copies_count: { type: integer }
+                  available_copies_count: { type: integer }
             book_copies: { type: array, items: { $ref: "#/components/schemas/BookCopy" } }
     BookCopy:
       type: object
@@ -410,7 +457,7 @@ components:
       properties:
         data: { type: array, items: { $ref: "#/components/schemas/Book" } }
         links: { $ref: "#/components/schemas/PaginationLinks" }
-        meta: { $ref: "#/components/schemas/PaginationMeta" }
+        meta: { $ref: "#/components/schemas/BookPaginationMeta" }
     PaginatedReservations:
       type: object
       required: [data, links, meta, summary]

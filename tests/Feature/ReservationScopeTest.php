@@ -648,8 +648,74 @@ it('shows member search results even when the current reservation scope is block
         ->assertDontSee('Narių pagal šią paiešką nerasta.');
 });
 
+it('refreshes the member book details page after creating a reservation from the web form', function () {
+    $fixture = reservationScopeFixture();
+
+    Livewire::actingAs($fixture['member'])
+        ->test(CreateReservationForm::class, ['book' => $fixture['book']])
+        ->set('scope', Reservation::SCOPE_LIBRARY)
+        ->call('save')
+        ->assertRedirect(route('books.show', ['book' => $fixture['book']]));
+
+    $reservation = Reservation::query()
+        ->where('library_id', $fixture['library']->id)
+        ->where('book_id', $fixture['book']->id)
+        ->where('user_id', $fixture['member']->id)
+        ->active()
+        ->first();
+
+    expect($reservation)->not->toBeNull()
+        ->and($reservation->scope)->toBe(Reservation::SCOPE_LIBRARY)
+        ->and($reservation->branch_id)->toBeNull();
+
+    $this->actingAs($fixture['member'])
+        ->get(route('books.show', ['book' => $fixture['book']]))
+        ->assertOk()
+        ->assertSee('Tavo rezervacija')
+        ->assertSee('Laukianti eilėje')
+        ->assertSee('Vieta eilėje')
+        ->assertSee('Visa biblioteka')
+        ->assertSee('Atšaukti')
+        ->assertDontSee('Rezervuoti sau');
+});
+
+it('stores the exact selected branch after member web branch reservation submit', function () {
+    $fixture = reservationScopeFixture();
+
+    Livewire::actingAs($fixture['member'])
+        ->test(CreateReservationForm::class, ['book' => $fixture['book']])
+        ->set('scope', Reservation::SCOPE_BRANCH)
+        ->set('branchId', (string) $fixture['branchA']->id)
+        ->call('save')
+        ->assertRedirect(route('books.show', ['book' => $fixture['book']]));
+
+    $reservation = Reservation::query()
+        ->where('library_id', $fixture['library']->id)
+        ->where('book_id', $fixture['book']->id)
+        ->where('user_id', $fixture['member']->id)
+        ->active()
+        ->first();
+
+    expect($reservation)->not->toBeNull()
+        ->and($reservation->scope)->toBe(Reservation::SCOPE_BRANCH)
+        ->and((int) $reservation->branch_id)->toBe((int) $fixture['branchA']->id);
+
+    $this->actingAs($fixture['member'])
+        ->get(route('books.show', ['book' => $fixture['book']]))
+        ->assertOk()
+        ->assertSee('Tavo rezervacija')
+        ->assertSee('Konkretus filialas')
+        ->assertSee($fixture['branchA']->name)
+        ->assertSee('Atšaukti')
+        ->assertDontSee('Rezervuoti sau');
+});
+
 it('shows copy reservation details on the web book details page', function () {
     $fixture = reservationScopeFixture();
+    $fixture['copyA']->update([
+        'status' => BookCopy::STATUS_IN_CIRCULATION,
+        'lifecycle_status' => BookCopy::STATUS_IN_CIRCULATION,
+    ]);
 
     Reservation::factory()->create([
         'library_id' => $fixture['library']->id,

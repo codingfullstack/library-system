@@ -147,6 +147,14 @@ class CreateReservationForm extends Component
         $this->notes = '';
         $this->successMessage = 'Rezervacija sėkmingai sukurta.';
 
+        if ($actor->effectiveRole($actor->activeLibraryId()) === User::ROLE_MEMBER) {
+            $book = Book::query()->find($this->bookId);
+
+            return redirect()
+                ->route('books.show', ['book' => $book ?: $this->bookId])
+                ->with('success', $this->successMessage);
+        }
+
         $this->dispatch('reservation-created', bookId: $this->bookId);
 
         return null;

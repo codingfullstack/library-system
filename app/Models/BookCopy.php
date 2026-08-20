@@ -3,11 +3,11 @@
 namespace App\Models;
 
 use App\Concerns\BelongsToLibrary;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Builder;
 
 class BookCopy extends Model
 {
@@ -156,7 +156,7 @@ class BookCopy extends Model
     {
         return [
             self::STATUS_PREPARING => 'Ruošiama',
-            self::STATUS_IN_CIRCULATION => 'Apyvartoje',
+            self::STATUS_IN_CIRCULATION => 'Aktyvi',
             self::STATUS_LOST => 'Prarasta',
             self::STATUS_MAINTENANCE => 'Tvarkoma',
             self::STATUS_WITHDRAWN => 'Nurašyta',
@@ -174,12 +174,12 @@ class BookCopy extends Model
     {
         return [
             'laisva' => 'Laisva',
-            'paskolinta' => 'Paskolinta',
-            'rezervuota' => 'Rezervuota',
-            self::STATUS_PREPARING => 'Ruošiama',
-            self::STATUS_LOST => 'Prarasta',
-            self::STATUS_MAINTENANCE => 'Tvarkoma',
-            self::STATUS_WITHDRAWN => 'Nurašyta',
+            'paskolinta' => 'Išduota',
+            'rezervuota' => 'Paruošta atsiimti',
+            self::STATUS_PREPARING => 'Neprieinama',
+            self::STATUS_LOST => 'Neprieinama',
+            self::STATUS_MAINTENANCE => 'Neprieinama',
+            self::STATUS_WITHDRAWN => 'Neprieinama',
         ];
     }
 
@@ -234,9 +234,9 @@ class BookCopy extends Model
     {
         return match ($this->operationalStatus()) {
             'laisva' => 'Laisva',
-            'paskolinta' => 'Paskolinta',
-            'rezervuota' => 'Rezervuota',
-            default => $this->lifecycleStatusLabel(),
+            'paskolinta' => 'Išduota',
+            'rezervuota' => 'Paruošta atsiimti',
+            default => 'Neprieinama',
         };
     }
 

@@ -225,8 +225,18 @@ it('matches book details and book copy contracts', function () {
     apiContractAssertObjectMatchesSchema($copyPayload, 'BookCopy');
 });
 
-it('matches paginated reservation loan and notification contracts', function () {
+it('matches paginated book reservation loan and notification contracts', function () {
     ['admin' => $admin, 'member' => $member] = apiContractSeedFixture();
+
+    $books = $this->actingAs($admin)
+        ->getJson('/api/auth/books?per_page=1')
+        ->assertOk()
+        ->json();
+
+    expect($books)->toHaveKeys(apiContractSchema('PaginatedBooks')['required']);
+    apiContractAssertObjectMatchesSchema($books['data'][0], 'Book');
+    apiContractAssertObjectMatchesSchema($books['links'], 'PaginationLinks');
+    apiContractAssertObjectMatchesSchema($books['meta'], 'BookPaginationMeta');
 
     $reservations = $this->actingAs($admin)
         ->getJson('/api/auth/reservations?per_page=1')

@@ -69,7 +69,7 @@
                             <div class="xl:min-w-0">
                                 <select id="availability" name="availability" class="app-input h-11 rounded-2xl border-zinc-200 bg-zinc-50 shadow-none dark:border-zinc-700 dark:bg-zinc-950">
                                     <option value="">Būsena</option>
-                                    <option value="laisva" @selected(request('availability') === 'laisva')>Aktyvi</option>
+                                    <option value="laisva" @selected(request('availability') === 'laisva')>Galima</option>
                                     <option value="unavailable" @selected(request('availability') === 'unavailable')>Neprieinama</option>
                                 </select>
                             </div>
@@ -110,6 +110,15 @@
                                         @php
                                             $authorsList = $book->authors->pluck('name')->filter()->values();
                                             $categoriesList = $book->categories->pluck('name')->filter()->values();
+                                            $activeLibraryId = auth()->user()?->activeLibraryId();
+                                            $detailLibraryId = optional(
+                                                $book->bookCopies->firstWhere('library_id', $activeLibraryId)
+                                                    ?: $book->bookCopies->first()
+                                            )->library_id;
+                                            $bookShowRoute = route('books.show', array_filter([
+                                                'book' => $book,
+                                                'library_id' => $detailLibraryId,
+                                            ]));
                                             $librariesList = $book->bookCopies
                                                 ->pluck('library')
                                                 ->filter()
@@ -121,10 +130,8 @@
                                                 })
                                                 ->values();
                                             $statusMeta = $book->available_copies_count > 0
-                                                ? ['label' => 'Aktyvi', 'classes' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300']
-                                                : ($book->loaned_copies_count > 0
-                                                    ? ['label' => 'Išduota', 'classes' => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300']
-                                                    : ['label' => 'Neprieinama', 'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300']);
+                                                ? ['label' => 'Galima', 'classes' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300']
+                                                : ['label' => 'Neprieinama', 'classes' => 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300'];
                                         @endphp
                                         <tr class="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40">
                                             <td class="px-4 py-4 align-middle">
@@ -137,7 +144,7 @@
                                                         @endif
                                                     </div>
                                                     <div class="min-w-0">
-                                                        <a href="{{ route('books.show', $book) }}" class="font-semibold text-zinc-950 transition hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">
+                                                        <a href="{{ $bookShowRoute }}" class="font-semibold text-zinc-950 transition hover:text-emerald-700 dark:text-white dark:hover:text-emerald-300">
                                                             {{ $book->title }}
                                                         </a>
                                                         <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{{ $book->isbn ?: '-' }}</div>

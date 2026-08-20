@@ -5,19 +5,20 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\BookDetailsResource;
 use App\Http\Resources\BookResource;
-use App\Models\BookCopy;
 use App\Models\Book;
+use App\Models\BookCopy;
 use App\Queries\Books\GetLibraryBookDetailsQuery;
 use App\Queries\Books\GetLibraryBooksQuery;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class BookController extends Controller
 {
-    public function index(Request $request, GetLibraryBooksQuery $getLibraryBooksQuery): AnonymousResourceCollection
+    public function index(Request $request, GetLibraryBooksQuery $getLibraryBooksQuery): JsonResponse
     {
+        $this->ensureCatalogContext($request);
+
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:120'],
             'category_id' => ['nullable', 'integer', 'exists:categories,id'],
@@ -32,7 +33,7 @@ class BookController extends Controller
             'scope_to_assigned_branch' => ['nullable', 'boolean'],
         ]);
 
-        $books = $getLibraryBooksQuery->handle($request->user(), [
+        $filters = [
             'search' => $validated['search'] ?? null,
             'category_id' => $validated['category_id'] ?? null,
             'author_id' => $validated['author_id'] ?? null,
@@ -43,9 +44,15 @@ class BookController extends Controller
             'direction' => $validated['direction'] ?? 'asc',
             'per_page' => $validated['per_page'] ?? 25,
             'scope_to_assigned_branch' => $request->boolean('scope_to_assigned_branch'),
-        ]);
+            'active_library_only' => true,
+        ];
 
-        return BookResource::collection($books);
+        $books = $getLibraryBooksQuery->handle($request->user(), $filters);
+        $summary = $getLibraryBooksQuery->summary($request->user(), $filters);
+        $response = BookResource::collection($books)->response($request)->getData(true);
+        $response['meta']['summary'] = $summary;
+
+        return response()->json($response);
     }
 
     public function show(
@@ -53,6 +60,8 @@ class BookController extends Controller
         Book $book,
         GetLibraryBookDetailsQuery $getLibraryBookDetailsQuery
     ): JsonResponse {
+        $this->ensureCatalogContext($request);
+
         $validated = $request->validate([
             'copy_status' => ['nullable', Rule::in(array_keys(BookCopy::statusLabels()))],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
@@ -63,10 +72,18 @@ class BookController extends Controller
             'copy_status' => $validated['copy_status'] ?? null,
             'branch_id' => $validated['branch_id'] ?? null,
             'location_id' => $validated['location_id'] ?? null,
+            'active_library_only' => true,
         ]);
 
         return response()->json(
             (new BookDetailsResource($book))->resolve()
         );
+    }
+
+    private function ensureCatalogContext(Request $request): void
+    {
+        $user = $request->user();
+
+        abort_unless($user && ($user->isSuperAdmin() || $user->activeLibraryId()), 403, 'Neturite aktyvios narystes bibliotekos katalogui.');
     }
 }

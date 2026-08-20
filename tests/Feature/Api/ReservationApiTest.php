@@ -104,6 +104,70 @@ it('returns waiting and ready reservations for the active api filter', function 
         ->not->toContain($expiredReservation->id);
 });
 
+it('returns queue metadata consistently on the member dashboard and reservations list', function () {
+    $library = Library::factory()->create();
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create(['title' => 'Dashboard eile']);
+    $readyBook = Book::factory()->create(['title' => 'Dashboard paruošta']);
+    $pickupBranch = Branch::factory()->create(['library_id' => $library->id, 'name' => 'Centras']);
+
+    foreach (range(1, 10) as $index) {
+        Reservation::factory()->create([
+            'library_id' => $library->id,
+            'book_id' => $book->id,
+            'user_id' => User::factory()->member()->create(['library_id' => $library->id])->id,
+            'status' => Reservation::STATUS_WAITING,
+            'reserved_at' => now()->subHours(12 - $index),
+            'created_at' => now()->subHours(12 - $index),
+            'expires_at' => null,
+        ]);
+    }
+
+    $waitingReservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'user_id' => $member->id,
+        'status' => Reservation::STATUS_WAITING,
+        'reserved_at' => now()->subHour(),
+        'created_at' => now()->subHour(),
+        'expires_at' => null,
+    ]);
+    $readyReservation = Reservation::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $readyBook->id,
+        'user_id' => $member->id,
+        'pickup_branch_id' => $pickupBranch->id,
+        'status' => Reservation::STATUS_READY,
+        'reserved_at' => now(),
+        'ready_at' => now(),
+        'expires_at' => now()->addDays(7),
+        'fulfilled_at' => null,
+        'cancelled_at' => null,
+    ]);
+
+    $dashboard = $this->actingAs($member)
+        ->getJson('/api/auth/member/dashboard')
+        ->assertOk();
+
+    $dashboardReservations = collect($dashboard->json('active_reservations'));
+    $dashboardWaiting = $dashboardReservations->firstWhere('book.title', 'Dashboard eile');
+    $dashboardReady = $dashboardReservations->firstWhere('book.title', 'Dashboard paruošta');
+
+    $reservations = $this->actingAs($member)
+        ->getJson('/api/auth/reservations?status=active&per_page=20')
+        ->assertOk();
+
+    $listWaiting = collect($reservations->json('data'))->firstWhere('id', $waitingReservation->id);
+
+    expect($dashboardWaiting['queue_position'])->toBe(11)
+        ->and($dashboardWaiting['queue_size'])->toBe(11)
+        ->and($dashboardWaiting['queue_position'])->toBe($listWaiting['queue_position'])
+        ->and($dashboardWaiting['queue_size'])->toBe($listWaiting['queue_size'])
+        ->and($dashboardReady['queue_position'])->toBeNull()
+        ->and($dashboardReady['queue_size'])->toBeNull()
+        ->and($readyReservation->exists)->toBeTrue();
+});
+
 it('accepts canonical reservation status constants in api filters', function () {
     $library = Library::factory()->create();
     $branch = Branch::factory()->create(['library_id' => $library->id]);
@@ -331,6 +395,142 @@ it('matches can cancel with the cancellation action for inactive reservations', 
     $this->actingAs($member)
         ->patchJson('/api/auth/reservations/'.$reservation->id.'/cancel')
         ->assertUnprocessable();
+});
+
+it('keeps duplicate reservation creation as a 422 api validation error', function () {
+    $library = Library::factory()->create();
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create();
+
+    BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_MAINTENANCE,
+        'lifecycle_status' => BookCopy::STATUS_MAINTENANCE,
+    ]);
+
+    $payload = [
+        'book_id' => $book->id,
+        'scope' => Reservation::SCOPE_LIBRARY,
+    ];
+
+    $this->actingAs($member)
+        ->postJson('/api/auth/reservations', $payload)
+        ->assertCreated();
+
+    $this->actingAs($member)
+        ->postJson('/api/auth/reservations', $payload)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['book_id']);
+});
+
+it('forbids api reservation creation for a book outside the member library', function () {
+    $memberLibrary = Library::factory()->create();
+    $otherLibrary = Library::factory()->create();
+    $otherBranch = Branch::factory()->create(['library_id' => $otherLibrary->id]);
+    $otherLocation = Location::factory()->create(['library_id' => $otherLibrary->id, 'branch_id' => $otherBranch->id]);
+    $member = User::factory()->member()->create(['library_id' => $memberLibrary->id]);
+    $otherBook = Book::factory()->create();
+
+    BookCopy::factory()->create([
+        'library_id' => $otherLibrary->id,
+        'book_id' => $otherBook->id,
+        'branch_id' => $otherBranch->id,
+        'location_id' => $otherLocation->id,
+        'status' => BookCopy::STATUS_MAINTENANCE,
+        'lifecycle_status' => BookCopy::STATUS_MAINTENANCE,
+    ]);
+
+    $this->actingAs($member)
+        ->postJson('/api/auth/reservations', [
+            'book_id' => $otherBook->id,
+            'scope' => Reservation::SCOPE_LIBRARY,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['book_id']);
+});
+
+it('rejects branch scoped api reservation without a branch id', function () {
+    $library = Library::factory()->create();
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create();
+
+    BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_MAINTENANCE,
+        'lifecycle_status' => BookCopy::STATUS_MAINTENANCE,
+    ]);
+
+    $this->actingAs($member)
+        ->postJson('/api/auth/reservations', [
+            'book_id' => $book->id,
+            'scope' => Reservation::SCOPE_BRANCH,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['branch_id']);
+});
+
+it('rejects branch scoped api reservation for a branch outside the member library', function () {
+    $library = Library::factory()->create();
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $otherLibrary = Library::factory()->create();
+    $otherBranch = Branch::factory()->create(['library_id' => $otherLibrary->id]);
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create();
+
+    BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_MAINTENANCE,
+        'lifecycle_status' => BookCopy::STATUS_MAINTENANCE,
+    ]);
+
+    $this->actingAs($member)
+        ->postJson('/api/auth/reservations', [
+            'book_id' => $book->id,
+            'scope' => Reservation::SCOPE_BRANCH,
+            'branch_id' => $otherBranch->id,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['branch_id']);
+});
+
+it('rejects branch scoped api reservation for a missing branch id', function () {
+    $library = Library::factory()->create();
+    $branch = Branch::factory()->create(['library_id' => $library->id]);
+    $location = Location::factory()->create(['library_id' => $library->id, 'branch_id' => $branch->id]);
+    $member = User::factory()->member()->create(['library_id' => $library->id]);
+    $book = Book::factory()->create();
+
+    BookCopy::factory()->create([
+        'library_id' => $library->id,
+        'book_id' => $book->id,
+        'branch_id' => $branch->id,
+        'location_id' => $location->id,
+        'status' => BookCopy::STATUS_MAINTENANCE,
+        'lifecycle_status' => BookCopy::STATUS_MAINTENANCE,
+    ]);
+
+    $this->actingAs($member)
+        ->postJson('/api/auth/reservations', [
+            'book_id' => $book->id,
+            'scope' => Reservation::SCOPE_BRANCH,
+            'branch_id' => 999999,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['branch_id']);
 });
 
 it('orders api reservations by creation date descending', function () {

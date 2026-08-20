@@ -20,6 +20,7 @@ class AttachCurrentReservationForCopies
 
         $eligibleCopies = $copies
             ->filter(fn (BookCopy $copy) => $copy->book_id && $copy->library_id)
+            ->filter(fn (BookCopy $copy) => $copy->isInCirculation())
             ->filter(fn (BookCopy $copy) => is_callable($canViewOperationalDetails)
                 ? (bool) $canViewOperationalDetails($copy)
                 : $canViewOperationalDetails)
@@ -97,6 +98,10 @@ class AttachCurrentReservationForCopies
         }
 
         if (! $reservation->isPending()) {
+            return false;
+        }
+
+        if ($copy->operationalStatus() !== 'laisva') {
             return false;
         }
 

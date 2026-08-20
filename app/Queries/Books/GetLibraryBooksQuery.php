@@ -7,41 +7,25 @@ use App\Models\BookCopy;
 use App\Models\Branch;
 use App\Models\Library;
 use App\Models\Loan;
+use App\Models\Reservation;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 
 class GetLibraryBooksQuery
 {
     public function handle(?User $user, array $filters = []): LengthAwarePaginator
     {
-        $perPage = max(1, min((int) ($filters['per_page'] ?? 25), 100));
-        $search = trim((string) ($filters['search'] ?? ''));
-        $categoryId = $filters['category_id'] ?? null;
-        $authorId = $filters['author_id'] ?? null;
-        $publisherId = $filters['publisher_id'] ?? null;
-        $availability = $filters['availability'] ?? null;
-        $libraryIds = $this->visibleLibraryIds($user, $filters);
-        $branchId = $this->visibleBranchId($user, $filters, $libraryIds);
-        $sort = $filters['sort'] ?? 'title';
-        $direction = strtolower($filters['direction'] ?? 'asc');
+        [
+            'query' => $query,
+            'libraryIds' => $libraryIds,
+            'branchId' => $branchId,
+            'sort' => $sort,
+            'direction' => $direction,
+            'perPage' => $perPage,
+        ] = $this->filteredBookQuery($user, $filters);
 
-        if (! in_array($direction, ['asc', 'desc'], true)) {
-            $direction = 'asc';
-        }
-
-        $allowedSorts = [
-            'title',
-            'publication_year',
-            'copies_count',
-            'created_at',
-            'updated_at',
-        ];
-
-        if (! in_array($sort, $allowedSorts, true)) {
-            $sort = 'title';
-        }
-
-        $query = Book::query()
+        $query
             ->with([
                 'publisher:id,name',
                 'categories:id,name',
@@ -71,23 +55,10 @@ class GetLibraryBooksQuery
                 'created_at',
                 'updated_at',
             ])
-            ->when(
-                is_array($libraryIds),
-                fn ($builder) => $libraryIds === []
-                    ? $builder->whereRaw('1 = 0')
-                    : $builder->whereHas('bookCopies', fn ($copyQuery) => $copyQuery
-                        ->withoutGlobalScope('library')
-                        ->whereIn('library_id', $libraryIds))
-            )
-            ->when(
-                filled($filters['branch_id'] ?? null) && $branchId === null,
-                fn ($builder) => $builder->whereRaw('1 = 0')
-            )
-            ->when(
-                $branchId,
-                fn ($builder) => $builder->whereHas('bookCopies', fn ($copyQuery) => $this->applyCopyVisibility($copyQuery, $libraryIds, $branchId))
-            )
             ->withCount([
+                'bookCopies as total_copies_count' => function ($copyQuery) use ($libraryIds, $branchId) {
+                    $this->applyCopyVisibility($copyQuery, $libraryIds, $branchId);
+                },
                 'bookCopies as copies_count' => function ($copyQuery) use ($libraryIds, $branchId) {
                     $this->applyCopyVisibility($copyQuery, $libraryIds, $branchId);
                 },
@@ -117,6 +88,30 @@ class GetLibraryBooksQuery
                     }
 
                     $reservationQuery->active();
+                },
+                'reservations as ready_reservations_count' => function ($reservationQuery) use ($libraryIds) {
+                    if (is_array($libraryIds)) {
+                        $reservationQuery->whereIn('library_id', $libraryIds);
+                    }
+
+                    $reservationQuery
+                        ->where('status', Reservation::STATUS_READY)
+                        ->whereNull('fulfilled_at')
+                        ->whereNull('cancelled_at');
+                },
+                'reservations as waiting_reservations_count' => function ($reservationQuery) use ($libraryIds) {
+                    if (is_array($libraryIds)) {
+                        $reservationQuery->whereIn('library_id', $libraryIds);
+                    }
+
+                    $reservationQuery->pending();
+                },
+                'reservations as pending_reservations_count' => function ($reservationQuery) use ($libraryIds) {
+                    if (is_array($libraryIds)) {
+                        $reservationQuery->whereIn('library_id', $libraryIds);
+                    }
+
+                    $reservationQuery->pending();
                 },
                 'reservations as current_user_active_reservations_count' => function ($reservationQuery) use ($user, $libraryIds) {
                     if ($user?->effectiveRole($user->activeLibraryId()) !== User::ROLE_MEMBER) {
@@ -150,6 +145,93 @@ class GetLibraryBooksQuery
                         ->whereIn('loans.status', Loan::ACTIVE_STATUSES);
                 },
             ]);
+
+        $query->orderBy($sort, $direction)->orderBy('id');
+
+        return $query->paginate($perPage)->withQueryString();
+    }
+
+    /**
+     * @return array{total_copies: int, available_copies: int}
+     */
+    public function summary(?User $user, array $filters = []): array
+    {
+        [
+            'query' => $query,
+            'libraryIds' => $libraryIds,
+            'branchId' => $branchId,
+        ] = $this->filteredBookQuery($user, $filters);
+
+        $bookIds = (clone $query)->select('books.id');
+
+        $copiesQuery = BookCopy::query()
+            ->withoutGlobalScope('library')
+            ->whereIn('book_id', $bookIds);
+
+        $this->applyCopyVisibility($copiesQuery, $libraryIds, $branchId);
+
+        return [
+            'total_copies' => (clone $copiesQuery)->count(),
+            'available_copies' => (clone $copiesQuery)->operationallyAvailable()->count(),
+        ];
+    }
+
+    /**
+     * @return array{
+     *     query: Builder,
+     *     libraryIds: list<int>|null,
+     *     branchId: int|null,
+     *     sort: string,
+     *     direction: string,
+     *     perPage: int
+     * }
+     */
+    private function filteredBookQuery(?User $user, array $filters): array
+    {
+        $perPage = max(1, min((int) ($filters['per_page'] ?? 25), 100));
+        $search = trim((string) ($filters['search'] ?? ''));
+        $categoryId = $filters['category_id'] ?? null;
+        $authorId = $filters['author_id'] ?? null;
+        $publisherId = $filters['publisher_id'] ?? null;
+        $availability = $filters['availability'] ?? null;
+        $libraryIds = $this->visibleLibraryIds($user, $filters);
+        $branchId = $this->visibleBranchId($user, $filters, $libraryIds);
+        $sort = $filters['sort'] ?? 'title';
+        $direction = strtolower($filters['direction'] ?? 'asc');
+
+        if (! in_array($direction, ['asc', 'desc'], true)) {
+            $direction = 'asc';
+        }
+
+        $allowedSorts = [
+            'title',
+            'publication_year',
+            'copies_count',
+            'created_at',
+            'updated_at',
+        ];
+
+        if (! in_array($sort, $allowedSorts, true)) {
+            $sort = 'title';
+        }
+
+        $query = Book::query()
+            ->when(
+                is_array($libraryIds),
+                fn ($builder) => $libraryIds === []
+                    ? $builder->whereRaw('1 = 0')
+                    : $builder->whereHas('bookCopies', fn ($copyQuery) => $copyQuery
+                        ->withoutGlobalScope('library')
+                        ->whereIn('library_id', $libraryIds))
+            )
+            ->when(
+                filled($filters['branch_id'] ?? null) && $branchId === null,
+                fn ($builder) => $builder->whereRaw('1 = 0')
+            )
+            ->when(
+                $branchId,
+                fn ($builder) => $builder->whereHas('bookCopies', fn ($copyQuery) => $this->applyCopyVisibility($copyQuery, $libraryIds, $branchId))
+            );
 
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
@@ -185,7 +267,7 @@ class GetLibraryBooksQuery
             $query->where('publisher_id', $publisherId);
         }
 
-        if ($availability === BookCopy::STATUS_AVAILABLE) {
+        if ($availability === 'laisva') {
             $query->whereHas('bookCopies', function ($copyQuery) use ($libraryIds, $branchId) {
                 $this->applyCopyVisibility($copyQuery, $libraryIds, $branchId);
 
@@ -205,9 +287,14 @@ class GetLibraryBooksQuery
                 });
         }
 
-        $query->orderBy($sort, $direction)->orderBy('id');
-
-        return $query->paginate($perPage)->withQueryString();
+        return [
+            'query' => $query,
+            'libraryIds' => $libraryIds,
+            'branchId' => $branchId,
+            'sort' => $sort,
+            'direction' => $direction,
+            'perPage' => $perPage,
+        ];
     }
 
     /**
@@ -230,7 +317,7 @@ class GetLibraryBooksQuery
             return $libraryId ? [(int) $libraryId] : null;
         }
 
-        if ($user->role === 'narys') {
+        if ($user->role === User::ROLE_MEMBER && ! ($filters['active_library_only'] ?? false)) {
             return $user->manageableLibraryIds();
         }
 

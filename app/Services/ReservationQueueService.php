@@ -188,12 +188,22 @@ class ReservationQueueService
      */
     public function getEligibleReservationForCopy(BookCopy $copy, array $exceptReservationIds = [], bool $lockForUpdate = false): ?Reservation
     {
+        if (! $copy->isInCirculation()) {
+            return null;
+        }
+
+        $canServeWaitingReservation = $copy->operationalStatus() === 'laisva';
+
         $query = $this->activeReservationsQuery((int) $copy->library_id, (int) $copy->book_id)
             ->where(function (Builder $scopeQuery) use ($copy) {
                 $this->scopeToServiceableBranch($scopeQuery, (int) $copy->branch_id);
             })
-            ->where(function (Builder $assignmentQuery) use ($copy) {
-                $assignmentQuery->where('status', Reservation::STATUS_WAITING);
+            ->where(function (Builder $assignmentQuery) use ($copy, $canServeWaitingReservation) {
+                if ($canServeWaitingReservation) {
+                    $assignmentQuery->where('status', Reservation::STATUS_WAITING);
+                } else {
+                    $assignmentQuery->whereRaw('1 = 0');
+                }
 
                 $assignmentQuery->orWhere(function (Builder $readyQuery) use ($copy) {
                     $readyQuery

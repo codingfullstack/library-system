@@ -67,8 +67,8 @@ class ListExportController extends Controller
 
         $rows = $books->map(function ($book) {
             $status = $book->available_copies_count > 0
-                ? 'Aktyvi'
-                : ($book->loaned_copies_count > 0 ? 'Išduota' : 'Neprieinama');
+                ? 'Galima'
+                : 'Neprieinama';
 
             return [
                 $book->title,
@@ -87,7 +87,7 @@ class ListExportController extends Controller
 
         return $this->csvResponse(
             'knygos',
-            ['Pavadinimas', 'Paantraštė', 'ISBN', 'Autoriai', 'Kategorijos', 'Leidykla', 'Kopijos', 'Laisvi', 'Rezervacijos', 'Būsena', 'Atnaujinta'],
+            ['Pavadinimas', 'Paantraštė', 'ISBN', 'Autoriai', 'Kategorijos', 'Leidykla', 'Kopijos', 'Laisvi', 'Aktyvios rezervacijos', 'Būsena', 'Atnaujinta'],
             $rows
         );
     }
