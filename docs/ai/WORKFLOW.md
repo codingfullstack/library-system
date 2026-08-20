@@ -53,3 +53,13 @@ The handoff must include:
 - `.ai/runtime/HANDOFF.md`
 
 Runtime handoff and review files are ignored by Git and must not be committed.
+
+## Git Ownership In Sandboxed Runs
+
+The workflow scripts route all Git commands through a shared wrapper that adds per-command trust for the exact worktree being accessed:
+
+```text
+git -c safe.directory=<absolute-worktree-path> -C <absolute-worktree-path> ...
+```
+
+This is intentionally scoped to one concrete path at a time. The workflow does not require `safe.directory=*` and does not write global, system, or repository Git trust configuration.

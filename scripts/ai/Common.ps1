@@ -1,22 +1,34 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Resolve-AbsolutePath {
+    param([Parameter(Mandatory = $true)][string] $Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        throw 'Path cannot be empty.'
+    }
+
+    return [IO.Path]::GetFullPath($Path)
+}
+
 function Invoke-Git {
     param(
         [Parameter(Mandatory = $true)][string] $Repo,
         [Parameter(Mandatory = $true)][string[]] $Arguments
     )
 
+    $safeDirectory = Resolve-AbsolutePath -Path $Repo
+    $safeDirectoryConfig = $safeDirectory -replace '\\', '/'
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        $output = & git -C $Repo @Arguments 2>&1
+        $output = & git -c "safe.directory=$safeDirectoryConfig" -C $safeDirectory @Arguments 2>&1
     } finally {
         $ErrorActionPreference = $previousErrorActionPreference
     }
 
     if ($LASTEXITCODE -ne 0) {
-        throw "git $($Arguments -join ' ') failed in ${Repo}: $output"
+        throw "git $($Arguments -join ' ') failed in ${safeDirectory}: $output"
     }
 
     return @($output)
@@ -26,10 +38,10 @@ function Get-RepoRoot {
     param([string] $Path = '')
 
     if ([string]::IsNullOrWhiteSpace($Path)) {
-        $Path = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+        return Resolve-AbsolutePath -Path (Join-Path $PSScriptRoot '../..')
     }
 
-    $root = @(Invoke-Git -Repo $Path -Arguments @('rev-parse', '--show-toplevel'))
+    $root = @(Invoke-Git -Repo (Resolve-AbsolutePath -Path $Path) -Arguments @('rev-parse', '--show-toplevel'))
     return [string] $root[0]
 }
 
@@ -91,7 +103,8 @@ function Get-DefaultBranchName {
 function Get-WorkflowPaths {
     param([string] $Repo = (Get-RepoRoot))
 
-    $parent = Split-Path -Parent $Repo
+    $repoRoot = Resolve-AbsolutePath -Path $Repo
+    $parent = Split-Path -Parent $repoRoot
 
     return [pscustomobject] @{
         Human = Join-Path $parent 'library-system'
