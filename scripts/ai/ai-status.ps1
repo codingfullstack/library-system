@@ -27,5 +27,13 @@ foreach ($path in @($paths.Human, $paths.Codex, $paths.Claude)) {
         Write-Output ''
         Write-Output "Status for ${path}:"
         Invoke-Git -Repo $path -Arguments @('status', '--short', '--branch') | ForEach-Object { Write-Output $_ }
+
+        if ((Resolve-AbsolutePath -Path $path) -eq (Resolve-AbsolutePath -Path $paths.Codex)) {
+            $environment = Get-WorktreeEnvironmentStatus -Repo $path
+            Write-Output "Environment: $($environment.Status)"
+            if ($environment.Missing.Count -gt 0) {
+                Write-Output "Missing: $($environment.Missing -join ', ')"
+            }
+        }
     }
 }

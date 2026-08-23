@@ -42,7 +42,9 @@ if (Test-Path $CodexPath) {
         throw "Codex workspace already exists at $CodexPath on branch '$currentBranch', expected '$BranchName'."
     }
 
-    Write-Output "Codex workspace already ready: $CodexPath"
+    Write-Output "Codex workspace already exists: $CodexPath"
+    $environment = Get-WorktreeEnvironmentStatus -Repo $CodexPath
+    Write-Output "Environment: $($environment.Status)"
     exit 0
 }
 
@@ -59,10 +61,29 @@ if ($branchExists) {
     Invoke-Git -Repo $repo -Arguments @('worktree', 'add', '-b', $BranchName, $CodexPath, $BaseRef) | Out-Null
 }
 
-$statePath = Write-WorkflowState -Repo $CodexPath -State @{
+$state = @{
     branch = $BranchName
     base_ref = $BaseRef
     base_sha = $baseSha
+    bootstrap_status = 'PENDING'
+}
+$statePath = Write-WorkflowState -Repo $CodexPath -State $state
+
+try {
+    & (Join-Path $PSScriptRoot 'ai-bootstrap-worktree.ps1') -WorktreePath $CodexPath
+    $state.bootstrap_status = 'READY'
+    $statePath = Write-WorkflowState -Repo $CodexPath -State $state
+} catch {
+    $state.bootstrap_status = 'NOT_READY'
+    $state.bootstrap_error = $_.Exception.Message
+    $statePath = Write-WorkflowState -Repo $CodexPath -State $state
+    Write-Output 'TASK CREATED / BOOTSTRAP FAILED'
+    Write-Output "Codex workspace: $CodexPath"
+    Write-Output "Branch: $BranchName"
+    Write-Output "Base: $BaseRef"
+    Write-Output "Base SHA: $baseSha"
+    Write-Output "State: $statePath"
+    throw "Bootstrap failed. The task branch and worktree were left intact: $($_.Exception.Message)"
 }
 
 Write-Output "Codex workspace: $CodexPath"
@@ -70,3 +91,4 @@ Write-Output "Branch: $BranchName"
 Write-Output "Base: $BaseRef"
 Write-Output "Base SHA: $baseSha"
 Write-Output "State: $statePath"
+Write-Output 'Environment: READY'

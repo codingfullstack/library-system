@@ -11,6 +11,18 @@ function Resolve-AbsolutePath {
     return [IO.Path]::GetFullPath($Path)
 }
 
+function Resolve-RepoRelativePath {
+    param(
+        [Parameter(Mandatory = $true)][string] $Repo,
+        [Parameter(Mandatory = $true)][string] $Path
+    )
+
+    if ([IO.Path]::IsPathRooted($Path)) {
+        return Resolve-AbsolutePath -Path $Path
+    }
+
+    return Resolve-AbsolutePath -Path (Join-Path (Resolve-AbsolutePath -Path $Repo) $Path)
+}
 function Invoke-Git {
     param(
         [Parameter(Mandatory = $true)][string] $Repo,
@@ -34,6 +46,38 @@ function Invoke-Git {
     return @($output)
 }
 
+function Invoke-ExternalCommand {
+    param(
+        [Parameter(Mandatory = $true)][string] $WorkingDirectory,
+        [Parameter(Mandatory = $true)][string] $FilePath,
+        [Parameter(Mandatory = $true)][string[]] $Arguments,
+        [string] $DisplayName = ''
+    )
+
+    $directory = Resolve-AbsolutePath -Path $WorkingDirectory
+    if ([string]::IsNullOrWhiteSpace($DisplayName)) {
+        $DisplayName = $FilePath
+    }
+
+    $previousLocation = Get-Location
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        Set-Location -LiteralPath $directory
+        $output = & $FilePath @Arguments 2>&1
+    } finally {
+        $exitCode = $LASTEXITCODE
+        $ErrorActionPreference = $previousErrorActionPreference
+        Set-Location -LiteralPath $previousLocation
+    }
+
+    if ($exitCode -ne 0) {
+        throw "$DisplayName $($Arguments -join ' ') failed in ${directory}: $output"
+    }
+
+    return @($output)
+}
+
 function Get-RepoRoot {
     param([string] $Path = '')
 
@@ -43,6 +87,30 @@ function Get-RepoRoot {
 
     $root = @(Invoke-Git -Repo (Resolve-AbsolutePath -Path $Path) -Arguments @('rev-parse', '--show-toplevel'))
     return [string] $root[0]
+}
+
+function Assert-RepositoryWorktree {
+    param(
+        [Parameter(Mandatory = $true)][string] $CoordinationRepo,
+        [Parameter(Mandatory = $true)][string] $WorktreePath
+    )
+
+    $target = Resolve-AbsolutePath -Path $WorktreePath
+    if (-not (Test-Path -LiteralPath $target -PathType Container)) {
+        throw "Worktree path does not exist: $target"
+    }
+
+    $targetCommonDir = @(Invoke-Git -Repo $target -Arguments @('rev-parse', '--git-common-dir'))[0]
+    $repoCommonDir = @(Invoke-Git -Repo $CoordinationRepo -Arguments @('rev-parse', '--git-common-dir'))[0]
+
+    $targetCommonFull = Resolve-RepoRelativePath -Repo $target -Path $targetCommonDir
+    $repoCommonFull = Resolve-RepoRelativePath -Repo $CoordinationRepo -Path $repoCommonDir
+
+    if ($targetCommonFull -ne $repoCommonFull) {
+        throw "Path is not a worktree of this repository: $target"
+    }
+
+    return $target
 }
 
 function Get-CurrentBranch {
@@ -173,3 +241,97 @@ function Write-WorkflowState {
 
     return $statePath
 }
+
+function Test-GitIgnored {
+    param(
+        [Parameter(Mandatory = $true)][string] $Repo,
+        [Parameter(Mandatory = $true)][string] $RelativePath
+    )
+
+    try {
+        Invoke-Git -Repo $Repo -Arguments @('check-ignore', '--quiet', $RelativePath) | Out-Null
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Test-LaravelBootReady {
+    param([Parameter(Mandatory = $true)][string] $Repo)
+
+    $artisan = Join-Path $Repo 'artisan'
+    if (-not (Test-Path -LiteralPath $artisan -PathType Leaf)) {
+        return $false
+    }
+
+    $previousLocation = Get-Location
+    try {
+        Set-Location -LiteralPath $Repo
+        Invoke-ExternalCommand -WorkingDirectory $Repo -FilePath 'php' -Arguments @('artisan', '--version') -DisplayName 'php artisan' | Out-Null
+        return $true
+    } catch {
+        return $false
+    } finally {
+        Set-Location -LiteralPath $previousLocation
+    }
+}
+
+function Get-WorktreeEnvironmentStatus {
+    param([Parameter(Mandatory = $true)][string] $Repo)
+
+    $repoPath = Resolve-AbsolutePath -Path $Repo
+    $signals = @()
+    $missing = @()
+
+    if (Test-Path -LiteralPath (Join-Path $repoPath 'composer.lock')) {
+        if (Test-Path -LiteralPath (Join-Path $repoPath 'vendor/autoload.php') -PathType Leaf) {
+            $signals += 'vendor/autoload.php'
+        } else {
+            $missing += 'vendor/autoload.php'
+        }
+    }
+
+    if (Test-Path -LiteralPath (Join-Path $repoPath '.env') -PathType Leaf) {
+        $signals += '.env'
+    } elseif (Test-Path -LiteralPath (Join-Path $repoPath '.env.example') -PathType Leaf) {
+        $missing += '.env'
+    }
+
+    if (Test-Path -LiteralPath (Join-Path $repoPath 'package.json') -PathType Leaf) {
+        if (Test-Path -LiteralPath (Join-Path $repoPath 'node_modules') -PathType Container) {
+            $signals += 'node_modules'
+        } else {
+            $missing += 'node_modules'
+        }
+
+        if (Test-Path -LiteralPath (Join-Path $repoPath 'public/build/manifest.json') -PathType Leaf) {
+            $signals += 'public/build/manifest.json'
+        } else {
+            $missing += 'public/build/manifest.json'
+        }
+    }
+
+    $bootReady = Test-LaravelBootReady -Repo $repoPath
+    if ($bootReady) {
+        $signals += 'laravel-boot'
+    } else {
+        $missing += 'laravel-boot'
+    }
+
+    if ($missing.Count -eq 0 -and $signals.Count -gt 0) {
+        $status = 'READY'
+    } elseif ($signals.Count -gt 0 -or $missing.Count -gt 0) {
+        $status = 'NOT_READY'
+    } else {
+        $status = 'UNKNOWN'
+    }
+
+    return [pscustomobject] @{
+        Status = $status
+        Present = $signals
+        Missing = $missing
+    }
+}
+
+
+
