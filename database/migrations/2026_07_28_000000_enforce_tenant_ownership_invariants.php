@@ -166,8 +166,8 @@ return new class extends Migration
 
         $this->addForeign('reservations', ['library_id', 'user_id'], 'library_memberships', ['library_id', 'user_id'], 'cascade', 'cascade', 'reservations_user_membership_fk');
         $this->addForeign('reservations', ['branch_id', 'library_id'], 'branches', ['id', 'library_id'], 'restrict', 'cascade', 'reservations_branch_library_fk');
-        $this->addForeign('reservations', ['pickup_branch_id', 'library_id'], 'branches', ['id', 'library_id'], 'restrict', 'cascade', 'reservations_pickup_branch_library_fk');
-        $this->addForeign('reservations', ['assigned_book_copy_id', 'library_id'], 'book_copies', ['id', 'library_id'], 'restrict', 'cascade', 'reservations_assigned_copy_library_fk');
+        $this->addForeign('reservations', ['pickup_branch_id', 'library_id'], 'branches', ['id', 'library_id'], 'restrict', 'restrict', 'reservations_pickup_branch_library_fk');
+        $this->addForeign('reservations', ['assigned_book_copy_id', 'library_id'], 'book_copies', ['id', 'library_id'], 'restrict', 'restrict', 'reservations_assigned_copy_library_fk');
 
         $this->addForeign('scan_logs', ['book_copy_id', 'library_id'], 'book_copies', ['id', 'library_id'], 'restrict', 'cascade', 'scan_logs_book_copy_library_fk');
     }
