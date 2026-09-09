@@ -58,17 +58,9 @@ return new class extends Migration
 
     private function addCompositeIndexes(): void
     {
-        Schema::table('branches', function (Blueprint $table) {
-            $table->unique(['id', 'library_id'], 'branches_id_library_unique');
-        });
-
-        Schema::table('locations', function (Blueprint $table) {
-            $table->unique(['id', 'library_id'], 'locations_id_library_unique');
-        });
-
-        Schema::table('book_copies', function (Blueprint $table) {
-            $table->unique(['id', 'library_id'], 'book_copies_id_library_unique');
-        });
+        $this->addUniqueIfMissing('branches', ['id', 'library_id'], 'branches_id_library_unique');
+        $this->addUniqueIfMissing('locations', ['id', 'library_id'], 'locations_id_library_unique');
+        $this->addUniqueIfMissing('book_copies', ['id', 'library_id'], 'book_copies_id_library_unique');
     }
 
     private function dropCompositeIndexes(): void
@@ -88,34 +80,22 @@ return new class extends Migration
 
     private function addCompositeChildIndexes(): void
     {
-        Schema::table('locations', function (Blueprint $table) {
-            $table->index(['branch_id', 'library_id'], 'locations_branch_library_index');
-        });
+        $this->addIndexIfMissing('locations', ['branch_id', 'library_id'], 'locations_branch_library_index');
 
-        Schema::table('book_copies', function (Blueprint $table) {
-            $table->index(['branch_id', 'library_id'], 'book_copies_branch_library_index');
-            $table->index(['location_id', 'library_id'], 'book_copies_location_library_index');
-        });
+        $this->addIndexIfMissing('book_copies', ['branch_id', 'library_id'], 'book_copies_branch_library_index');
+        $this->addIndexIfMissing('book_copies', ['location_id', 'library_id'], 'book_copies_location_library_index');
 
-        Schema::table('library_memberships', function (Blueprint $table) {
-            $table->index(['branch_id', 'library_id'], 'memberships_branch_library_index');
-        });
+        $this->addIndexIfMissing('library_memberships', ['branch_id', 'library_id'], 'memberships_branch_library_index');
 
-        Schema::table('loans', function (Blueprint $table) {
-            $table->index(['book_copy_id', 'library_id'], 'loans_book_copy_library_index');
-            $table->index(['library_id', 'user_id'], 'loans_user_membership_index');
-        });
+        $this->addIndexIfMissing('loans', ['book_copy_id', 'library_id'], 'loans_book_copy_library_index');
+        $this->addIndexIfMissing('loans', ['library_id', 'user_id'], 'loans_user_membership_index');
 
-        Schema::table('reservations', function (Blueprint $table) {
-            $table->index(['library_id', 'user_id'], 'reservations_user_membership_index');
-            $table->index(['branch_id', 'library_id'], 'reservations_branch_library_index');
-            $table->index(['pickup_branch_id', 'library_id'], 'reservations_pickup_branch_library_index');
-            $table->index(['assigned_book_copy_id', 'library_id'], 'reservations_assigned_copy_library_index');
-        });
+        $this->addIndexIfMissing('reservations', ['library_id', 'user_id'], 'reservations_user_membership_index');
+        $this->addIndexIfMissing('reservations', ['branch_id', 'library_id'], 'reservations_branch_library_index');
+        $this->addIndexIfMissing('reservations', ['pickup_branch_id', 'library_id'], 'reservations_pickup_branch_library_index');
+        $this->addIndexIfMissing('reservations', ['assigned_book_copy_id', 'library_id'], 'reservations_assigned_copy_library_index');
 
-        Schema::table('scan_logs', function (Blueprint $table) {
-            $table->index(['book_copy_id', 'library_id'], 'scan_logs_book_copy_library_index');
-        });
+        $this->addIndexIfMissing('scan_logs', ['book_copy_id', 'library_id'], 'scan_logs_book_copy_library_index');
     }
 
     private function dropCompositeChildIndexes(): void
@@ -250,6 +230,10 @@ return new class extends Migration
         string $onUpdate,
         string $name
     ): void {
+        if ($this->foreignExists($table, $name)) {
+            return;
+        }
+
         $columnList = implode(', ', array_map(fn ($column) => "`{$column}`", $columns));
         $referenceList = implode(', ', array_map(fn ($column) => "`{$column}`", $references));
 
@@ -258,15 +242,55 @@ return new class extends Migration
         );
     }
 
-    private function dropForeignIfExists(string $table, string $constraint): void
+    /**
+     * @param  list<string>  $columns
+     */
+    private function addUniqueIfMissing(string $tableName, array $columns, string $indexName): void
     {
-        $exists = DB::table('information_schema.REFERENTIAL_CONSTRAINTS')
+        if ($this->indexExists($tableName, $indexName)) {
+            return;
+        }
+
+        Schema::table($tableName, function (Blueprint $table) use ($columns, $indexName) {
+            $table->unique($columns, $indexName);
+        });
+    }
+
+    /**
+     * @param  list<string>  $columns
+     */
+    private function addIndexIfMissing(string $tableName, array $columns, string $indexName): void
+    {
+        if ($this->indexExists($tableName, $indexName)) {
+            return;
+        }
+
+        Schema::table($tableName, function (Blueprint $table) use ($columns, $indexName) {
+            $table->index($columns, $indexName);
+        });
+    }
+
+    private function indexExists(string $table, string $index): bool
+    {
+        return DB::table('information_schema.STATISTICS')
+            ->where('TABLE_SCHEMA', DB::getDatabaseName())
+            ->where('TABLE_NAME', $table)
+            ->where('INDEX_NAME', $index)
+            ->exists();
+    }
+
+    private function foreignExists(string $table, string $constraint): bool
+    {
+        return DB::table('information_schema.REFERENTIAL_CONSTRAINTS')
             ->where('CONSTRAINT_SCHEMA', DB::getDatabaseName())
             ->where('TABLE_NAME', $table)
             ->where('CONSTRAINT_NAME', $constraint)
             ->exists();
+    }
 
-        if ($exists) {
+    private function dropForeignIfExists(string $table, string $constraint): void
+    {
+        if ($this->foreignExists($table, $constraint)) {
             DB::statement("ALTER TABLE `{$table}` DROP FOREIGN KEY `{$constraint}`");
         }
     }
