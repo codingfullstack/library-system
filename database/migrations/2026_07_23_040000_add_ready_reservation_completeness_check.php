@@ -33,6 +33,8 @@ return new class extends Migration
             return;
         }
 
+        $this->restrictPickupBranchForeignKey();
+
         DB::statement("
             ALTER TABLE reservations
             ADD CONSTRAINT ".self::CONSTRAINT."
@@ -55,5 +57,28 @@ return new class extends Migration
         }
 
         DB::statement('ALTER TABLE reservations DROP CONSTRAINT '.self::CONSTRAINT);
+    }
+
+    private function restrictPickupBranchForeignKey(): void
+    {
+        $foreignKey = DB::selectOne("
+            SELECT rc.DELETE_RULE AS delete_rule
+            FROM information_schema.referential_constraints rc
+            WHERE rc.constraint_schema = database()
+              AND rc.table_name = 'reservations'
+              AND rc.constraint_name = 'reservations_pickup_branch_id_foreign'
+        ");
+
+        $deleteRule = $foreignKey->delete_rule ?? $foreignKey->DELETE_RULE ?? null;
+
+        if ($deleteRule === 'RESTRICT' || $deleteRule === 'NO ACTION') {
+            return;
+        }
+
+        DB::statement('ALTER TABLE reservations DROP FOREIGN KEY reservations_pickup_branch_id_foreign');
+        DB::statement(
+            'ALTER TABLE reservations ADD CONSTRAINT reservations_pickup_branch_id_foreign '.
+            'FOREIGN KEY (pickup_branch_id) REFERENCES branches(id) ON DELETE RESTRICT'
+        );
     }
 };
