@@ -11,8 +11,8 @@ return new class extends Migration
             return;
         }
 
-        $deleteRule = DB::selectOne("
-            SELECT rc.delete_rule
+        $foreignKey = DB::selectOne("
+            SELECT rc.DELETE_RULE AS delete_rule
             FROM information_schema.referential_constraints rc
             JOIN information_schema.key_column_usage kcu
               ON kcu.constraint_schema = rc.constraint_schema
@@ -21,7 +21,9 @@ return new class extends Migration
             WHERE rc.constraint_schema = database()
               AND rc.table_name = 'reservations'
               AND kcu.column_name = 'assigned_book_copy_id'
-        ")?->delete_rule;
+        ");
+
+        $deleteRule = $foreignKey->delete_rule ?? $foreignKey->DELETE_RULE ?? null;
 
         if ($deleteRule === 'RESTRICT' || $deleteRule === 'NO ACTION') {
             return;
